@@ -1,5 +1,66 @@
 # wsn-testbed
 
+## Overview
+```mermaid
+graph TD
+    subgraph main.c
+        main[main]
+        send_t[sendT_func]
+        recv_t[recvT_func]
+    end
+
+    subgraph ALOHA.c
+        ALOHA_sendMsgQ_enqueue[sendMsgQ_enqueue]
+        ALOHA_sendT_func[sendMsg_func]
+        ALOHA_recvT_func[recvMsg_func]
+        ALOHA_recvMsgQ_timeddequeue[recvMsgQ_timeddequeue]
+        ALOHA_MAC_send[MAC_send]
+        ALOHA_MAC_timedrecv[MAC_timedrecv]
+        ALOHA_sendMsgQ[(sendMsgQ)]
+        ALOHA_recvMsgQ[(recvMsgQ)]
+    end
+
+    subgraph SX1262.c
+        SX1262_send[SX1262_send]
+        SX1262_timedrecv[SX1262_timedrecv]
+        SX1262_recvQ_timeddequeue[recvQ_timeddequeue]
+        SX1262_sendQ_enqueue[sendQ_enqueue]
+        SX1262_send_t[sendBytes_func]
+        SX1262_recv_t[recvBytes_func]
+        SX1262_recvQ_enqueue[recvQ_enqueue]
+        SX1262_sendQ[("sendQ")]
+        SX1262_recvQ[(recvQ)]
+    end
+
+    main-->|pthread_create| send_t
+    main-->|pthread_create| recv_t
+    send_t-->ALOHA_MAC_send
+    -->ALOHA_sendMsgQ_enqueue
+    -->ALOHA_sendMsgQ
+    -.-|async|ALOHA_sendT_func
+    --> SX1262_send
+    -->SX1262_sendQ_enqueue
+    -->SX1262_sendQ
+    -.-|async|SX1262_send_t
+    -->|TX| Serial
+
+    Serial-->|RX|SX1262_recv_t
+    -->SX1262_recvQ_enqueue
+    -->SX1262_recvQ    
+
+    recv_t-->ALOHA_MAC_timedrecv
+    -->ALOHA_recvMsgQ_timeddequeue
+
+
+    ALOHA_recvMsgQ-->ALOHA_recvMsgQ_timeddequeue
+    ALOHA_recvT_func-->SX1262_timedrecv
+    -->SX1262_recvQ_timeddequeue
+    -->SX1262_recvQ
+
+    ALOHA_recvT_func-.->|async|ALOHA_recvMsgQ
+
+```
+
 ## Sequence Diagram 
 ```mermaid
 sequenceDiagram
@@ -18,7 +79,7 @@ sequenceDiagram
     SX1262.c->>SX1262.c: recvT_func()
     SX1262.c->>ALOHA.c: recvQ_enqueue(bytes)
     ALOHA.c->>ALOHA.c: recvT_func()
-    ALOHA.c->>ALOHA.c: recvMsgQ_enqueue(msg)
+    ALOHA.c->>ALOHA.c: recvMsgQ_timeddequeue(msg)
     main.c->>ALOHA.c: recvMsgQ_dequeue()
     ALOHA.c-->>main.c: Received message
 
@@ -29,8 +90,10 @@ sequenceDiagram
 classDiagram
     class MAC {
         -addr: uint8_t
-        -debug: bool
+        -maxtrials: uint8_t
+        -noiseThreshold: int8_t
         -recvTimeout: uint32_t
+        -debug: bool
         -recvH: MAC_Header
         -RSSI: uint8_t
         +MAC_init()
@@ -46,13 +109,13 @@ classDiagram
         -recvT_func()
         -sendT_func()
         -recvMsgQ_init()
-        -recvMsgQ_enqueue()
+        -recvMsgQ_timeddequeue()
         -recvMsgQ_dequeue()
         -recvMsgQ_trydequeue()
         -recvMsgQ_timeddequeue()
         -sendMsgQ_init()
         -sendMsgQ_enqueue()
-        -sendMsgQ_tryenqueue()
+        -sendMsgQ_dequeue()
         -acknowledged()
         -acknowledgement()
     }
@@ -65,17 +128,18 @@ classDiagram
         -recvQ_init()
         -recvQ_enqueue()
         -recvQ_dequeue()
-        -recvQ_trydequeue()
-        -recvQ_timeddequeue()
         -sendQ_init()
         -sendQ_enqueue()
         -sendQ_dequeue()
         +SX1262_send()
         +SX1262_recv()
+        +SX1262_timedrecv()
+        +SX1262_tryrecv()
     }
 
     MAC ..> ALOHA
     ALOHA ..> SX1262
+
 
 ```
 ## Activity Diagrams
@@ -120,6 +184,7 @@ graph TD
     SignalCompletion-->End
 
 
+
 ```
 
 
@@ -133,5 +198,5 @@ stateDiagram-v2
     Transmitting --> Idle: Transmission complete
     Idle --> Receiving: SX1262_recv()
     Receiving --> Processing: recvQ_enqueue()
-    Processing --> Idle: recvMsgQ_enqueue()
+    Processing --> Idle: recvMsgQ_timeddequeue()
 ```
