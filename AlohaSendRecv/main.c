@@ -9,12 +9,10 @@
 #include "ALOHA/ALOHA.h"
 #include "GPIO/GPIO.h"
 #include "common.h"
+#include "util.h"
 
-#define NUM_NODES 3
-
-const unsigned char nodes[NUM_NODES] = {'\x21', '\x22', '\x06'};
-
-unsigned int self;
+uint8_t self;
+unsigned int sleepDuration;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -41,8 +39,8 @@ void receive(MAC *mac)
 
 void send(MAC *mac)
 {
-	char buffer[18];
-	sprintf(buffer, "Send-Receive Pi %d\n", self);
+	char buffer[7];
+	sprintf(buffer, "Pi %02X\n", self);
 
 	// send buffer
 	MAC_send(mac, ADDR_Gateway, buffer, sizeof(buffer));
@@ -57,7 +55,7 @@ void *receiveT_func(void *args)
 		// Puffer für größtmögliche Nachricht
 		unsigned char buffer[240];
 
-		printf("Waiting for message...\n");
+		// printf("Waiting for message...\n");
 		fflush(stdout);
 
 		// Blockieren bis eine Nachricht ankommt
@@ -65,9 +63,9 @@ void *receiveT_func(void *args)
 
 		MAC_timedrecv(mac, buffer, 2);
 
-		printf("Received : %s\n", buffer);
+		printf("%s - Received from peer : %s\n", get_timestamp(), buffer);
 		fflush(stdout);
-		sleep(3);
+		usleep(sleepDuration * 10000);
 	}
 	return NULL;
 }
@@ -77,13 +75,19 @@ void *sendT_func(void *args)
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
-		char buffer[18];
-		sprintf(buffer, "Hello from Pi %d\n", self);
+		char buffer[7];
+		sprintf(buffer, "Pi %02X", self);
+
+		uint8_t dest_addr;
+		do
+		{
+			dest_addr = ADDR_GROUP[rand() % GROUP_SIZE];
+		} while (dest_addr == self);
 
 		// send buffer
-		MAC_send(mac, ADDR_Gateway, buffer, sizeof(buffer));
+		MAC_send(mac, dest_addr, buffer, sizeof(buffer));
 		fflush(stdout);
-		sleep(3);
+		usleep(sleepDuration * 10000);
 	}
 	return NULL;
 }
@@ -94,13 +98,14 @@ int main(int argc, char *argv[])
 
 	// ALOHA-Protokoll initialisieren
 	MAC mac;
-
-	self = atoi(argv[1]);
-
-	printf("Self: %d\n", self);
 	MAC_init(&mac, atoi(argv[1]));
-	mac.debug = 1;
+	// mac.debug = 1;
 	mac.recvTimeout = 3000;
+
+	self = (uint8_t)atoi(argv[1]);
+	sleepDuration = MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
+	printf("%s - Node: %02X\n", get_timestamp(), self);
+	printf("%s - sleep duration: %d ms\n", get_timestamp(), sleepDuration);
 
 	// Threading implementation
 

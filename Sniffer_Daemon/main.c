@@ -5,6 +5,7 @@
 #include <time.h>
 
 #include "SX1262/SX1262.h"
+#include "util.h"
 
 /*typedef enum MSGType {
     MSG, ACK, RTS, CTS, wakeBEA, wakeACK, ERR
@@ -40,22 +41,14 @@ int main(int argc, char *argv[])
     // clock_gettime(CLOCK_REALTIME, &start);
 
     // while (!stop && count < sizeof(slot) / sizeof(slot[0])) {
+    printf("%s - Sniffer Daemon Starting...\n", get_timestamp());
     while (1)
     {
-        time_t current_time;
-        struct tm *time_info;
-        char time_buffer[20]; // Buffer for storing formatted timestamp
-
-        time(&current_time);               // Get current time
-        time_info = gmtime(&current_time); // Convert to UTC time
-
-        // Format the timestamp
-        strftime(time_buffer, sizeof(time_buffer), "%Y-%m-%dT%H:%M:%S", time_info);
-
-        // printf("Current timestamp: %s\n", time_buffer);
 
         uint8_t ctrl;
         SX1262_recv(&ctrl, sizeof(ctrl));
+
+        printf("%s - DEBUG: ctrl=%02X\n", get_timestamp(), ctrl);
 
         // clock_gettime(CLOCK_REALTIME, &slot.time);
 
@@ -126,14 +119,35 @@ int main(int argc, char *argv[])
             slot.src_addr = header[0];
             slot.dst_addr = header[1];
         }
+        else if (ctrl == '\xC1' || ctrl == '\xC0' || ctrl == '\xC1' || ctrl == '\xC2' || ctrl == '\xC3' || ctrl == '\x00' || ctrl == '\x01')
+        {
+            uint8_t ambient[3];
+            int8_t noise;
+            SX1262_recv(ambient, sizeof(ambient));
+            strcpy(slot.type, "AMB");
+            if (ambient[0] == '\x00' && ambient[1] == '\x01')
+            {
+                noise = -ambient[2] / 2;
+                printf("%s - Ambient noise : %02X RSSI:%02X", get_timestamp(), noise, ambient[2]);
+            }
+            else
+            {
+                // ungültiges Ambient Noise ausgeben
+                printf("%s - Ambient-Noise Antwort ungültig: Anfang = %02X, Länge = %02X, RSSI = %hhd\n", get_timestamp(), ambient[0], ambient[1], ambient[2]);
+            }
+        }
         else
         {
             // slot.type = ERR;
             strcpy(slot.type, "ERR");
 
-            uint8_t c;
-            while (SX1262_timedrecv(&c, sizeof(c), 100))
-                ;
+            // uint8_t c;
+            // printf("%s - Discard buffer : ", get_timestamp());
+            // while (SX1262_timedrecv(&c, sizeof(c), 100))
+            // {
+            //     printf("%02X ", c);
+            // }
+            // printf("\n");
         }
 
         int8_t RSSI;
@@ -141,11 +155,11 @@ int main(int argc, char *argv[])
 
         if (strcmp(slot.type, "MSG") == 0)
         {
-            printf("%s %s: pi%d -> pi%d [%s]\n", time_buffer, slot.type, slot.src_addr, slot.dst_addr, msg);
+            printf("%s - %s: pi%d -> pi%d %d [%s]\n", get_timestamp(), slot.type, slot.src_addr, slot.dst_addr, RSSI, msg);
         }
-        else
+        else if (strcmp(slot.type, "AMB") != 0)
         {
-            printf("%s %s: pi%d -> pi%d\n", time_buffer, slot.type, slot.src_addr, slot.dst_addr);
+            printf("%s - %s: pi%d -> pi%d %d\n", get_timestamp(), slot.type, slot.src_addr, slot.dst_addr, RSSI);
         }
 
         fflush(stdout);

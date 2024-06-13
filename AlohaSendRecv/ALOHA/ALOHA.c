@@ -613,7 +613,8 @@ static void* sendT_func(void* args) {
 			// Nachricht versenden
 			SX1262_send(buffer, MAC_Header_len + msg.len);
 
-			if (mac->debug) {
+			// if (mac->debug) { // ### test
+			if (1) {
 				// Gesendeten Header und Nachricht ausgeben
 				printf("Gesendet: ");
 				for (int i = 0; i < MAC_Header_len; i++)
