@@ -45,7 +45,7 @@ void send(MAC *mac)
 	fflush(stdout);
 }
 
-void *receiveT_func(void *args)
+void *recvT_func(void *args)
 {
 	MAC *mac = (MAC *)args;
 	while (1)
@@ -68,7 +68,7 @@ void *receiveT_func(void *args)
 	return NULL;
 }
 
-void *send_t(void *args)
+void *sendT_func(void *args)
 {
 	MAC *mac = (MAC *)args;
 	while (1)
@@ -100,13 +100,13 @@ int main(int argc, char *argv[])
 
 	// Threading implementation
 
-	if (pthread_create(&recvT, NULL, receiveT_func, &mac) != 0)
+	if (pthread_create(&recvT, NULL, recvT_func, &mac) != 0)
 	{
 		printf("Failed to create receive thread");
 		exit(EXIT_FAILURE);
 	}
 
-	if (pthread_create(&sendT, NULL, send_t, &mac) != 0)
+	if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
 	{
 		printf("Failed to create send thread");
 		exit(EXIT_FAILURE);

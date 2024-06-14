@@ -1,9 +1,7 @@
-﻿#ifndef ALOHA_H
-#define ALOHA_H
+﻿#ifndef MACAW_H
+#define MACAW_H
 
 #include <stdint.h>			// uint8_t, int8_t, uint32_t
-
-#define ADDR_BROADCAST 0XFF
 
 // Struktur für den Nachrichtenheader
 typedef struct MAC_Header {
@@ -16,20 +14,24 @@ typedef struct MAC_Header {
 } MAC_Header;
 #define MAC_Header_len 8
 
-// Struktur für die Daten des MAC-Protokolls
+// Struktur für die Daten des MACAW-Protokolls
 typedef struct MAC {
 	/* konfigurierbare Parameter */
 	uint8_t addr;				// Adresse des Pis
 	unsigned int maxtrials;		// Anzahl Sendeversuche
 	int noiseThreshold;			// Schwellwert für das Ambient Noise
 	unsigned int recvTimeout;	// Timeout beim Empfangen der Bytes einer Nachricht in Millisekunden
+	unsigned int timeout;		// Timeout in Sekunden für das Warten auf Bestätigungen
+	unsigned int timeslot;		// Timeslot in Millisekunden für den Backoff
+	unsigned int t_offset;		// Offset für das Versenden von Bytes in Millisekunden
+	unsigned int t_perByte;		// Übertragungsdauer für jedes zusätzliche Byte in Millisekuden
 
 	/* Daten zur letzten empfangenen Nachricht */
 	MAC_Header recvH;			// Nachrichtenheader der letzten empfangenen Nachricht
 	int RSSI;					// RSSI-Wert der letzten empfangenen Nachricht
 
 	/* Sonstige */
-	int debug;					// Gibt an, ob Debug-Ausgaben erstellt werden sollen
+	int debug;                  // Gibt an, ob Debug-Ausgaben erstellt werden sollen
 } MAC;
 
 void MAC_init(MAC*, unsigned char);
@@ -41,4 +43,4 @@ int MAC_timedrecv(MAC*, unsigned char*, unsigned int);
 int MAC_send(MAC*, unsigned char, unsigned char*, unsigned int);
 int MAC_Isend(MAC*, unsigned char, unsigned char*, unsigned int);
 
-#endif /* ALOHA_H */
+#endif /* MACAW_H */

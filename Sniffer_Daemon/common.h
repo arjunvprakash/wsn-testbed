@@ -9,4 +9,9 @@
 #define CTRL_ANW     '\x03'
 #define CTRL_CO2     '\x04'
 
+// Kontrollflags
+#define CTRL_RET '\xC1' // Antwort des Moduls
+#define CTRL_MSG '\xC4' // Nachricht
+#define CTRL_ACK '\xC5' // Acknowledgement
+
 #endif

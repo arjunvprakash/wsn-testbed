@@ -3,8 +3,6 @@
 
 #include <stdint.h>			// uint8_t, int8_t, uint32_t
 
-#define ADDR_BROADCAST 0XFF
-
 // Struktur für den Nachrichtenheader
 typedef struct MAC_Header {
 	uint8_t ctrl;			// Kontrollflag

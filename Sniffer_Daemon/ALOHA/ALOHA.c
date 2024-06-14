@@ -322,7 +322,7 @@ static bool acknowledged(MAC *mac, uint8_t addr)
 
 		// Nachricht ist ein Acknowledgement, wenn Sender der vorherige Empfänger ist
 		// und Ack-Nummer mit Seq-Nummer übereinstimmt.
-		if (addr == ADDR_BROADCAST || (ack.src_addr == addr && ack.seq == sendSeq[addr]))
+		if (ack.src_addr == addr && ack.seq == sendSeq[addr])
 			return true;
 		else if (mac->debug)
 		{
@@ -485,21 +485,19 @@ static void *recvMsg_func(void *args)
 			for (int i = 0; i < recvH.msg_len; i++)
 				checksum += msg_buffer[i];
 
+			// ### Commenting for sniffer impl
 			// Checksumme prüfen
-			if (checksum != recvH.checksum)
-			{
-				if (mac->debug)
-					printf("Checksumme 0x%02X ungültig! Expected: 0x%02X.\n", recvH.checksum, checksum);
+			// if (checksum != recvH.checksum)
+			// {
+			// 	if (mac->debug)
+			// 		printf("Checksumme 0x%02X ungültig! Expected: 0x%02X.\n", recvH.checksum, checksum);
 
-				continue;
-			}
+			// 	continue;
+			// }
 
-			// Wenn Nachricht nicht an diesen Pi adressiert ist
-			if (recvH.dst_addr != ADDR_BROADCAST && recvH.dst_addr != mac->addr)
-			{
-				// Routing logic
-				continue;
-			}
+			// // Wenn Nachricht nicht an diesen Pi adressiert ist
+			// if (recvH.dst_addr != mac->addr)
+			// 	continue;
 
 			if (mac->debug)
 			{
@@ -515,12 +513,14 @@ static void *recvMsg_func(void *args)
 
 			// Wenn eine Nachricht mit einer kleineren oder gleichen Sequenznummer schon empfangen wurde
 			// und Sequenznummer nicht die Startsequenznummer ist
-			if (recvH.seq <= recvSeq[recvH.src_addr] && recvH.seq != 0)
-			{
-				if (mac->debug)
-					printf("... wurde schon empfangen.\n\n");
-			}
-			else
+			// ### Commenting for sniffer impl
+			// if (recvH.seq <= recvSeq[recvH.src_addr] && recvH.seq != 0)
+			// {
+			// 	if (mac->debug)
+			// 		printf("... wurde schon empfangen.\n\n");
+			// }
+			// else
+			if (1)
 			{
 				// aktuelle Sequenznummer speichern
 				recvSeq[recvH.src_addr] = recvH.seq;
@@ -556,8 +556,9 @@ static void *recvMsg_func(void *args)
 				}
 			}
 
+			// ### Commenting for sniffer impl
 			// Acknowledgment senden
-			acknowledgement(mac, recvH);
+			// acknowledgement(mac, recvH);
 		}
 
 		// Kontrollflag unbekannt
@@ -661,7 +662,8 @@ static void *sendMsg_func(void *args)
 			SX1262_send(buffer, MAC_Header_len + msg.len);
 
 			if (mac->debug)
-			{
+			{ // ### test
+				// if (1) {
 				// Gesendeten Header und Nachricht ausgeben
 				printf("Gesendet: ");
 				for (int i = 0; i < MAC_Header_len; i++)
