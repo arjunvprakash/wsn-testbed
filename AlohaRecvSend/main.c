@@ -41,7 +41,7 @@ void send(MAC *mac)
 	sprintf(buffer, "Receive-Send Pi %d\n", self);
 
 	// send buffer
-	MAC_send(mac, ADDR_Gateway, buffer, sizeof(buffer));
+	MAC_send(mac, ADDR_GATEWAY, buffer, sizeof(buffer));
 	fflush(stdout);
 }
 
@@ -77,7 +77,7 @@ void *sendT_func(void *args)
 		sprintf(buffer, "Hello from Pi %d\n", self);
 
 		// send buffer
-		MAC_send(mac, ADDR_Gateway, buffer, sizeof(buffer));
+		MAC_send(mac, ADDR_GATEWAY, buffer, sizeof(buffer));
 		fflush(stdout);
 		sleep(3);
 	}
