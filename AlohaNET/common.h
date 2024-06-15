@@ -13,17 +13,20 @@ uint8_t ADDR_POOL[POOL_SIZE] = {0x04, 0x05, 0x06, 0x07, 0x08, 0x09, ADDR_BROADCA
 #define MIN_SLEEP_TIME 1000 // ms
 #define MAX_SLEEP_TIME 3000 // ms
 
-enum MODE
+// Operation mode of all nodes in the P2P network mode
+typedef enum OperationMode
 {
     DEDICATED,
     MIXED
-};
+} OperationMode;
 
-enum NODE_TYPE
-{
-    GATEWAY,
-    CLIENT,
-    SNIFFER
-};
+/*
+Communication Type : P2P, Routing
+*/
+typedef enum NetworkMode {
+    SINGLE_HOP,
+    MULTI_HOP
+} NetworkMode;
+
 
 #endif

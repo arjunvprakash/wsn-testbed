@@ -1,5 +1,14 @@
 {
     "files.associations": {
-        "common.h": "c"
+        "stdint.h": "c",
+        "stdarg.h": "c",
+        "string.h": "c",
+        "pthread.h": "c",
+        "stdio.h": "c",
+        "aloha.h": "c",
+        "stdbool.h": "c",
+        "stdlib.h": "c",
+        "util.h": "c",
+        "routing.h": "c"
     }
 }

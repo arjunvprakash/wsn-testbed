@@ -11,6 +11,12 @@
 #include "common.h"
 #include "util.h"
 
+// Configuration flags
+
+static enum NetworkMode nwMode = SINGLE_HOP;
+static enum OperationMode opMode = MIXED;
+static unsigned short debug = 0;
+
 uint8_t self;
 unsigned int sleepDuration;
 
@@ -20,27 +26,16 @@ static pthread_t sendT;
 void *recvT_func(void *args);
 void *sendT_func(void *args);
 int getMsg();
-uint8_t getNewDest();
-void node_init(char *argv[]);
-void print_mode();
-
-static enum MODE mode = MIXED;
-static enum NODE_TYPE nodeType = CLIENT;
-
-uint8_t isRX(uint8_t addr)
-{
-	return addr == ADDR_BROADCAST || (mode == DEDICATED && (addr % 2 == 0));
-}
+int getSleepDur();
+void printOpMode(OperationMode opMode);
 
 void *receiveT_func(void *args)
 {
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
-		// Puffer für größtmögliche Nachricht
 		unsigned char buffer[240];
 
-		// printf("Waiting for message...\n");
 		fflush(stdout);
 
 		// Blockieren bis eine Nachricht ankommt
@@ -64,9 +59,8 @@ void *sendT_func(void *args)
 		int msg = getMsg();
 		sprintf(buffer, "%04d", msg);
 
-		uint8_t dest_addr = getNewDest();
+		uint8_t dest_addr = getDestAddr(self, opMode);
 
-		// send buffer
 		if (MAC_send(mac, dest_addr, buffer, sizeof(buffer)))
 		{
 			printf("%s - TX: %02X msg: %04d\n", get_timestamp(), dest_addr, msg);
@@ -77,92 +71,60 @@ void *sendT_func(void *args)
 	return NULL;
 }
 
-int getMsg()
-{
-	return rand() % 10000;
-}
-
 int main(int argc, char *argv[])
+
 {
-	GPIO_init();
 
-	// ALOHA-Protokoll initialisieren
-	MAC mac;
-	MAC_init(&mac, atoi(argv[1]));
-	// mac.debug = 1;
-	mac.recvTimeout = 3000;
-
-	node_init(argv);
+	self = (uint8_t)atoi(argv[1]);
 	printf("%s - Node: %02X\n", get_timestamp(), self);
-	printf("%s - sleep duration: %d ms\n", get_timestamp(), sleepDuration);
-	print_mode();
 
-	// Threading implementation
-
-	if (mode == MIXED || (mode == DEDICATED && isRX(self)))
+	if (nwMode == SINGLE_HOP)
 	{
-		if (pthread_create(&recvT, NULL, receiveT_func, &mac) != 0)
+		MAC mac = initNode(self, debug);
+
+		sleepDuration = getSleepDur();
+		printf("%s - Sleep duration: %d ms\n", get_timestamp(), sleepDuration);
+		printOpMode(opMode);
+
+		if (opMode == MIXED || (opMode == DEDICATED && isRX(self, opMode)))
 		{
-			printf("Failed to create receive thread");
-			exit(EXIT_FAILURE);
+			if (pthread_create(&recvT, NULL, receiveT_func, &mac) != 0)
+			{
+				printf("Failed to create receive thread");
+				exit(EXIT_FAILURE);
+			}
+		}
+
+		if (opMode == MIXED || (opMode == DEDICATED && !isRX(self, opMode)))
+		{
+			if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
+			{
+				printf("Failed to create send thread");
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
-
-	if (mode == MIXED || (mode == DEDICATED && !isRX(self)))
+	else if (nwMode == MULTI_HOP)
 	{
-		if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
-		{
-			printf("Failed to create send thread");
-			exit(EXIT_FAILURE);
-		}
 	}
-
 	pthread_join(recvT, NULL);
 	pthread_join(sendT, NULL);
 
 	return 0;
-
-	// Normal implemenation
-	// while (1) {
-
-	// 	send(&mac);
-
-	// 	printf("Go to sleep for 3 seconds...\n");
-	//     	sleep(3);
-
-	// 	receive(&mac);
-
-	// }
 }
 
-void node_init(char *argv[])
+void printOpMode(OperationMode opMode)
 {
-	self = (uint8_t)atoi(argv[1]);
-	sleepDuration = MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
-}
-
-uint8_t getNewDest()
-{
-	uint8_t dest_addr;
-	do
-	{
-		dest_addr = ADDR_POOL[rand() % POOL_SIZE];
-	} while (dest_addr == self || (mode == DEDICATED && !isRX(dest_addr)));
-	return dest_addr;
-}
-
-void print_mode()
-{
-	switch (mode)
+	switch (opMode)
 	{
 	case DEDICATED:
-		printf("%s - Mode: DEDICATED (%s)\n", get_timestamp(), (isRX(self) ? "RX" : "TX"));
+		printf("%s - Operation Mode: DEDICATED (%s)\n", get_timestamp(), (isRX(self, opMode) ? "RX" : "TX"));
 		break;
 	case MIXED:
-		printf("%s - Mode: MIXED\n", get_timestamp());
+		printf("%s - Operation Mode: MIXED\n", get_timestamp());
 		break;
 	default:
-		printf("%s - Unknown mode\n", get_timestamp());
+		printf("%s - Unknown Operation Mode\n", get_timestamp());
 		break;
 	}
 }
