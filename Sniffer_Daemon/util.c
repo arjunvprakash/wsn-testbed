@@ -1,7 +1,7 @@
 #include <time.h>
 #include <string.h>
 
-char* get_timestamp() {
+char* timestamp() {
     time_t current_time;
     struct tm* time_info;
     static char time_buffer[20]; // Static buffer to avoid memory allocation/deallocation

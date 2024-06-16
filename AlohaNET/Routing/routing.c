@@ -1,5 +1,3 @@
-#include "ALOHA.h"
-
 #include <errno.h>     // errno
 #include <pthread.h>   // pthread_create
 #include <semaphore.h> // sem_init, sem_wait, sem_trywait, sem_timedwait
@@ -9,6 +7,8 @@
 #include <string.h>    // memcpy, strerror
 
 #include "routing.h"
+#include "../ALOHA/ALOHA.h"
+#include "../GPIO/GPIO.h"
 #include "../common.h"
 #include "../util.h"
 
@@ -37,12 +37,28 @@ static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
 
-int routing_init(uint8_t self, unsigned short debug)
+void fwdQ_init();
+void recvQ_init();
+void fwdMsgQ_enqueue(RoutingMessage msg);
+RoutingMessage fwdMsgQ_dequeue();
+void recvMsgQ_enqueue(RoutingMessage msg);
+RoutingMessage recvMsgQ_dequeue();
+void recvPackets_func(void *args);
+RoutingMessage buildRoutingMessage(uint8_t *pkt);
+void sendPackets_func(void *args);
+int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
+uint8_t getNextHopAddr(uint8_t self);
+MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout);
+
+int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
-    mac = initNode(self, debug);
+    mac = initMAC(self, debug, timeout);
+    fwdQ_init();
+    recvQ_init();
+    return 1;
 }
 
-int routing_send(uint8_t dest, uint8_t *data, unsigned int len)
+int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 {
     RoutingMessage msg;
     msg.len = len;
@@ -56,14 +72,14 @@ int routing_send(uint8_t dest, uint8_t *data, unsigned int len)
     return 1;
 }
 
-int routing_recv(unsigned char *data, RouteHeader *header)
+int routingReceive(RouteHeader *header, uint8_t *data)
 {
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
-    *data = msg.data;
-    return 1;
+    *data = *msg.data;
+    return msg.len;
 }
 
 void fwdQ_init()
@@ -141,7 +157,7 @@ void recvPackets_func(void *args)
     {
         uint8_t *pkt = (uint8_t *)malloc(240);
 
-        // Receive a packetF
+        // Receive a packet
         int pktSize = MAC_recv(mac, pkt);
         RoutingMessage msg = buildRoutingMessage(pkt);
         free(pkt);
@@ -157,17 +173,17 @@ void recvPackets_func(void *args)
     }
 }
 
-RoutingMessage buildRoutingMessage(uint8_t *)
+RoutingMessage buildRoutingMessage(uint8_t *pkt)
 {
     // Construct RoutingMessage
     RoutingMessage msg;
     msg.src = pkt[1];
-    msg.prev = mac->recvH.src_addr;
+    msg.prev = mac.recvH.src_addr;
     msg.dest = pkt[0];
-    msg.next = getNextHopAddr(mac->addr);
+    msg.next = getNextHopAddr(mac.addr);
     msg.len = pkt[2];
     msg.data = (uint8_t *)malloc(msg.len);
-    memcpy(msg.data, pkt[3], msg.len);
+    memcpy(msg.data, &pkt[3], msg.len);
     free(pkt);
 
     return msg;
@@ -184,7 +200,7 @@ void sendPackets_func(void *args)
         uint8_t *pkt;
         int pktSize = buildRoutingPacket(msg, &pkt);
         // send
-        MAC_send(&mac, msg.next, pkt, pktSize);
+        MAC_send(mac, msg.next, pkt, pktSize);
     }
 }
 
@@ -212,4 +228,24 @@ int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     free(routePkt);
 
     return routePktSize;
+}
+
+uint8_t getNextHopAddr(uint8_t self)
+{
+    uint8_t addr;
+    do
+    {
+        addr = ADDR_POOL[rand() % POOL_SIZE];
+    } while (addr >= self);
+    return addr;
+}
+
+MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout)
+{
+    GPIO_init();
+    MAC mac;
+    MAC_init(&mac, addr);
+    mac.debug = debug;
+    mac.recvTimeout = timeout;
+    return mac;
 }

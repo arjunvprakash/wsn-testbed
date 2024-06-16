@@ -47,7 +47,7 @@ void *receiveT_func(void *args)
 
         // MAC_timedrecv(mac, buffer, 2);
 
-        printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", get_timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
+        printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
         fflush(stdout);
         // usleep(sleepDuration * 10000);
     }
@@ -67,8 +67,8 @@ int main(int argc, char *argv[])
     mac.recvTimeout = 3000;
 
     self = (uint8_t)atoi(argv[1]);
-    printf("%s - Node: %02X\n", get_timestamp(), self);
-    printf("%s - Mode: Sniffer\n", get_timestamp());
+    printf("%s - Node: %02X\n", timestamp(), self);
+    printf("%s - Mode: Sniffer\n", timestamp());
 
     receiveT_func(&mac);
 

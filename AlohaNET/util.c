@@ -1,14 +1,15 @@
 #include <time.h>
 #include <string.h>
-#include <time.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "common.h"
 #include "ALOHA/ALOHA.h"
 #include "GPIO/GPIO.h"
 
-char *get_timestamp()
+// Returns the current timestamp. Sample: 2024-06-16T11:56:23
+char *timestamp()
 {
     time_t current_time;
     struct tm *time_info;
@@ -22,48 +23,15 @@ char *get_timestamp()
     return time_buffer;
 }
 
-uint8_t isRX(uint8_t addr, OperationMode opMode)
+// Returns a random value within the range
+int randInRange(int min, int max)
 {
-    return addr == ADDR_BROADCAST || (opMode == DEDICATED && (addr % 2 == 0));
+    return min + (rand() % (max - min + 1));
 }
 
-MAC initNode(uint8_t addr, unsigned short debug)
+// Returns a random code with n digits
+int randCode(int n)
 {
-    GPIO_init();
-    MAC mac;
-    MAC_init(&mac, addr);
-    mac.debug = debug;
-    mac.recvTimeout = 3000;
-
-    return mac;
-}
-
-uint8_t getDestAddr(uint8_t self, OperationMode opMode)
-{
-    uint8_t dest_addr;
-    do
-    {
-        dest_addr = ADDR_POOL[rand() % POOL_SIZE];
-    } while (dest_addr == self || (opMode == DEDICATED && !isRX(dest_addr, opMode)));
-    return dest_addr;
-}
-
-int getSleepDur()
-{
-    return MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
-}
-
-int getMsg()
-{
-    return rand() % 10000;
-}
-
-uint8_t getNextHopAddr(uint8_t self)
-{
-    uint8_t addr;
-    do
-    {
-        addr = ADDR_POOL[rand() % POOL_SIZE];
-    } while (addr >= self);
-    return addr;
+    int maxValue = pow(10, n);
+    return rand() % maxValue;
 }

@@ -9,6 +9,7 @@
         "stdbool.h": "c",
         "stdlib.h": "c",
         "util.h": "c",
-        "routing.h": "c"
+        "routing.h": "c",
+        "common.h": "c"
     }
 }

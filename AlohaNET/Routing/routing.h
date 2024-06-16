@@ -10,8 +10,8 @@ typedef struct RouteHeader
     int RSSI;
 } RouteHeader;
 
-int routing_init(uint8_t self, unsigned short debug);
-int routing_send(uint8_t addr, unsigned char *msg, unsigned int len);
-int routing_recv(unsigned char *msg, RouteHeader *header);
+int routingInit(uint8_t self, uint8_t debug, unsigned int timeout);
+int routingSend(uint8_t dest, uint8_t *data, unsigned int len);
+int routingReceive(RouteHeader *header, uint8_t *data);
 
 #endif
