@@ -16,6 +16,7 @@ typedef struct RoutingMessage
 {
     uint8_t src;
     uint8_t prev;
+    unsigned int numHops;
     uint8_t dest;
     uint8_t next;
     uint8_t *data;
@@ -31,17 +32,20 @@ typedef struct RoutingQueue
     sem_t mutex, full, free;
 } RoutingQueue;
 
-static RoutingQueue fwdQ, recvQ;
+static RoutingQueue sendQ, recvQ;
 
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
+static uint8_t debug;
+static const unsigned short maxTrials = 4;
+static const unsigned short numHeaderFields = 4;
 
-void fwdQ_init();
+void sendQ_init();
 void recvQ_init();
-void fwdMsgQ_enqueue(RoutingMessage msg);
-RoutingMessage fwdMsgQ_dequeue();
-void recvMsgQ_enqueue(RoutingMessage msg);
+void sendQ_enqueue(RoutingMessage msg);
+RoutingMessage sendQ_dequeue();
+void recvQ_enqueue(RoutingMessage msg);
 RoutingMessage recvMsgQ_dequeue();
 void recvPackets_func(void *args);
 RoutingMessage buildRoutingMessage(uint8_t *pkt);
@@ -49,15 +53,19 @@ void sendPackets_func(void *args);
 int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
 uint8_t getNextHopAddr(uint8_t self);
 MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout);
+void setDebug(uint8_t d);
 
+// Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
+    setDebug(debug);
     mac = initMAC(self, debug, timeout);
-    fwdQ_init();
+    sendQ_init();
     recvQ_init();
     return 1;
 }
 
+// Send a message via the routing layer
 int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 {
     RoutingMessage msg;
@@ -67,11 +75,12 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.src = mac.addr;
     memcpy(msg.data, data, len);
 
-    fwdMsgQ_enqueue(msg);
+    sendQ_enqueue(msg);
 
     return 1;
 }
 
+// Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
     RoutingMessage msg = recvMsgQ_dequeue();
@@ -82,14 +91,14 @@ int routingReceive(RouteHeader *header, uint8_t *data)
     return msg.len;
 }
 
-void fwdQ_init()
+void sendQ_init()
 {
-    fwdQ.begin = 0;
-    fwdQ.end = 0;
+    sendQ.begin = 0;
+    sendQ.end = 0;
 
-    sem_init(&fwdQ.full, 0, 0);
-    sem_init(&fwdQ.free, 0, RoutingQueueSize);
-    sem_init(&fwdQ.mutex, 0, 1);
+    sem_init(&sendQ.full, 0, 0);
+    sem_init(&sendQ.free, 0, RoutingQueueSize);
+    sem_init(&sendQ.mutex, 0, 1);
 }
 
 void recvQ_init()
@@ -102,31 +111,31 @@ void recvQ_init()
     sem_init(&recvQ.mutex, 0, 1);
 }
 
-void fwdMsgQ_enqueue(RoutingMessage msg)
+void sendQ_enqueue(RoutingMessage msg)
 {
-    sem_wait(&fwdQ.free);
-    sem_wait(&fwdQ.mutex);
+    sem_wait(&sendQ.free);
+    sem_wait(&sendQ.mutex);
 
-    fwdQ.packet[fwdQ.end] = msg;
-    fwdQ.end = (fwdQ.end + 1) % RoutingQueueSize;
+    sendQ.packet[sendQ.end] = msg;
+    sendQ.end = (sendQ.end + 1) % RoutingQueueSize;
 
-    sem_post(&fwdQ.mutex);
-    sem_post(&fwdQ.full);
+    sem_post(&sendQ.mutex);
+    sem_post(&sendQ.full);
 }
 
-RoutingMessage fwdMsgQ_dequeue()
+RoutingMessage sendQ_dequeue()
 {
-    sem_wait(&fwdQ.full);
-    sem_wait(&fwdQ.mutex);
+    sem_wait(&sendQ.full);
+    sem_wait(&sendQ.mutex);
 
-    RoutingMessage msg = fwdQ.packet[fwdQ.begin];
-    fwdQ.begin = (fwdQ.begin + 1) % RoutingQueueSize;
+    RoutingMessage msg = sendQ.packet[sendQ.begin];
+    sendQ.begin = (sendQ.begin + 1) % RoutingQueueSize;
 
-    sem_post(&fwdQ.mutex);
-    sem_post(&fwdQ.full);
+    sem_post(&sendQ.mutex);
+    sem_post(&sendQ.full);
 }
 
-void recvMsgQ_enqueue(RoutingMessage msg)
+void recvQ_enqueue(RoutingMessage msg)
 {
     sem_wait(&recvQ.free);
     sem_wait(&recvQ.mutex);
@@ -161,31 +170,42 @@ void recvPackets_func(void *args)
         int pktSize = MAC_recv(mac, pkt);
         RoutingMessage msg = buildRoutingMessage(pkt);
         free(pkt);
-        if (msg.dest != mac->addr)
+        if (msg.dest == mac->addr)
         {
-            // Enqueue the message into the forward queue
-            fwdMsgQ_enqueue(msg);
+            // Keep
+            recvQ_enqueue(msg);
         }
         else
         {
-            recvMsgQ_enqueue(msg);
+            // Forward
+            msg.next = getNextHopAddr(mac->addr);
+            msg.numHops++;
+            if (MAC_send(mac, msg.next, pkt, pktSize))
+            {
+                if (debug)
+                {
+                    printf("%s - FWD: %02X -> %02X msg: %04d\n", timestamp(), msg.src, msg.next, msg.data);
+                }
+            }
+            else
+            {
+                printf("%s - ## Error forwarding: %02X -> %02X msg: %04d\n", timestamp(), msg.src, msg.next, msg.data);
+            }
         }
     }
 }
 
+// Construct RoutingMessage
 RoutingMessage buildRoutingMessage(uint8_t *pkt)
 {
-    // Construct RoutingMessage
     RoutingMessage msg;
     msg.src = pkt[1];
     msg.prev = mac.recvH.src_addr;
     msg.dest = pkt[0];
-    msg.next = getNextHopAddr(mac.addr);
     msg.len = pkt[2];
     msg.data = (uint8_t *)malloc(msg.len);
     memcpy(msg.data, &pkt[3], msg.len);
-    free(pkt);
-
+    msg.numHops = pkt[4];
     return msg;
 }
 
@@ -195,7 +215,7 @@ void sendPackets_func(void *args)
 
     while (1)
     {
-        RoutingMessage msg = fwdMsgQ_dequeue();
+        RoutingMessage msg = sendQ_dequeue();
 
         uint8_t *pkt;
         int pktSize = buildRoutingPacket(msg, &pkt);
@@ -206,7 +226,7 @@ void sendPackets_func(void *args)
 
 int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 {
-    uint16_t routePktSize = msg.len + 3;
+    uint16_t routePktSize = msg.len + numHeaderFields;
     *routePkt = (uint8_t *)malloc(routePktSize);
 
     uint8_t *p = *routePkt;
@@ -225,6 +245,10 @@ int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 
     // Set msg
     memcpy(p, msg.data, msg.len);
+    p += msg.len;
+
+    // Set numHops
+    *p = msg.numHops;
     free(routePkt);
 
     return routePktSize;
@@ -233,11 +257,14 @@ int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 uint8_t getNextHopAddr(uint8_t self)
 {
     uint8_t addr;
+    unsigned short trial = 0;
     do
     {
-        addr = ADDR_POOL[rand() % POOL_SIZE];
-    } while (addr >= self);
-    return addr;
+        addr = NODE_POOL[rand() % POOL_SIZE];
+        trial++;
+    } while (addr >= self && trial <= maxTrials);
+
+    return (trial > maxTrials) ? ADDR_SINK : addr;
 }
 
 MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout)
@@ -248,4 +275,9 @@ MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout)
     mac.debug = debug;
     mac.recvTimeout = timeout;
     return mac;
+}
+
+void setDebug(uint8_t d)
+{
+    debug = debug;
 }

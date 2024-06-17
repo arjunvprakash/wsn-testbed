@@ -7,7 +7,9 @@ typedef struct RouteHeader
 {
     uint8_t src;
     uint8_t dst;
+    uint8_t prev;
     int RSSI;
+    unsigned int numHops;
 } RouteHeader;
 
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout);

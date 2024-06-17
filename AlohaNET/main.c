@@ -32,8 +32,8 @@ void printOpMode(OperationMode opMode);
 uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled);
 MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout);
 uint8_t isRXNode(uint8_t addr, OperationMode opMode);
-void *sendT_func_routing(void *args);
-void *recvT_func_routing(void *args);
+void *handleRoutingSend(void *args);
+void *handleRoutingReceive(void *args);
 
 int main(int argc, char *argv[])
 {
@@ -72,15 +72,18 @@ int main(int argc, char *argv[])
 	{
 		routingInit(self, debug, recvTimeout);
 		RouteHeader header;
-		if (pthread_create(&recvT, NULL, recvT_func_routing, &header) != 0)
+		if (pthread_create(&recvT, NULL, handleRoutingReceive, &header) != 0)
 		{
 			printf("Failed to create receive thread");
 			exit(EXIT_FAILURE);
 		}
-		if (pthread_create(&sendT, NULL, sendT_func_routing, &header) != 0)
+		if (self != ADDR_SINK)
 		{
-			printf("Failed to create send thread");
-			exit(1);
+			if (pthread_create(&sendT, NULL, handleRoutingSend, &header) != 0)
+			{
+				printf("Failed to create send thread");
+				exit(1);
+			}
 		}
 	}
 	pthread_join(recvT, NULL);
@@ -110,7 +113,7 @@ void *recvT_func(void *args)
 	return NULL;
 }
 
-void *recvT_func_routing(void *args)
+void *handleRoutingReceive(void *args)
 {
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
@@ -124,7 +127,7 @@ void *recvT_func_routing(void *args)
 
 		// MAC_timedrecv(mac, buffer, 2);
 
-		printf("%s - RX: %02X RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->RSSI, buffer);
+		printf("%s - RX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
 		fflush(stdout);
 		// usleep(sleepDuration * 10000);
 	}
@@ -152,7 +155,7 @@ void *sendT_func(void *args)
 	return NULL;
 }
 
-void *sendT_func_routing(void *args)
+void *handleRoutingSend(void *args)
 {
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
@@ -200,7 +203,7 @@ uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled)
 	{
 		do
 		{
-			dest_addr = ADDR_POOL[rand() % POOL_SIZE];
+			dest_addr = NODE_POOL[rand() % POOL_SIZE];
 		} while (dest_addr == self || (opMode == DEDICATED && !isRXNode(dest_addr, opMode)));
 		return dest_addr;
 	}
