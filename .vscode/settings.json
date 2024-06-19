@@ -11,6 +11,7 @@
         "util.h": "c",
         "routing.h": "c",
         "common.h": "c",
-        "gpio.h": "c"
+        "gpio.h": "c",
+        "errno.h": "c"
     }
 }

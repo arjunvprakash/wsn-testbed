@@ -10,15 +10,6 @@
 #include "GPIO/GPIO.h"
 #include "common.h"
 #include "util.h"
-#include "Routing/routing.h"
-
-// Configuration flags
-
-uint8_t debug = 0;
-static unsigned int recvTimeout = 3000;
-static enum NetworkMode nwMode = SINGLE_HOP;
-static enum OperationMode opMode = MIXED;
-uint8_t broadCastEnabled = 1;
 
 uint8_t self;
 unsigned int sleepDuration;
@@ -28,106 +19,37 @@ static pthread_t sendT;
 
 void *recvT_func(void *args);
 void *sendT_func(void *args);
-void printOpMode(OperationMode opMode);
-uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled);
-MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout);
-uint8_t isRXNode(uint8_t addr, OperationMode opMode);
-void *handleRoutingSend(void *args);
-void *handleRoutingReceive(void *args);
+int getMsg();
+uint8_t getNewDest();
+void node_init(char *argv[]);
+void print_mode();
 
-int main(int argc, char *argv[])
+static enum MODE mode = DEDICATED;
+static enum NODE_TYPE nodeType = CLIENT;
+static uint8_t broadCastEnabled = 1;
+
+uint8_t isRX(uint8_t addr)
 {
-	self = (uint8_t)atoi(argv[1]);
-	printf("%s - Node: %02X\n", timestamp(), self);
-	printf("%s - Network Mode: %02X\n", timestamp(), nwMode == SINGLE_HOP ? "SINGLE_HOP" : "MULTI_HOP");
-
-	sleepDuration = randInRange(MIN_SLEEP_TIME, MAX_SLEEP_TIME);
-	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
-
-	if (nwMode == SINGLE_HOP)
-	{
-		MAC mac = initMAC(self, debug, recvTimeout);
-
-		printOpMode(opMode);
-
-		if (opMode == MIXED || (opMode == DEDICATED && isRXNode(self, opMode)))
-		{
-			if (pthread_create(&recvT, NULL, recvT_func, &mac) != 0)
-			{
-				printf("Failed to create receive thread");
-				exit(EXIT_FAILURE);
-			}
-		}
-
-		if (opMode == MIXED || (opMode == DEDICATED && !isRXNode(self, opMode)))
-		{
-			if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
-			{
-				printf("Failed to create send thread");
-				exit(1);
-			}
-		}
-	}
-	else if (nwMode == MULTI_HOP)
-	{
-		routingInit(self, debug, recvTimeout);
-		RouteHeader header;
-		if (pthread_create(&recvT, NULL, handleRoutingReceive, &header) != 0)
-		{
-			printf("Failed to create receive thread");
-			exit(EXIT_FAILURE);
-		}
-		if (self != ADDR_SINK)
-		{
-			if (pthread_create(&sendT, NULL, handleRoutingSend, &header) != 0)
-			{
-				printf("Failed to create send thread");
-				exit(1);
-			}
-		}
-	}
-	pthread_join(recvT, NULL);
-	pthread_join(sendT, NULL);
-
-	return 0;
+	return addr == ADDR_BROADCAST || (mode == DEDICATED && (addr % 2 == 0));
 }
 
-void *recvT_func(void *args)
+void *receiveT_func(void *args)
 {
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
+		// Puffer für größtmögliche Nachricht
 		unsigned char buffer[240];
 
+		// printf("Waiting for message...\n");
 		fflush(stdout);
 
-		// blocking
+		// Blockieren bis eine Nachricht ankommt
 		MAC_recv(mac, buffer);
 
 		// MAC_timedrecv(mac, buffer, 2);
 
-		printf("%s - RX: %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, buffer);
-		fflush(stdout);
-		// usleep(sleepDuration * 10000);
-	}
-	return NULL;
-}
-
-void *handleRoutingReceive(void *args)
-{
-	RouteHeader *header = (RouteHeader *)args;
-	while (1)
-	{
-		unsigned char buffer[240];
-
-		fflush(stdout);
-
-		// blocking
-		routingReceive(header, buffer);
-
-		// MAC_timedrecv(mac, buffer, 2);
-
-		printf("%s - RX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
+		printf("%s - RX: %02X RSSI: (%02d) msg: %s\n", get_timestamp(), mac->recvH.src_addr, mac->RSSI, buffer);
 		fflush(stdout);
 		// usleep(sleepDuration * 10000);
 	}
@@ -140,14 +62,15 @@ void *sendT_func(void *args)
 	while (1)
 	{
 		char buffer[5];
-		int msg = randCode(4);
+		int msg = getMsg();
 		sprintf(buffer, "%04d", msg);
 
-		uint8_t dest_addr = getDestAddr(self, opMode, broadCastEnabled);
+		uint8_t dest_addr = getNewDest();
 
+		// send buffer
 		if (MAC_send(mac, dest_addr, buffer, sizeof(buffer)))
 		{
-			printf("%s - TX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("%s - TX: %02X msg: %04d\n", get_timestamp(), dest_addr, msg);
 		}
 		fflush(stdout);
 		usleep(sleepDuration * 10000);
@@ -155,72 +78,96 @@ void *sendT_func(void *args)
 	return NULL;
 }
 
-void *handleRoutingSend(void *args)
+int getMsg()
 {
-	RouteHeader *header = (RouteHeader *)args;
-	while (1)
+	return rand() % 10000;
+}
+
+int main(int argc, char *argv[])
+{
+	GPIO_init();
+
+	// ALOHA-Protokoll initialisieren
+	MAC mac;
+	MAC_init(&mac, atoi(argv[1]));
+	// mac.debug = 1;
+	mac.recvTimeout = 3000;
+
+	node_init(argv);
+	printf("%s - Node: %02X\n", get_timestamp(), self);
+	printf("%s - sleep duration: %d ms\n", get_timestamp(), sleepDuration);
+	print_mode();
+
+	// Threading implementation
+
+	if (mode == MIXED || (mode == DEDICATED && isRX(self)))
 	{
-		char buffer[5];
-		int msg = randCode(4);
-		sprintf(buffer, "%04d", msg);
-
-		uint8_t dest_addr = ADDR_SINK;
-
-		if (routingSend(dest_addr, buffer, sizeof(buffer)))
+		if (pthread_create(&recvT, NULL, receiveT_func, &mac) != 0)
 		{
-			printf("%s - TX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("Failed to create receive thread");
+			exit(EXIT_FAILURE);
 		}
-		fflush(stdout);
-		usleep(sleepDuration * 10000);
 	}
-	return NULL;
-}
 
-void printOpMode(OperationMode opMode)
-{
-	switch (opMode)
+	if (mode == MIXED || (mode == DEDICATED && !isRX(self)))
 	{
-	case DEDICATED:
-		printf("%s - Operation Mode: DEDICATED (%s)\n", timestamp(), (isRXNode(self, opMode) ? "RX" : "TX"));
-		break;
-	case MIXED:
-		printf("%s - Operation Mode: MIXED\n", timestamp());
-		break;
-	default:
-		printf("%s - Unknown Operation Mode\n", timestamp());
-		break;
+		if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
+		{
+			printf("Failed to create send thread");
+			exit(EXIT_FAILURE);
+		}
 	}
+
+	pthread_join(recvT, NULL);
+	pthread_join(sendT, NULL);
+
+	return 0;
+
+	// Normal implemenation
+	// while (1) {
+
+	// 	send(&mac);
+
+	// 	printf("Go to sleep for 3 seconds...\n");
+	//     	sleep(3);
+
+	// 	receive(&mac);
+
+	// }
 }
 
-uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled)
+void node_init(char *argv[])
+{
+	self = (uint8_t)atoi(argv[1]);
+	sleepDuration = MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
+}
+
+uint8_t getNewDest()
 {
 	uint8_t dest_addr;
 	if (broadCastEnabled && (rand() % 100) < 20)
 	{
 		dest_addr = ADDR_BROADCAST;
 	}
-	else
+	do
 	{
-		do
-		{
-			dest_addr = NODE_POOL[rand() % POOL_SIZE];
-		} while (dest_addr == self || (opMode == DEDICATED && !isRXNode(dest_addr, opMode)));
-		return dest_addr;
+		dest_addr = ADDR_POOL[rand() % POOL_SIZE];
+	} while (dest_addr == self || (mode == DEDICATED && !isRX(dest_addr)));
+	return dest_addr;
+}
+
+void print_mode()
+{
+	switch (mode)
+	{
+	case DEDICATED:
+		printf("%s - Mode: DEDICATED (%s)\n", get_timestamp(), (isRX(self) ? "RX" : "TX"));
+		break;
+	case MIXED:
+		printf("%s - Mode: MIXED\n", get_timestamp());
+		break;
+	default:
+		printf("%s - Unknown mode\n", get_timestamp());
+		break;
 	}
-}
-
-uint8_t isRXNode(uint8_t addr, OperationMode opMode)
-{
-	return addr == ADDR_BROADCAST || (opMode == DEDICATED && (addr % 2 == 0));
-}
-
-MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout)
-{
-	GPIO_init();
-	MAC mac;
-	MAC_init(&mac, addr);
-	mac.debug = debug;
-	mac.recvTimeout = timeout;
-
-	return mac;
 }
