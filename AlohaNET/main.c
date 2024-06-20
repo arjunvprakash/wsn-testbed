@@ -11,26 +11,25 @@
 #include "common.h"
 #include "util.h"
 
-uint8_t self;
-unsigned int sleepDuration;
+static uint8_t self;
+static unsigned int sleepDuration;
 
 static pthread_t recvT;
 static pthread_t sendT;
 
-void *recvT_func(void *args);
-void *sendT_func(void *args);
-int getMsg();
-uint8_t getNewDest();
-void node_init(char *argv[]);
-void print_mode();
+static void *recvT_func(void *args);
+static void *sendT_func(void *args);
+static int getMsg();
+static uint8_t getNewDest();
+static void node_init(char *argv[]);
+static void print_mode();
 
-static enum MODE mode = DEDICATED;
-static enum NODE_TYPE nodeType = CLIENT;
+static enum MODE mode = MIXED;
 static uint8_t broadCastEnabled = 1;
 
 uint8_t isRX(uint8_t addr)
 {
-	return addr == ADDR_BROADCAST || (mode == DEDICATED && (addr % 2 == 0));
+	return addr == ADDR_BROADCAST || (mode == DEDICATED && (addr % 2 != 0));
 }
 
 void *receiveT_func(void *args)
@@ -51,7 +50,7 @@ void *receiveT_func(void *args)
 
 		printf("%s - RX: %02X RSSI: (%02d) msg: %s\n", get_timestamp(), mac->recvH.src_addr, mac->RSSI, buffer);
 		fflush(stdout);
-		// usleep(sleepDuration * 10000);
+		// usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
@@ -73,7 +72,7 @@ void *sendT_func(void *args)
 			printf("%s - TX: %02X msg: %04d\n", get_timestamp(), dest_addr, msg);
 		}
 		fflush(stdout);
-		usleep(sleepDuration * 10000);
+		usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
@@ -122,37 +121,29 @@ int main(int argc, char *argv[])
 	pthread_join(sendT, NULL);
 
 	return 0;
-
-	// Normal implemenation
-	// while (1) {
-
-	// 	send(&mac);
-
-	// 	printf("Go to sleep for 3 seconds...\n");
-	//     	sleep(3);
-
-	// 	receive(&mac);
-
-	// }
 }
 
 void node_init(char *argv[])
 {
 	self = (uint8_t)atoi(argv[1]);
 	sleepDuration = MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
+	srand(time(NULL));
 }
 
 uint8_t getNewDest()
 {
 	uint8_t dest_addr;
-	if (broadCastEnabled && (rand() % 100) < 20)
+	if (broadCastEnabled && (rand() % 100) <= (100 / ((POOL_SIZE / 2) + 1)))
 	{
 		dest_addr = ADDR_BROADCAST;
 	}
-	do
+	else
 	{
-		dest_addr = ADDR_POOL[rand() % POOL_SIZE];
-	} while (dest_addr == self || (mode == DEDICATED && !isRX(dest_addr)));
+		do
+		{
+			dest_addr = NODE_POOL[rand() % POOL_SIZE];
+		} while (dest_addr == self || (mode == DEDICATED && !isRX(dest_addr)));
+	}
 	return dest_addr;
 }
 
@@ -161,10 +152,10 @@ void print_mode()
 	switch (mode)
 	{
 	case DEDICATED:
-		printf("%s - Mode: DEDICATED (%s)\n", get_timestamp(), (isRX(self) ? "RX" : "TX"));
+		printf("%s - Mode: DEDICATED (%s) Broadcast: %d\n", get_timestamp(), (isRX(self) ? "RX" : "TX"), broadCastEnabled);
 		break;
 	case MIXED:
-		printf("%s - Mode: MIXED\n", get_timestamp());
+		printf("%s - Mode: MIXED Broadcast: %d\n", get_timestamp(), broadCastEnabled);
 		break;
 	default:
 		printf("%s - Unknown mode\n", get_timestamp());

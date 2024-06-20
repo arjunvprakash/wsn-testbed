@@ -9,6 +9,7 @@
 #include <string.h>	   // memcpy, strerror
 
 #include "../SX1262/SX1262.h"
+#include "../common.h"
 
 // Kontrollflags
 #define CTRL_RET '\xC1' // Antwort des Moduls
@@ -420,7 +421,7 @@ static void *recvMsg_func(void *args)
 		}
 
 		// Nachricht
-		else if (ctrl == CTRL_MSG)
+		else if (ctrl == CTRL_MSG || ctrl == CTRL_PKT)
 		{
 			// Puffer für den Nachrichtenheader
 			uint8_t header_buffer[MAC_Header_len];
@@ -430,6 +431,8 @@ static void *recvMsg_func(void *args)
 
 			// Kontrollflag im Puffer speichern
 			*p = ctrl;
+			printf("%s - ### ALOHA: ctrl : %02X\n", "time", ctrl);
+
 			p += sizeof(ctrl);
 
 			// Nachrichtenheader empfangen

@@ -4,9 +4,12 @@
 /*
 Constants for subnet group
 */
+
+#define CTRL_PKT '\x45' // Routing layer packet
+
 #define ADDR_BROADCAST 0XFF
 #define ADDR_SINK 0X01
-#define POOL_SIZE 6
+#define POOL_SIZE 3
 extern uint8_t NODE_POOL[POOL_SIZE];
 
 #define MIN_SLEEP_TIME 1000 // ms

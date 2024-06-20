@@ -13,5 +13,6 @@
 #define CTRL_RET '\xC1' // Antwort des Moduls
 #define CTRL_MSG '\xC4' // Nachricht
 #define CTRL_ACK '\xC5' // Acknowledgement
+#define CTRL_PKT '\x45' // Routing layer packet
 
 #endif

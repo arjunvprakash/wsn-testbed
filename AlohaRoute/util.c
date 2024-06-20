@@ -32,6 +32,6 @@ int randInRange(int min, int max)
 // Returns a random code with n digits
 int randCode(int n)
 {
-    int maxValue = pow(10, n);
+    int maxValue = (int)pow(10, n);
     return rand() % maxValue;
 }

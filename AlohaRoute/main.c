@@ -15,10 +15,10 @@
 
 // Configuration flags
 
-static uint8_t debug = 0;
-static unsigned int recvTimeout = 3000;
-static enum NetworkMode nwMode = SINGLE_HOP;
-static enum OperationMode opMode = DEDICATED;
+static uint8_t debugFlag = 1;
+static unsigned int recvTimeout = 5000;
+static enum NetworkMode nwMode = MULTI_HOP;
+static enum OperationMode opMode = MIXED;
 static uint8_t broadCastEnabled = 1;
 
 static uint8_t self;
@@ -28,13 +28,13 @@ static pthread_t recvT;
 static pthread_t sendT;
 
 void *recvT_func(void *args);
-void *sendT_func(void *args);
-void printOpMode(OperationMode opMode);
-uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled);
+static void *sendT_func(void *args);
+static void printOpMode(OperationMode mode);
+static uint8_t getDestAddr(uint8_t self, OperationMode mode, int broadCastEnabled);
 static MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout);
-uint8_t isRXNode(uint8_t addr, OperationMode opMode);
-void *handleRoutingSend(void *args);
-void *handleRoutingReceive(void *args);
+static uint8_t isRXNode(uint8_t addr, OperationMode mode);
+static void *handleRoutingSend(void *args);
+static void *handleRoutingReceive(void *args);
 
 int main(int argc, char *argv[])
 {
@@ -44,15 +44,21 @@ int main(int argc, char *argv[])
 
 	sleepDuration = randInRange(MIN_SLEEP_TIME, MAX_SLEEP_TIME);
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
+	srand(time(NULL));
 
 	if (nwMode == SINGLE_HOP)
 	{
-		MAC mac = initMAC(self, debug, recvTimeout);
+
+		MAC mac;
+		MAC_init(&mac, atoi(argv[1]));
+		mac.debug = debugFlag;
+		mac.recvTimeout = recvTimeout;
 
 		printOpMode(opMode);
 
 		if (opMode == MIXED || (opMode == DEDICATED && isRXNode(self, opMode)))
 		{
+
 			if (pthread_create(&recvT, NULL, recvT_func, &mac) != 0)
 			{
 				printf("Failed to create receive thread");
@@ -62,6 +68,7 @@ int main(int argc, char *argv[])
 
 		if (opMode == MIXED || (opMode == DEDICATED && !isRXNode(self, opMode)))
 		{
+
 			if (pthread_create(&sendT, NULL, sendT_func, &mac) != 0)
 			{
 				printf("Failed to create send thread");
@@ -71,7 +78,9 @@ int main(int argc, char *argv[])
 	}
 	else if (nwMode == MULTI_HOP)
 	{
-		routingInit(self, debug, recvTimeout);
+		printf("%s - ### Inside MULTI_HOP\n", timestamp());
+
+		routingInit(self, debugFlag, recvTimeout);
 		printf("%s - ### Done routingInit\n", timestamp());
 		RouteHeader header;
 
@@ -105,23 +114,24 @@ void *recvT_func(void *args)
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
+
 		unsigned char buffer[240];
 
 		fflush(stdout);
 
 		// blocking
-		// MAC_recv(mac, buffer);
+		MAC_recv(mac, buffer);
 
-		MAC_timedrecv(mac, buffer, 2);
+		// MAC_timedrecv(mac, buffer, 2);
 
 		printf("%s - RX: %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, buffer);
 		fflush(stdout);
-		// usleep(sleepDuration * 10000);
+		// usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
 
-void *handleRoutingReceive(void *args)
+static void *handleRoutingReceive(void *args)
 {
 	printf("%s - ### Inside handleRoutingReceive\n", timestamp());
 
@@ -134,39 +144,45 @@ void *handleRoutingReceive(void *args)
 		fflush(stdout);
 
 		// blocking
-		// routingReceive(header, buffer);
+		// int msgLen = routingReceive(header, buffer);
 
-		routingTimedReceive(header, buffer, 2);
+		int msgLen = routingTimedReceive(header, buffer, 2);
+		if (msgLen > 0)
+		{
+			printf("%s - RRX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
+			fflush(stdout);
+		}
 
-		printf("%s - RX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
-		fflush(stdout);
-		// usleep(sleepDuration * 10000);
+		usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
 
-void *sendT_func(void *args)
+static void *sendT_func(void *args)
 {
+
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
+
 		char buffer[5];
 		int msg = randCode(4);
 		sprintf(buffer, "%04d", msg);
 
 		uint8_t dest_addr = getDestAddr(self, opMode, broadCastEnabled);
 
-		if (MAC_send(mac, dest_addr, buffer, sizeof(buffer)))
+		if (MAC_Isend(mac, dest_addr, buffer, sizeof(buffer)))
 		{
 			printf("%s - TX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
 		}
+
 		fflush(stdout);
-		usleep(sleepDuration * 10000);
+		usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
 
-void *handleRoutingSend(void *args)
+static void *handleRoutingSend(void *args)
 {
 	printf("%s - ### Inside handleRoutingSend\n", timestamp());
 
@@ -183,23 +199,25 @@ void *handleRoutingSend(void *args)
 
 		if (routingSend(dest_addr, buffer, sizeof(buffer)))
 		{
-			printf("%s - TX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("%s - RTX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
 		}
+		printf("%s - ### dest_addr : %02X\n", timestamp(), dest_addr);
+
 		fflush(stdout);
-		usleep(sleepDuration * 10000);
+		usleep(sleepDuration * 1000);
 	}
 	return NULL;
 }
 
-void printOpMode(OperationMode opMode)
+static void printOpMode(OperationMode mode)
 {
-	switch (opMode)
+	switch (mode)
 	{
 	case DEDICATED:
-		printf("%s - Operation Mode: DEDICATED (%s)\n", timestamp(), (isRXNode(self, opMode) ? "RX" : "TX"));
+		printf("%s - Operation Mode: DEDICATED (%s)  Broadcast: %d\n", timestamp(), (isRXNode(self, mode) ? "RX" : "TX"), broadCastEnabled);
 		break;
 	case MIXED:
-		printf("%s - Operation Mode: MIXED\n", timestamp());
+		printf("%s - Operation Mode: MIXED  Broadcast: %d\n", timestamp(), broadCastEnabled);
 		break;
 	default:
 		printf("%s - Unknown Operation Mode\n", timestamp());
@@ -207,10 +225,10 @@ void printOpMode(OperationMode opMode)
 	}
 }
 
-uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled)
+static uint8_t getDestAddr(uint8_t addr, OperationMode mode, int broadcast)
 {
 	uint8_t dest_addr;
-	if (broadCastEnabled && (rand() % 100) < 20)
+	if (broadcast && (rand() % 100) <= (100 / ((POOL_SIZE / 2) + 1)))
 	{
 		dest_addr = ADDR_BROADCAST;
 	}
@@ -219,23 +237,25 @@ uint8_t getDestAddr(uint8_t self, OperationMode opMode, int broadCastEnabled)
 		do
 		{
 			dest_addr = NODE_POOL[rand() % POOL_SIZE];
-		} while (dest_addr == self || (opMode == DEDICATED && !isRXNode(dest_addr, opMode)));
-		return dest_addr;
+		} while (dest_addr == addr || (mode == DEDICATED && !isRXNode(dest_addr, mode)));
 	}
+	return dest_addr;
 }
 
-uint8_t isRXNode(uint8_t addr, OperationMode opMode)
+static uint8_t isRXNode(uint8_t addr, OperationMode mode)
 {
-	return addr == ADDR_BROADCAST || (opMode == DEDICATED && (addr % 2 == 0));
+	return addr == ADDR_BROADCAST || (mode == DEDICATED && (addr % 2 == 0));
 }
 
 static MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout)
 {
-	GPIO_init();
-	MAC mac;
-	MAC_init(&mac, addr);
-	mac.debug = debug;
-	mac.recvTimeout = timeout;
+	printf("%s - ### Inside initMAC\n", timestamp());
 
-	return mac;
+	GPIO_init();
+	MAC m;
+	MAC_init(&m, addr);
+	m.debug = debug;
+	m.recvTimeout = timeout;
+
+	return m;
 }
