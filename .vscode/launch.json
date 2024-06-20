@@ -1,0 +1,22 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Remote Debug",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/AlohaRoute/Debug/script.bat",
+            "cwd": "${workspaceFolder}",
+            "miDebuggerPath": "X:\\Master Thesis\\msys64\\ucrt64\\bin\\gdb.exe",
+            "setupCommands": [
+                {
+                    "text": "-target-select remote <IP>:1234",
+                    "description": "Connect to the remote GDB server"
+                }
+            ]
+        }
+    ]
+}
