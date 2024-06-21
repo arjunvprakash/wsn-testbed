@@ -31,4 +31,6 @@ typedef enum NetworkMode
     MULTI_HOP
 } NetworkMode;
 
+#define BLURT(buffer) printf("TRACE: %s:%d:%s -> %s"__FILE__, __LINE__, __func__, buffer)
+
 #endif

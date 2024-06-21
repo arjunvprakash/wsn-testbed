@@ -5,31 +5,14 @@
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <string.h>
 
 #include "ALOHA/ALOHA.h"
 #include "GPIO/GPIO.h"
 #include "common.h"
 #include "util.h"
 
-/*typedef enum MSGType {
-    MSG, ACK, RTS, CTS, wakeBEA, wakeACK, ERR
-} MSGType;*/
-
 uint8_t self;
-
-typedef struct Slot
-{
-    struct timespec time;
-    uint8_t src_addr, dst_addr;
-    // MSGType type;
-    char type[4];
-} Slot;
-
-int stop = 0;
-void sigHandler(int sig)
-{
-    stop = 1;
-}
 
 void *receiveT_func(void *args)
 {
@@ -43,11 +26,23 @@ void *receiveT_func(void *args)
         fflush(stdout);
 
         // Blockieren bis eine Nachricht ankommt
-        MAC_recv(mac, buffer);
+        int len = MAC_recv(mac, buffer);
+        uint8_t ctrl = *buffer;
+        if (ctrl == CTRL_PKT)
+        {
+            uint8_t *ptr = buffer;
+            ptr += 7;
+            uint8_t *msg = (uint8_t *)malloc(len);
+            memcpy(msg, ptr, len);
+            printf("%s - [R] %02X->(%02d)[%02X->%02X]->%02X RSSI: (%02d) msg: %s\n", timestamp(), buffer[2], buffer[3], mac->recvH.src_addr, mac->recvH.dst_addr, buffer[1], mac->RSSI, msg);
+        }
+        else
+        {
+            printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
+        }
 
         // MAC_timedrecv(mac, buffer, 2);
 
-        printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
         fflush(stdout);
         // usleep(sleepDuration * 10000);
     }

@@ -15,10 +15,10 @@
 
 // Configuration flags
 
-static uint8_t debugFlag = 1;
-static unsigned int recvTimeout = 5000;
+static uint8_t debugFlag = 0;
+static unsigned int recvTimeout = 2000;
 static enum NetworkMode nwMode = MULTI_HOP;
-static enum OperationMode opMode = MIXED;
+static enum OperationMode opMode = DEDICATED;
 static uint8_t broadCastEnabled = 1;
 
 static uint8_t self;
@@ -41,10 +41,11 @@ int main(int argc, char *argv[])
 	self = (uint8_t)atoi(argv[1]);
 	printf("%s - Node: %02X\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == SINGLE_HOP ? "SINGLE_HOP" : "MULTI_HOP"));
+	srand(self * time(NULL));
 
-	sleepDuration = randInRange(MIN_SLEEP_TIME, MAX_SLEEP_TIME);
+	// sleepDuration = randInRange(MIN_SLEEP_TIME, MAX_SLEEP_TIME);
+	sleepDuration = MIN_SLEEP_TIME + (rand() % (MAX_SLEEP_TIME - MIN_SLEEP_TIME + 1));
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
-	srand(time(NULL));
 
 	if (nwMode == SINGLE_HOP)
 	{
@@ -78,10 +79,7 @@ int main(int argc, char *argv[])
 	}
 	else if (nwMode == MULTI_HOP)
 	{
-		printf("%s - ### Inside MULTI_HOP\n", timestamp());
-
 		routingInit(self, debugFlag, recvTimeout);
-		printf("%s - ### Done routingInit\n", timestamp());
 		RouteHeader header;
 
 		if (self != ADDR_SINK)
@@ -89,22 +87,20 @@ int main(int argc, char *argv[])
 			if (pthread_create(&sendT, NULL, handleRoutingSend, &header) != 0)
 			{
 				printf("Failed to create send thread");
-				exit(1);
+				exit(EXIT_FAILURE);
 			}
-			printf("%s - ### sendT created\n", timestamp());
 		}
-		if (pthread_create(&recvT, NULL, handleRoutingReceive, &header) != 0)
+		else
 		{
-			printf("Failed to create receive thread");
-			exit(EXIT_FAILURE);
+			if (pthread_create(&recvT, NULL, handleRoutingReceive, &header) != 0)
+			{
+				printf("Failed to create receive thread");
+				exit(EXIT_FAILURE);
+			}
 		}
-		printf("%s - ### recvT created\n", timestamp());
 	}
-	pthread_join(recvT, NULL);
-	printf("%s - ### recvT join\n", timestamp());
-
 	pthread_join(sendT, NULL);
-	printf("%s - ### sendT join\n", timestamp());
+	pthread_join(recvT, NULL);
 
 	return 0;
 }
@@ -131,33 +127,6 @@ void *recvT_func(void *args)
 	return NULL;
 }
 
-static void *handleRoutingReceive(void *args)
-{
-	printf("%s - ### Inside handleRoutingReceive\n", timestamp());
-
-	RouteHeader *header = (RouteHeader *)args;
-	while (1)
-	{
-		printf("%s - ### Loop handleRoutingReceive\n", timestamp());
-		unsigned char buffer[240];
-
-		fflush(stdout);
-
-		// blocking
-		// int msgLen = routingReceive(header, buffer);
-
-		int msgLen = routingTimedReceive(header, buffer, 2);
-		if (msgLen > 0)
-		{
-			printf("%s - RRX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
-			fflush(stdout);
-		}
-
-		usleep(sleepDuration * 1000);
-	}
-	return NULL;
-}
-
 static void *sendT_func(void *args)
 {
 
@@ -171,7 +140,7 @@ static void *sendT_func(void *args)
 
 		uint8_t dest_addr = getDestAddr(self, opMode, broadCastEnabled);
 
-		if (MAC_Isend(mac, dest_addr, buffer, sizeof(buffer)))
+		if (MAC_send(mac, dest_addr, buffer, sizeof(buffer)))
 		{
 			printf("%s - TX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
 		}
@@ -182,14 +151,36 @@ static void *sendT_func(void *args)
 	return NULL;
 }
 
-static void *handleRoutingSend(void *args)
+static void *handleRoutingReceive(void *args)
 {
-	printf("%s - ### Inside handleRoutingSend\n", timestamp());
 
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
 	{
-		printf("%s - ### Loop handleRoutingSend\n", timestamp());
+		unsigned char buffer[240];
+
+		fflush(stdout);
+
+		// blocking
+		int msgLen = routingReceive(header, buffer);
+
+		// int msgLen = routingTimedReceive(header, buffer, 2);
+		if (msgLen > 0)
+		{
+			printf("%s - RRX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
+			fflush(stdout);
+		}
+
+		// usleep(sleepDuration * 1000);
+	}
+	return NULL;
+}
+
+static void *handleRoutingSend(void *args)
+{
+	RouteHeader *header = (RouteHeader *)args;
+	while (1)
+	{
 
 		char buffer[5];
 		int msg = randCode(4);
@@ -201,7 +192,6 @@ static void *handleRoutingSend(void *args)
 		{
 			printf("%s - RTX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
 		}
-		printf("%s - ### dest_addr : %02X\n", timestamp(), dest_addr);
 
 		fflush(stdout);
 		usleep(sleepDuration * 1000);
@@ -249,7 +239,6 @@ static uint8_t isRXNode(uint8_t addr, OperationMode mode)
 
 static MAC initMAC(uint8_t addr, uint8_t debug, unsigned int timeout)
 {
-	printf("%s - ### Inside initMAC\n", timestamp());
 
 	GPIO_init();
 	MAC m;

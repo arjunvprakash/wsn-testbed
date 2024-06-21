@@ -133,6 +133,7 @@ static bool recvMsgQ_tryenqueue(recvMessage msg)
 
 static recvMessage recvMsgQ_dequeue()
 {
+
 	// ggf. blockieren und Semaphoren dekrementieren
 	sem_wait(&recvMsgQ.full);
 	sem_wait(&recvMsgQ.mutex);
@@ -431,8 +432,6 @@ static void *recvMsg_func(void *args)
 
 			// Kontrollflag im Puffer speichern
 			*p = ctrl;
-			printf("%s - ### ALOHA: ctrl : %02X\n", "time", ctrl);
-
 			p += sizeof(ctrl);
 
 			// Nachrichtenheader empfangen
@@ -642,23 +641,24 @@ static void *sendMsg_func(void *args)
 		while (1)
 		{
 			// Wenn Noise zu hoch
-			if (ambientNoise(mac) <= mac->noiseThreshold)
-			{
-				if (mac->debug)
-					printf("Noise is too high.\n");
+			// ###
+			// if (ambientNoise(mac) <= mac->noiseThreshold)
+			// {
+			// 	if (mac->debug)
+			// 		printf("Noise is too high.\n");
 
-				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
-				if (numtrials >= mac->maxtrials)
-					break;
+			// 	// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
+			// 	if (numtrials >= mac->maxtrials)
+			// 		break;
 
-				// 5 bis 10 Sekunden warten
-				msleep(5000 + rand() % 5001);
+			// 	// 5 bis 10 Sekunden warten
+			// 	msleep(5000 + rand() % 5001);
 
-				// Anzahl Sendeversuche inkrementieren
-				numtrials++;
+			// 	// Anzahl Sendeversuche inkrementieren
+			// 	numtrials++;
 
-				continue;
-			}
+			// 	continue;
+			// }
 
 			// Nachricht versenden
 			SX1262_send(buffer, MAC_Header_len + msg.len);
@@ -773,6 +773,7 @@ void MAC_init(MAC *mac, unsigned char addr)
 
 int MAC_recv(MAC *mac, unsigned char *msg_buffer)
 {
+
 	// Nachricht aus Warteschlange entfernen
 	recvMessage msg = recvMsgQ_dequeue();
 
@@ -817,7 +818,6 @@ int MAC_tryrecv(MAC *mac, unsigned char *msg_buffer)
 
 int MAC_timedrecv(MAC *mac, unsigned char *msg_buffer, unsigned int timeout)
 {
-	// printf("Inside MAC_timedrecv\n");
 	//  Timeout festlegen
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
@@ -856,7 +856,6 @@ int MAC_send(MAC *mac, unsigned char addr, unsigned char *data, unsigned int len
 	// Nachricht setzen
 	sendMessage msg;
 	msg.addr = addr;
-	// printf("addr : %u\n", addr);
 	msg.len = len;
 
 	// Blockieren und Zeiger setzen

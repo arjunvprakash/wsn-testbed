@@ -25,7 +25,7 @@ typedef struct RoutingMessage
     uint8_t ctrl;
 } RoutingMessage;
 
-#define RoutingQueueSize 16
+#define RoutingQueueSize 64
 
 typedef struct RoutingQueue
 {
@@ -41,7 +41,7 @@ static pthread_t sendT;
 static MAC mac;
 static uint8_t debugFlag;
 static const unsigned short maxTrials = 4;
-static const unsigned short numHeaderFields = 5;
+static const unsigned short headerSize = 7;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -61,31 +61,37 @@ static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
-    printf("%s - ### Inside routingInit\n", timestamp());
+    // printf("%s - ### Inside routingInit\n", timestamp());
     setDebug(debug);
     // mac = initMAC(self, debugFlag, timeout);
-    srand(self * time(NULL));
+    // srand(self * time(NULL));
 
     MAC_init(&mac, self);
-    mac.debug = debugFlag;
+    mac.debug = debug;
     mac.recvTimeout = timeout;
+    mac.noiseThreshold = -65;
 
     sendQ_init();
     recvQ_init();
-
-    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+    // if (self == ADDR_SINK)
     {
-        printf("Failed to create Routing receive thread");
-        exit(1);
+        if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+        {
+            printf("Failed to create Routing receive thread");
+            exit(1);
+        }
+        // printf("%s - ### Routing : recvT created\n", timestamp());
     }
-    printf("%s - ### Routing : recvT created\n", timestamp());
 
-    if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
+    if (self != ADDR_SINK)
     {
-        printf("Failed to create Routing send thread");
-        exit(1);
+        if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
+        {
+            printf("Failed to create Routing send thread");
+            exit(1);
+        }
+        // printf("%s - ### Routing : sendT created\n", timestamp());
     }
-    printf("%s - ### Routing : sendT created\n", timestamp());
     return 1;
 }
 
@@ -96,10 +102,11 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.ctrl = CTRL_PKT;
     msg.dest = dest;
     msg.src = mac.addr;
-    msg.numHops = 0;
     msg.len = len;
     msg.next = getNextHopAddr(mac.addr);
-    printf("%s - ### routingSend: malloc \n", timestamp());
+    msg.numHops = 0;
+
+    // printf("%s - ### routingSend: malloc \n", timestamp());
 
     msg.data = (uint8_t *)malloc(len);
     if (msg.data != NULL)
@@ -109,13 +116,15 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     else
     {
         // Handle memory allocation failure
-        printf("%s - ### routingSend: memory allocation failure\n", timestamp());
+        // printf("%s - ### routingSend: memory allocation failure\n", timestamp());
     }
     memcpy(msg.data, data, len);
-    printf("### - routingSend %02X %02X %02X %02d %02d %s|\n", msg.ctrl, msg.dest, msg.src, msg.numHops, msg.len, msg.data);
+    // printf("### - routingSend %02X %02X %02X %02d %02d %s|\n", msg.ctrl, msg.dest, msg.src, msg.numHops, msg.len, msg.data);
     sendQ_enqueue(msg);
     // free(msg.data);
     // printf("%s - ### routingSend: free \n", timestamp());
+
+    // MAC_send(&mac, dest, data, len);
 
     return 1;
 }
@@ -123,45 +132,47 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
-    printf("%s - ### Inside routingReceive\n", timestamp());
+    // printf("%s - ### Inside routingReceive\n", timestamp());
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
+    header->numHops = msg.numHops;
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
     }
     else
     {
-        printf("%s - ### routingReceive: data is NULL\n", timestamp());
+        // printf("%s - ### routingReceive: data is NULL\n", timestamp());
     }
     return msg.len;
+
+    // MAC_recv(&mac, data);
 }
 
 // Receive a message via the routing layer
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
-    printf("%s - ### Inside routingTimedReceive\n", timestamp());
+    // printf("%s - ### Inside routingTimedReceive\n", timestamp());
     RoutingMessage msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += timeout;
     recvMsgQ_timed_dequeue(&msg, &ts);
-
-    printf("%s - ### routingTimedReceive: %02X -> %02X\n", timestamp(), msg.src, msg.dest);
-
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
+    header->numHops = msg.numHops;
     if (msg.data != NULL)
     {
+        // printf("%s - ### routingTimedReceive: %02X -> %02X\n", timestamp(), msg.src, msg.dest);
         memcpy(data, msg.data, msg.len);
     }
     else
     {
         // Handle null pointer case
-        printf("%s - ### routingTimedReceive: data is NULL\n", timestamp());
+        // printf("%s - ### routingTimedReceive: data is NULL\n", timestamp());
     }
     // *data = *msg.data;
     return msg.len;
@@ -169,10 +180,10 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
 
 static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 {
-    printf("%s - ### Inside recvMsgQ_timed_dequeue\n", timestamp());
+    // printf("%s - ### Inside recvMsgQ_timed_dequeue\n", timestamp());
     if (sem_timedwait(&recvQ.full, ts) == -1)
     {
-        // Handle timeout or error
+        // printf("%s - ### recvMsgQ_timed_dequeue timeout\n", timestamp());
         return;
     }
 
@@ -185,7 +196,7 @@ static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 
 static void sendQ_init()
 {
-    printf("%s - ### Inside sendQ_init\n", timestamp());
+    // printf("%s - ### Inside sendQ_init\n", timestamp());
 
     sendQ.begin = 0;
     sendQ.end = 0;
@@ -197,7 +208,7 @@ static void sendQ_init()
 
 static void recvQ_init()
 {
-    printf("%s - ### Inside recvQ_init\n", timestamp());
+    // printf("%s - ### Inside recvQ_init\n", timestamp());
 
     recvQ.begin = 0;
     recvQ.end = 0;
@@ -209,7 +220,7 @@ static void recvQ_init()
 
 static void sendQ_enqueue(RoutingMessage msg)
 {
-    printf("%s - ### Inside sendQ_enqueue\n", timestamp());
+    // printf("%s - ### Inside sendQ_enqueue\n", timestamp());
 
     sem_wait(&sendQ.free);
     sem_wait(&sendQ.mutex);
@@ -223,7 +234,7 @@ static void sendQ_enqueue(RoutingMessage msg)
 
 static RoutingMessage sendQ_dequeue()
 {
-    printf("%s - ### Inside sendQ_dequeue\n", timestamp());
+    // printf("%s - ### Inside sendQ_dequeue\n", timestamp());
 
     sem_wait(&sendQ.full);
     sem_wait(&sendQ.mutex);
@@ -239,7 +250,7 @@ static RoutingMessage sendQ_dequeue()
 
 static void recvQ_enqueue(RoutingMessage msg)
 {
-    printf("%s - ### Inside recvQ_enqueue\n", timestamp());
+    // printf("%s - ### Inside recvQ_enqueue\n", timestamp());
 
     sem_wait(&recvQ.free);
     sem_wait(&recvQ.mutex);
@@ -253,7 +264,7 @@ static void recvQ_enqueue(RoutingMessage msg)
 
 static RoutingMessage recvMsgQ_dequeue()
 {
-    printf("%s - ### Inside recvMsgQ_dequeue\n", timestamp());
+    // printf("%s - ### Inside recvMsgQ_dequeue\n", timestamp());
     sem_wait(&recvQ.full);
     sem_wait(&recvQ.mutex);
 
@@ -268,61 +279,69 @@ static RoutingMessage recvMsgQ_dequeue()
 
 static void *recvPackets_func(void *args)
 {
-    printf("%s - ### Inside recvPackets_func\n", timestamp());
+    // printf("%s - ### Inside recvPackets_func XX\n", timestamp());
 
     MAC *macTemp = (MAC *)args;
+    // printf("%s - ### Inside recvPackets_func addr = %02X\n", timestamp(), macTemp->addr);
+
     while (1)
     {
-        printf("%s - ### recvPackets_func: malloc\n", timestamp());
-
         uint8_t *pkt = (uint8_t *)malloc(240);
+        // printf("%s - ### recvPackets_func: malloc %d\n", timestamp(), pkt);
         if (pkt == NULL)
         {
-            printf("%s - ### recvPackets_func: malloc failed\n", timestamp());
-            continue; // Or handle error appropriately
+            // printf("%s - ### recvPackets_func: malloc failed\n", timestamp());
+            free(pkt);
+            continue;
         }
         // Receive a packet
-        unsigned int pktSize = MAC_recv(macTemp, pkt);
-        // unsigned int pktSize = MAC_timedrecv(macTemp, pkt, 3);
+        // int pktSize = MAC_recv(macTemp, pkt);
+        int pktSize = MAC_timedrecv(macTemp, pkt, 3);
 
         if (pktSize == 0)
         {
+            // printf("%s - ### recvPackets_func: pktSize == 0 free pkt\n", timestamp());
             free(pkt);
             continue;
         }
 
-        uint8_t ctrl = pkt[0];
+        // printf("%s - ### recvPackets_func: extract ctrl\n", timestamp());
+
+        uint8_t ctrl = *pkt;
+        // printf("%s - ### recvPackets_func: done extract ctrl\n", timestamp());
 
         if (ctrl == CTRL_PKT)
         {
             RoutingMessage msg = buildRoutingMessage(pkt);
-            printf("%s - ### Received %02X -> %02X msg: %s\n", timestamp(), msg.src, msg.dest, msg.data);
+            printf("%s - ### Received: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.dest, msg.data);
 
             if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             {
                 // Keep
+                // --msg.numHops;
                 recvQ_enqueue(msg);
             }
             else
             {
-                // Forward
+                ++msg.numHops;
                 msg.next = getNextHopAddr(macTemp->addr);
-                msg.numHops++;
+                printf("%s - FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
+                // Forward
                 if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
                     if (debugFlag)
                     {
-                        printf("%s - FWD: %02X -> %02X msg: %s\n", timestamp(), msg.src, msg.next, msg.data);
+                        printf("%s - FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
                     }
                 }
                 else
                 {
-                    printf("%s - ## Error forwarding: %02X -> %02X msg: %s\n", timestamp(), msg.src, msg.next, msg.data);
+                    printf("%s - ## Error FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
                 }
                 if (msg.data != NULL)
                 {
                     free(msg.data);
-                    printf("%s - ### recvPackets_func: free(msg.data)\n", timestamp());
+                    // printf("%s - ### recvPackets_func: free(msg.data)\n", timestamp());
                 }
             }
         }
@@ -332,39 +351,49 @@ static void *recvPackets_func(void *args)
         }
 
         free(pkt);
-        printf("%s - ### recvPackets_func: free(pkt)\n", timestamp());
+        // printf("%s - ### recvPackets_func: free(pkt)\n", timestamp());
     }
 }
 
 // Construct RoutingMessage
 static RoutingMessage buildRoutingMessage(uint8_t *pkt)
 {
-    printf("%s - ### Inside buildRoutingMessage\n", timestamp());
+    // printf("%s - ### Inside buildRoutingMessage\n", timestamp());
 
     RoutingMessage msg;
-    printf("%s - ### buildRoutingMessage pkt:\n", timestamp(), *pkt);
+    // printf("%s - ### buildRoutingMessage pkt:%s\n", timestamp(), *pkt);
 
-    msg.ctrl = pkt[0];
-    printf("%s - ### buildRoutingMessage ctrl : %02X\n", timestamp(), pkt[0]);
+    msg.ctrl = *pkt;
+    pkt += sizeof(msg.ctrl);
+    // printf("%s - ### buildRoutingMessage ctrl : %02X\n", timestamp(), pkt[0]);
 
-    msg.dest = pkt[1];
-    printf("%s - ### buildRoutingMessage dest : %02X\n", timestamp(), pkt[1]);
+    msg.dest = *pkt;
+    pkt += sizeof(msg.dest);
+    // printf("%s - ### buildRoutingMessage dest : %02X\n", timestamp(), pkt[1]);
 
-    msg.src = pkt[2];
-    printf("%s - ### buildRoutingMessage src : %02X\n", timestamp(), pkt[2]);
+    msg.src = *pkt;
+    pkt += sizeof(msg.src);
+    // printf("%s - ### buildRoutingMessage src : %02X\n", timestamp(), pkt[2]);
 
     msg.prev = mac.recvH.src_addr;
-    printf("%s - ### buildRoutingMessage prev : %02X\n", timestamp(), msg.prev);
+    // printf("%s - ### buildRoutingMessage prev : %02X\n", timestamp(), msg.prev);
 
-    msg.numHops = pkt[3];
-    printf("%s - ### buildRoutingMessage numHops : %02X\n", timestamp(), pkt[3]);
+    // msg.numHops = (uint16_t)*pkt;
+    // msg.numHops = (uint16_t)(*pkt << 8 | *(pkt + 1));
+    memcpy(&msg.numHops, pkt, sizeof(msg.numHops));
+    ++msg.numHops;
+    pkt += sizeof(msg.numHops);
+    // printf("%s - ### buildRoutingMessage numHops: %02X\n", timestamp(), msg.numHops);
 
-    msg.len = pkt[4];
-    printf("%s - ### buildRoutingMessage len : %02X\n", timestamp(), pkt[4]);
+    // msg.len = (uint16_t)*pkt;
+    // msg.len = (uint16_t)(*pkt << 8 | *(pkt + 1));
+    memcpy(&msg.len, pkt, sizeof(msg.len));
+    pkt += sizeof(msg.len);
+    // printf("%s - ### buildRoutingMessage len : %d\n", timestamp(), msg.len);
 
     if (msg.len > 0)
     {
-        printf("%s - ### buildRoutingMessage: malloc \n", timestamp());
+        // printf("%s - ### buildRoutingMessage: malloc \n", timestamp());
 
         msg.data = (uint8_t *)malloc(msg.len);
     }
@@ -372,60 +401,70 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
     {
         msg.data = NULL;
     }
-    memcpy(msg.data, &pkt[5], msg.len);
-    printf("%s - ### buildRoutingMessage data : %s\n", timestamp(), msg.data);
+    memcpy(msg.data, pkt, msg.len);
+    // printf("%s - ### buildRoutingMessage data : %s\n", timestamp(), msg.data);
 
-    free(msg.data);
-    printf("%s - ### buildRoutingMessage: free \n", timestamp());
+    // free(msg.data);
+    // printf("%s - ### buildRoutingMessage: free \n", timestamp());
 
     return msg;
 }
 
 static void *sendPackets_func(void *args)
 {
-    printf("%s - ### Inside sendPackets_func\n", timestamp());
+    // printf("%s - ### Inside sendPackets_func\n", timestamp());
 
     MAC *macTemp = (MAC *)args;
 
     while (1)
     {
-        printf("%s - ### Loop sendPackets_func\n", timestamp());
+        // printf("%s - ### sendPackets_func addr: %02X\n", timestamp(), macTemp->addr);
 
         RoutingMessage msg = sendQ_dequeue();
-        printf("### - sendPackets_func DQ'd msg : %02X %02X %02X %02d %02d %s|\n", msg.ctrl, msg.dest, msg.src, msg.numHops, msg.len, msg.data);
+        // printf("### - sendPackets_func DQ'd msg : %02X %02X %02X %02d %02d %s|\n", msg.ctrl, msg.dest, msg.src, msg.numHops, msg.len, msg.data);
 
         uint8_t *pkt;
         unsigned int pktSize = buildRoutingPacket(msg, &pkt);
         if (pkt == NULL)
         {
-            printf("%s - ### sendPackets_func: buildRoutingPacket failed\n", timestamp());
+            // printf("%s - ### sendPackets_func: buildRoutingPacket failed\n", timestamp());
+            free(pkt);
+            // printf("%s - ### sendPackets_func: free NULL pkt\n", timestamp());
             continue; // Or handle error appropriately
         }
 
-        printf("%s - ### sendPackets_func pkt: ", timestamp());
-        for (unsigned int i = 0; i < pktSize; i++)
-        {
-            printf("%02X ", pkt[i]);
-        }
-        printf("\n");
+        // printf("%s - ### sendPackets_func pkt: ", timestamp());
+        // for (unsigned int i = 0; i < pktSize; i++)
+        // {
+        //     printf("%02X ", pkt[i]);
+        // }
+        // printf("\n");
 
         // send
-        MAC_send(macTemp, msg.next, pkt, pktSize);
-        free(pkt);
-        printf("%s - ### sendPackets_func: free pkt\n", timestamp());
-
-        if (msg.data != NULL)
+        if (MAC_send(macTemp, msg.next, pkt, pktSize))
         {
-            free(msg.data);
-            printf("%s - ### sendPackets_func: free msg.data\n", timestamp());
+            // printf("%s - ### Done MAC_send : %02X (%s)\n", timestamp(), msg.next, msg.data);
         }
+        else
+        {
+            // printf("%s - ### Failed MAC_send : %02X\n", timestamp(), msg.next);
+        }
+        // MAC_Isend(macTemp, msg.next, pkt, pktSize);
+        // free(pkt);
+        // printf("%s - ### sendPackets_func: free pkt\n", timestamp());
+
+        // if (msg.data != NULL)
+        // {
+        //     free(msg.data);
+        // printf("%s - ### sendPackets_func: free msg.data\n", timestamp());
+        // }
     }
 }
 
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 {
-    uint16_t routePktSize = msg.len + numHeaderFields;
-    printf("%s - ### buildRoutingPacket: malloc : %03d bytes\n", timestamp(), routePktSize);
+    uint16_t routePktSize = msg.len + headerSize;
+    // printf("%s - ### buildRoutingPacket: malloc : %03d bytes\n", timestamp(), routePktSize);
 
     *routePkt = (uint8_t *)malloc(routePktSize);
 
@@ -455,14 +494,14 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     // p += msg.len;
 
     // free(routePkt);
-    // free(msg.data);
+    free(msg.data);
     // printf("%s - ### buildRoutingPacket: free \n", timestamp());
-    printf("%s - ### buildRoutingPacket: Packet contents: ", timestamp());
-    for (uint16_t i = 0; i < routePktSize; i++)
-    {
-        printf("%02X ", (*routePkt)[i]);
-    }
-    printf("\n");
+    // printf("%s - ### buildRoutingPacket: Packet contents: ", timestamp());
+    // for (uint16_t i = 0; i < routePktSize; i++)
+    // {
+    //     printf("%02X ", (*routePkt)[i]);
+    // }
+    // printf("\n");
     return routePktSize;
 }
 
@@ -474,19 +513,20 @@ static uint8_t getNextHopAddr(uint8_t self)
     {
         addr = NODE_POOL[rand() % POOL_SIZE];
         trial++;
-    } while (addr >= self && trial <= maxTrials);
+    } while ((addr >= self || (addr - self) > 1) && trial <= maxTrials);
 
     return (trial > maxTrials) ? ADDR_SINK : addr;
 }
 
 static MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout)
 {
-    printf("%s - ### Inside initMAC\n", timestamp());
+    // printf("%s - ### Inside initMAC\n", timestamp());
     GPIO_init();
     MAC macTemp;
     MAC_init(&macTemp, addr);
     macTemp.debug = debug;
     macTemp.recvTimeout = timeout;
+    // macTemp.noiseThreshold = -65;
     return macTemp;
 }
 
