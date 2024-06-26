@@ -17,8 +17,8 @@
 
 static uint8_t debugFlag = 0;
 static unsigned int recvTimeout = 2000;
-static enum NetworkMode nwMode = MULTI_HOP;
-static enum OperationMode opMode = DEDICATED;
+static enum NetworkMode nwMode = SINGLE_HOP;
+static enum OperationMode opMode = MIXED;
 static uint8_t broadCastEnabled = 1;
 
 static uint8_t self;
