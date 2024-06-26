@@ -23,20 +23,25 @@ typedef struct RoutingMessage
     uint8_t ctrl;
 } RoutingMessage;
 #define RoutingQueueSize 64
+
 typedef struct RoutingQueue
 {
     unsigned int begin, end;
     struct RoutingMessage packet[RoutingQueueSize];
     sem_t mutex, full, free;
 } RoutingQueue;
+
 static RoutingQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
 static uint8_t debugFlag;
 static const unsigned short maxTrials = 4;
-static const unsigned short headerSize = 7;
-static void sendQ_init();
+static const unsigned short headerSize = 7; // [ctrl|dest|src|numHops|len|data]
+static uint8_t nextHopAddr;
+
+static void
+sendQ_init();
 static void recvQ_init();
 static void sendQ_enqueue(RoutingMessage msg);
 static RoutingMessage sendQ_dequeue();
@@ -47,28 +52,25 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
 static uint8_t getNextHopAddr(uint8_t self);
-static MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout);
+static uint8_t getRandomLowerAddr(uint8_t self);
+static uint8_t getNextLowerAddress(uint8_t self);
 static void setDebug(uint8_t d);
 static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
+
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
     setDebug(debug);
-    // mac = initMAC(self, debugFlag, timeout);
     // srand(self * time(NULL));
     MAC_init(&mac, self);
     mac.debug = debug;
     mac.recvTimeout = timeout;
-    mac.noiseThreshold = -65;
     sendQ_init();
     recvQ_init();
-    // if (self == ADDR_SINK)
+    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
-        if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
-        {
-            printf("Failed to create Routing receive thread");
-            exit(1);
-        }
+        printf("Failed to create Routing receive thread");
+        exit(1);
     }
     if (self != ADDR_SINK)
     {
@@ -143,9 +145,9 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     {
         // Handle null pointer case
     }
-    // *data = *msg.data;
     return msg.len;
 }
+
 static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 {
     if (sem_timedwait(&recvQ.full, ts) == -1)
@@ -243,16 +245,9 @@ static void *recvPackets_func(void *args)
             else
             {
                 msg.next = getNextHopAddr(macTemp->addr);
-                printf("%s - ## FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
+                printf("%s - ## FWD: %02X (%02d) -> %02X msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                 // Forward
-                if (MAC_send(macTemp, msg.next, pkt, pktSize))
-                {
-                    if (debugFlag)
-                    {
-                        printf("%s - ## FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
-                    }
-                }
-                else
+                if (!MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
                     printf("%s - ## Error FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
                 }
@@ -321,24 +316,12 @@ static void *sendPackets_func(void *args)
             free(pkt);
             continue; // Or handle error appropriately
         }
-        // for (unsigned int i = 0; i < pktSize; i++)
-        // {
-        //     printf("%02X ", pkt[i]);
-        // }
-        // printf("\n");
-        // send
         if (MAC_send(macTemp, msg.next, pkt, pktSize))
         {
         }
         else
         {
         }
-        // MAC_Isend(macTemp, msg.next, pkt, pktSize);
-        // free(pkt);
-        // if (msg.data != NULL)
-        // {
-        //     free(msg.data);
-        // }
     }
 }
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
@@ -372,7 +355,31 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     // printf("\n");
     return routePktSize;
 }
+
 static uint8_t getNextHopAddr(uint8_t self)
+{
+    if (!nextHopAddr)
+    {
+        nextHopAddr = getNextLowerAddress(self);
+        printf("%s - Next Hop: %02X\n", timestamp(), nextHopAddr);
+    }
+    return nextHopAddr;
+}
+
+static uint8_t getNextLowerAddress(uint8_t self)
+{
+    uint8_t addr = ADDR_SINK;
+    for (int i = 0; i < POOL_SIZE; i++)
+    {
+        if (NODE_POOL[i] < self && NODE_POOL[i] > addr)
+        {
+            addr = NODE_POOL[i];
+        }
+    }
+    return addr;
+}
+
+static uint8_t getRandomLowerAddr(uint8_t self)
 {
     uint8_t addr;
     unsigned short trial = 0;
@@ -380,19 +387,10 @@ static uint8_t getNextHopAddr(uint8_t self)
     {
         addr = NODE_POOL[rand() % POOL_SIZE];
         trial++;
-    } while ((addr >= self || (addr - self) > 1) && trial <= maxTrials);
+    } while ((addr >= self && trial <= maxTrials));
     return (trial > maxTrials) ? ADDR_SINK : addr;
 }
-static MAC initMAC(uint8_t addr, unsigned short debug, unsigned int timeout)
-{
-    GPIO_init();
-    MAC macTemp;
-    MAC_init(&macTemp, addr);
-    macTemp.debug = debug;
-    macTemp.recvTimeout = timeout;
-    // macTemp.noiseThreshold = -65;
-    return macTemp;
-}
+
 static void setDebug(uint8_t d)
 {
     debugFlag = d;

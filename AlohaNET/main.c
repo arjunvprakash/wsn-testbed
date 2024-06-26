@@ -24,7 +24,7 @@ static uint8_t getNewDest();
 static void node_init(char *argv[]);
 static void print_mode();
 
-static enum MODE mode = MIXED;
+static enum MODE mode = DEDICATED;
 static uint8_t broadCastEnabled = 1;
 
 uint8_t isRX(uint8_t addr)

@@ -2,4 +2,4 @@
 
 #include "common.h"
 
-uint8_t NODE_POOL[POOL_SIZE] = {0x06, 0x05, 0x04};
+uint8_t NODE_POOL[POOL_SIZE] = {0x04, 0x05, 0x06};
