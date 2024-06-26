@@ -14,6 +14,7 @@
 #define CTRL_RET '\xC1' // Antwort des Moduls
 #define CTRL_MSG '\xC4' // Nachricht
 #define CTRL_ACK '\xC5' // Acknowledgement
+#define CTRL_PKT '\x45' // Routing layer packet
 
 // Struktur einer zu empfangenden Nachricht
 typedef struct recvMessage
@@ -420,7 +421,7 @@ static void *recvMsg_func(void *args)
 		}
 
 		// Nachricht
-		else if (ctrl == CTRL_MSG)
+		else if (ctrl == CTRL_MSG || ctrl == CTRL_PKT)
 		{
 			// Puffer für den Nachrichtenheader
 			uint8_t header_buffer[MAC_Header_len];

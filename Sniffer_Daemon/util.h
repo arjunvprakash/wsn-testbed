@@ -1,6 +1,6 @@
 #ifndef UTIL_H
 #define UTIL_H
 
-char* get_timestamp();
+char* timestamp();
 
 #endif
