@@ -37,13 +37,10 @@ void *receiveT_func(void *args)
 	MAC *mac = (MAC *)args;
 	while (1)
 	{
-		// Puffer für größtmögliche Nachricht
 		unsigned char buffer[240];
 
-		// printf("Waiting for message...\n");
 		fflush(stdout);
 
-		// Blockieren bis eine Nachricht ankommt
 		MAC_recv(mac, buffer);
 
 		// MAC_timedrecv(mac, buffer, 2);
@@ -86,7 +83,6 @@ int main(int argc, char *argv[])
 {
 	GPIO_init();
 
-	// ALOHA-Protokoll initialisieren
 	MAC mac;
 	MAC_init(&mac, atoi(argv[1]));
 	// mac.debug = 1;
@@ -96,8 +92,6 @@ int main(int argc, char *argv[])
 	printf("%s - Node: %02X\n", get_timestamp(), self);
 	printf("%s - sleep duration: %d ms\n", get_timestamp(), sleepDuration);
 	print_mode();
-
-	// Threading implementation
 
 	if (mode == MIXED || (mode == DEDICATED && isRX(self)))
 	{
