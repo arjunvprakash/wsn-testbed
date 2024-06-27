@@ -23,4 +23,6 @@ typedef enum NetworkMode
     ROUTING
 } NetworkMode;
 
+#define _PRINT_TRACE_ printf("### Trace: - %s:%d", __FILE__, __LINE__);
+
 #endif

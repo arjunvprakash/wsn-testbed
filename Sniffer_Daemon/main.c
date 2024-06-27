@@ -12,20 +12,18 @@
 #include "common.h"
 #include "util.h"
 
-uint8_t self;
+static uint8_t self;
+static uint8_t msg[240];
 
 void *receiveT_func(void *args)
 {
     MAC *mac = (MAC *)args;
     while (1)
     {
-        // Puffer für größtmögliche Nachricht
         unsigned char buffer[240];
 
-        // printf("Waiting for message...\n");
         fflush(stdout);
 
-        // Blockieren bis eine Nachricht ankommt
         int len = MAC_recv(mac, buffer);
         uint8_t ctrl = *buffer;
         if (ctrl == CTRL_PKT)
@@ -44,18 +42,14 @@ void *receiveT_func(void *args)
         // MAC_timedrecv(mac, buffer, 2);
 
         fflush(stdout);
-        // usleep(sleepDuration * 10000);
     }
     return NULL;
 }
-
-uint8_t msg[240];
 
 int main(int argc, char *argv[])
 {
     GPIO_init();
 
-    // ALOHA-Protokoll initialisieren
     MAC mac;
     MAC_init(&mac, atoi(argv[1]));
     // mac.debug = 1;

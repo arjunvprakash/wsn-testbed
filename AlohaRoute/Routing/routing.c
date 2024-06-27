@@ -37,11 +37,10 @@ static pthread_t sendT;
 static MAC mac;
 static uint8_t debugFlag;
 static const unsigned short maxTrials = 4;
-static const unsigned short headerSize = 7; // [ctrl|dest|src|numHops|len|data]
+static const unsigned short headerSize = 7; // [ctrl | dest | src | numHops(2) | len(2) | [data(len)] ]
 static uint8_t nextHopAddr;
 
-static void
-sendQ_init();
+static void sendQ_init();
 static void recvQ_init();
 static void sendQ_enqueue(RoutingMessage msg);
 static RoutingMessage sendQ_dequeue();
@@ -63,7 +62,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     setDebug(debug);
     // srand(self * time(NULL));
     MAC_init(&mac, self);
-    mac.debug = debug;
+    mac.debug = 0;
     mac.recvTimeout = timeout;
     sendQ_init();
     recvQ_init();
@@ -82,6 +81,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     }
     return 1;
 }
+
 // Send a message via the routing layer
 int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 {
@@ -99,14 +99,17 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     }
     else
     {
-        // Handle memory allocation failure
+        if (debugFlag)
+        {
+            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
+        }
     }
     memcpy(msg.data, data, len);
     sendQ_enqueue(msg);
-    // free(msg.data);
-    // MAC_send(&mac, dest, data, len);
+
     return 1;
 }
+
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
@@ -121,10 +124,14 @@ int routingReceive(RouteHeader *header, uint8_t *data)
     }
     else
     {
+        if (debugFlag)
+        {
+            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
+        }
     }
     return msg.len;
-    // MAC_recv(&mac, data);
 }
+
 // Receive a message via the routing layer
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
@@ -143,7 +150,10 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     }
     else
     {
-        // Handle null pointer case
+        if (debugFlag)
+        {
+            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
+        }
     }
     return msg.len;
 }
@@ -160,6 +170,7 @@ static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
 }
+
 static void sendQ_init()
 {
     sendQ.begin = 0;
@@ -168,6 +179,7 @@ static void sendQ_init()
     sem_init(&sendQ.free, 0, RoutingQueueSize);
     sem_init(&sendQ.mutex, 0, 1);
 }
+
 static void recvQ_init()
 {
     recvQ.begin = 0;
@@ -176,6 +188,7 @@ static void recvQ_init()
     sem_init(&recvQ.free, 0, RoutingQueueSize);
     sem_init(&recvQ.mutex, 0, 1);
 }
+
 static void sendQ_enqueue(RoutingMessage msg)
 {
     sem_wait(&sendQ.free);
@@ -185,6 +198,7 @@ static void sendQ_enqueue(RoutingMessage msg)
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
 }
+
 static RoutingMessage sendQ_dequeue()
 {
     sem_wait(&sendQ.full);
@@ -195,6 +209,7 @@ static RoutingMessage sendQ_dequeue()
     sem_post(&sendQ.free);
     return msg;
 }
+
 static void recvQ_enqueue(RoutingMessage msg)
 {
     sem_wait(&recvQ.free);
@@ -204,6 +219,7 @@ static void recvQ_enqueue(RoutingMessage msg)
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
 }
+
 static RoutingMessage recvMsgQ_dequeue()
 {
     sem_wait(&recvQ.full);
@@ -214,6 +230,7 @@ static RoutingMessage recvMsgQ_dequeue()
     sem_post(&recvQ.free);
     return msg;
 }
+
 static void *recvPackets_func(void *args)
 {
     MAC *macTemp = (MAC *)args;
@@ -225,7 +242,6 @@ static void *recvPackets_func(void *args)
             free(pkt);
             continue;
         }
-        // Receive a packet
         // int pktSize = MAC_recv(macTemp, pkt);
         int pktSize = MAC_timedrecv(macTemp, pkt, 3);
         if (pktSize == 0)
@@ -244,12 +260,12 @@ static void *recvPackets_func(void *args)
             }
             else
             {
-                msg.next = getNextHopAddr(macTemp->addr);
-                printf("%s - ## FWD: %02X (%02d) -> %02X msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                 // Forward
+                msg.next = getNextHopAddr(macTemp->addr);
+                printf("%s - FWD: %02X (%02d) -> %02X msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                 if (!MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
-                    printf("%s - ## Error FWD: (%02d) %02X -> %02X msg: %s\n", timestamp(), msg.numHops, msg.src, msg.next, msg.data);
+                    printf("%s - ## Error FWD: %02X (%02d) -> %02X msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                 }
                 if (msg.data != NULL)
                 {
@@ -303,6 +319,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
     memcpy(msg.data, pkt, msg.len);
     return msg;
 }
+
 static void *sendPackets_func(void *args)
 {
     MAC *macTemp = (MAC *)args;
@@ -314,45 +331,44 @@ static void *sendPackets_func(void *args)
         if (pkt == NULL)
         {
             free(pkt);
-            continue; // Or handle error appropriately
+            continue;
         }
-        if (MAC_send(macTemp, msg.next, pkt, pktSize))
+        if (!MAC_send(macTemp, msg.next, pkt, pktSize))
         {
-        }
-        else
-        {
+
+            printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
     }
 }
+
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 {
     uint16_t routePktSize = msg.len + headerSize;
     *routePkt = (uint8_t *)malloc(routePktSize);
+
     uint8_t *p = *routePkt;
     *p = msg.ctrl;
     p += sizeof(msg.ctrl);
+
     // Set dest
     *p = msg.dest;
     p += sizeof(msg.dest);
+
     // Set source as self
     *p = mac.addr;
     p += sizeof(mac.addr);
+
     // Set numHops
     *p = msg.numHops;
     p += sizeof(msg.numHops);
+
     // Set actual msg length
     *p = msg.len;
     p += sizeof(msg.len);
+
     // Set msg
     memcpy(p, msg.data, msg.len);
-    // p += msg.len;
-    // free(routePkt);
     free(msg.data);
-    // for (uint16_t i = 0; i < routePktSize; i++)
-    // {
-    //     printf("%02X ", (*routePkt)[i]);
-    // }
-    // printf("\n");
     return routePktSize;
 }
 
