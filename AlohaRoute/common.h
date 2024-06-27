@@ -6,6 +6,7 @@ Constants for subnet group
 */
 
 #define CTRL_PKT '\x45' // Routing layer packet
+#define CTRL_BCN '\x47' // Routing layer beacon
 
 #define ADDR_BROADCAST 0XFF
 #define ADDR_SINK 0X01
@@ -23,6 +24,6 @@ typedef enum NetworkMode
     ROUTING
 } NetworkMode;
 
-#define _PRINT_TRACE_ printf("### Trace: - %s:%d", __FILE__, __LINE__);
+#define _PRINT_TRACE_ printf("### Trace: - %s:%d\n", __FILE__, __LINE__);
 
 #endif

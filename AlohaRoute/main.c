@@ -15,8 +15,8 @@
 
 // Configuration flags
 
-static uint8_t debugFlag = 0;
-static unsigned int recvTimeout = 2000;
+static uint8_t debugFlag = 1;
+static unsigned int recvTimeout = 3000;
 static enum NetworkMode nwMode = ROUTING;
 
 static uint8_t self;
@@ -37,7 +37,8 @@ int main(int argc, char *argv[])
 
 	if (nwMode == ROUTING)
 	{
-		sleepDuration = MIN_SLEEP_TIME * self * 3;
+		// sleepDuration = MIN_SLEEP_TIME * self * 3;
+		sleepDuration = 10000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 		routingInit(self, debugFlag, recvTimeout);
 		RouteHeader header;

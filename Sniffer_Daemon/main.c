@@ -33,12 +33,16 @@ void *receiveT_func(void *args)
             uint8_t *msg = (uint8_t *)malloc(len);
             memcpy(msg, ptr, len);
             printf("%s - [R] %02X->(%02d)[%02X->%02X]->%02X RSSI: (%02d) msg: %s\n", timestamp(), buffer[2], buffer[3], mac->recvH.src_addr, mac->recvH.dst_addr, buffer[1], mac->RSSI, msg);
+            free(msg);
         }
-        else
+        else if (ctrl == CTRL_MSG)
         {
             printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
         }
-
+        else if (ctrl == CTRL_BCN)
+        {
+            printf("%s - [R] Beacon src: %02X RSSI: (%02d) %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, msg);
+        }
         // MAC_timedrecv(mac, buffer, 2);
 
         fflush(stdout);
