@@ -32,16 +32,16 @@ void *receiveT_func(void *args)
             ptr += 7;
             uint8_t *msg = (uint8_t *)malloc(len);
             memcpy(msg, ptr, len);
-            printf("%s - [R] %02X->(%02d)[%02X->%02X]->%02X RSSI: (%02d) msg: %s\n", timestamp(), buffer[2], buffer[3], mac->recvH.src_addr, mac->recvH.dst_addr, buffer[1], mac->RSSI, msg);
+            printf("%s - [R] %02d->(%02d)[%02d->%02d]->%02d RSSI: (%02d) msg: %s\n", timestamp(), buffer[2], buffer[3], mac->recvH.src_addr, mac->recvH.dst_addr, buffer[1], mac->RSSI, msg);
             free(msg);
         }
         else if (ctrl == CTRL_MSG)
         {
-            printf("%s - %02X -> %02X RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
+            printf("%s - %02d -> %02d RSSI: (%02d) msg: %s\n", timestamp(), mac->recvH.src_addr, mac->recvH.dst_addr, mac->RSSI, buffer);
         }
         else if (ctrl == CTRL_BCN)
         {
-            printf("%s - [R] Beacon src: %02X RSSI: (%02d) %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, msg);
+            printf("%s - [R] Beacon src: %02d RSSI: (%02d) %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, msg);
         }
         // MAC_timedrecv(mac, buffer, 2);
 
@@ -60,7 +60,7 @@ int main(int argc, char *argv[])
     mac.recvTimeout = 3000;
 
     self = (uint8_t)atoi(argv[1]);
-    printf("%s - Node: %02X\n", timestamp(), self);
+    printf("%s - Node: %02d\n", timestamp(), self);
     printf("%s - Mode: Sniffer\n", timestamp());
 
     receiveT_func(&mac);

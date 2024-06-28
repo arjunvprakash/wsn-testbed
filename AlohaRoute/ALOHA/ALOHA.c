@@ -641,23 +641,24 @@ static void *sendMsg_func(void *args)
 		while (1)
 		{
 			// Wenn Noise zu hoch
-			if (ambientNoise(mac) <= mac->noiseThreshold)
-			{
-				if (mac->debug)
-					printf("Noise is too high.\n");
+			// ###
+			// if (ambientNoise(mac) <= mac->noiseThreshold)
+			// {
+			// 	if (mac->debug)
+			// 		printf("Noise is too high.\n");
 
-				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
-				if (numtrials >= mac->maxtrials)
-					break;
+			// 	// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
+			// 	if (numtrials >= mac->maxtrials)
+			// 		break;
 
-				// 5 bis 10 Sekunden warten
-				msleep(5000 + rand() % 5001);
+			// 	// 5 bis 10 Sekunden warten
+			// 	msleep(5000 + rand() % 5001);
 
-				// Anzahl Sendeversuche inkrementieren
-				numtrials++;
+			// 	// Anzahl Sendeversuche inkrementieren
+			// 	numtrials++;
 
-				continue;
-			}
+			// 	continue;
+			// }
 
 			// Nachricht versenden
 			SX1262_send(buffer, MAC_Header_len + msg.len);
