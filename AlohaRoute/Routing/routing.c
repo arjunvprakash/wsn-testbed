@@ -92,7 +92,8 @@ static void initActiveNodes();
 static void cleanupInactiveNodes();
 static void selectRandomLowerNeighbour();
 static void selectRandomNeighbour();
-static void setNextLowerNeighbour();
+static void selectNextLowerNeighbour();
+static void selectClosestNeighbour();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -603,7 +604,36 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
     }
 }
 
-void setNextLowerNeighbour()
+static void selectClosestNeighbour()
+{
+    uint8_t newParent = ADDR_SINK;
+    unsigned short numActive = network.numActive;
+    int newParentRSSI = MIN_RSSI;
+
+    sem_wait(&network.mutex);
+    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
+    {
+        NodeInfo node = network.nodes[i];
+        if (node.isActive)
+        {
+            if (!node.isChild && node.RSSI > parentAddr)
+            {
+                if (debugFlag)
+                {
+                    printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
+                }
+                newParent = node.addr;
+                newParentRSSI = node.RSSI;
+            }
+            active++;
+        }
+    }
+    sem_post(&network.mutex);
+    parentAddr = newParent;
+    parentRSSI = newParentRSSI;
+}
+
+static void selectNextLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
     int newParentRSSI = MIN_RSSI;
@@ -631,7 +661,7 @@ void setNextLowerNeighbour()
     parentRSSI = newParentRSSI;
 }
 
-void selectRandomNeighbour()
+static void selectRandomNeighbour()
 {
     uint8_t newParent = parentAddr;
     unsigned short numActive = network.numActive;
@@ -640,7 +670,7 @@ void selectRandomNeighbour()
     int p = 0;
 
     sem_wait(&network.mutex);
-    for (int i = 0, active = 0; i < MAX_ACTIVE_NODES && active < numActive; i++)
+    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive)
@@ -676,7 +706,7 @@ void selectRandomNeighbour()
     parentRSSI = newParentRSSI;
 }
 
-void selectRandomLowerNeighbour()
+static void selectRandomLowerNeighbour()
 {
     uint8_t newParent = parentAddr;
     unsigned short numActive = network.numActive;
