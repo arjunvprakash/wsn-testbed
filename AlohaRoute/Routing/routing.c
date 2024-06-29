@@ -81,9 +81,6 @@ static void *recvPackets_func(void *args);
 static RoutingMessage buildRoutingMessage(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
-static uint8_t getNextHopAddr(uint8_t self);
-static uint8_t getRandomLowerAddr(uint8_t self);
-static uint8_t getNextLowerAddress(uint8_t self);
 static void setDebug(uint8_t d);
 static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
 static void *sendBeacon(void *args);
@@ -93,6 +90,9 @@ static void updateActiveNodes(uint8_t addr, int rssi, bool child);
 static void changeParent();
 static void initActiveNodes();
 static void cleanupInactiveNodes();
+static void selectRandomLowerNeighbour();
+static void selectRandomNeighbour();
+static void setNextLowerNeighbour();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -134,7 +134,6 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.dest = dest;
     msg.src = mac.addr;
     msg.len = len;
-    // msg.next = getNextHopAddr(mac.addr);
     msg.next = parentAddr;
     msg.numHops = 0;
     msg.data = (uint8_t *)malloc(len);
@@ -336,7 +335,6 @@ static void *recvPackets_func(void *args)
                         }
                     }
                 }
-                // msg.next = getNextHopAddr(macTemp->addr);
                 msg.next = parentAddr;
 
                 if (!MAC_send(macTemp, msg.next, pkt, pktSize))
@@ -464,41 +462,6 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     memcpy(p, msg.data, msg.len);
     free(msg.data);
     return routePktSize;
-}
-
-static uint8_t getNextHopAddr(uint8_t self)
-{
-    if (!parentAddr)
-    {
-        parentAddr = getNextLowerAddress(self);
-        printf("%s - Next Hop: %02d\n", timestamp(), parentAddr);
-    }
-    return parentAddr;
-}
-
-static uint8_t getNextLowerAddress(uint8_t self)
-{
-    uint8_t addr = ADDR_SINK;
-    for (int i = 0; i < POOL_SIZE; i++)
-    {
-        if (NODE_POOL[i] < self && NODE_POOL[i] > addr)
-        {
-            addr = NODE_POOL[i];
-        }
-    }
-    return addr;
-}
-
-static uint8_t getRandomLowerAddr(uint8_t self)
-{
-    uint8_t addr;
-    unsigned short trial = 0;
-    do
-    {
-        addr = NODE_POOL[rand() % POOL_SIZE];
-        trial++;
-    } while ((addr >= self && trial <= maxBeacons));
-    return (trial > maxBeacons) ? ADDR_SINK : addr;
 }
 
 static void setDebug(uint8_t d)
@@ -640,16 +603,13 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
     }
 }
 
-static void changeParent()
+void setNextLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    unsigned short numActive = network.numActive;
-    NodeInfo pool[numActive];
-    int rssi = parentRSSI;
-    int p = 0;
+    int newParentRSSI = MIN_RSSI;
 
     sem_wait(&network.mutex);
-    for (int i = 0, active = 0; i < MAX_ACTIVE_NODES && active < numActive; i++)
+    for (int i = 0; i < mac.addr; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive)
@@ -658,19 +618,43 @@ static void changeParent()
             {
                 printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
             }
-            // Choose random neighbour as parent
-            if (node.addr != ADDR_SINK && !node.isChild && node.addr < parentAddr)
+            if (!node.isChild)
             {
+                newParent = node.addr;
+                newParentRSSI = node.RSSI;
+            }
+        }
+    }
+    sem_post(&network.mutex);
+
+    parentAddr = newParent;
+    parentRSSI = newParentRSSI;
+}
+
+void selectRandomNeighbour()
+{
+    uint8_t newParent = parentAddr;
+    unsigned short numActive = network.numActive;
+    NodeInfo pool[numActive];
+    int newParentRSSI = MIN_RSSI;
+    int p = 0;
+
+    sem_wait(&network.mutex);
+    for (int i = 0, active = 0; i < MAX_ACTIVE_NODES && active < numActive; i++)
+    {
+        NodeInfo node = network.nodes[i];
+        if (node.isActive)
+        {
+            if (node.addr != ADDR_SINK && !node.isChild && node.addr != parentAddr)
+            {
+                if (debugFlag)
+                {
+                    printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
+                }
                 pool[p].addr = node.addr;
                 pool[p].RSSI = node.RSSI;
                 p++;
             }
-            // Choose node with higher RSSI
-            // if (node.RSSI > rssi && !node.isChild && node.addr != parentAddr)
-            // {
-            //     newParent = node.addr;
-            //     rssi = node.RSSI;
-            // }
             active++;
         }
     }
@@ -685,12 +669,60 @@ static void changeParent()
     {
         uint8_t index = rand() % numActive;
         newParent = pool[index].addr;
-        rssi = pool[index].addr;
+        newParentRSSI = pool[index].addr;
     }
 
     parentAddr = newParent;
-    parentRSSI = rssi;
+    parentRSSI = newParentRSSI;
+}
 
+void selectRandomLowerNeighbour()
+{
+    uint8_t newParent = parentAddr;
+    unsigned short numActive = network.numActive;
+    NodeInfo pool[numActive];
+    int newParentRSSI = MIN_RSSI;
+    int p = 0;
+
+    sem_wait(&network.mutex);
+    for (int i = 0; i < mac.addr; i++)
+    {
+        NodeInfo node = network.nodes[i];
+        if (node.isActive)
+        {
+            if (node.addr != ADDR_SINK && !node.isChild && node.addr < parentAddr)
+            {
+                if (debugFlag)
+                {
+                    printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
+                }
+                pool[p].addr = node.addr;
+                pool[p].RSSI = node.RSSI;
+                p++;
+            }
+        }
+    }
+    sem_post(&network.mutex);
+
+    if (p == 0)
+    {
+        newParent = ADDR_SINK;
+        parentRSSI = MIN_RSSI;
+    }
+    else
+    {
+        uint8_t index = rand() % numActive;
+        newParent = pool[index].addr;
+        newParentRSSI = pool[index].addr;
+    }
+
+    parentAddr = newParent;
+    parentRSSI = newParentRSSI;
+}
+
+static void changeParent()
+{
+    selectRandomNeighbour();
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, parentRSSI);
 }
 
