@@ -25,7 +25,7 @@ typedef struct recvMessage
 } recvMessage;
 
 // Struktur für die Empfangs-Warteschlange
-#define recvMsgQ_size 16
+#define recvMsgQ_size 256
 typedef struct recvMsgQueue
 {
 	recvMessage msg[recvMsgQ_size]; // Nachrichten der Warteschlange
@@ -46,7 +46,7 @@ typedef struct sendMessage
 } sendMessage;
 
 // Struktur für die Sende-Warteschlange
-#define sendMsgQ_size 16
+#define sendMsgQ_size 256
 typedef struct sendMsgQueue
 {
 	sendMessage msg[sendMsgQ_size]; // Nachrichten der Warteschlange

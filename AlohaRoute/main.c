@@ -88,7 +88,6 @@ static void *handleRoutingReceive(void *args)
 
 		// usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }
 
 static void *handleRoutingSend(void *args)
@@ -96,7 +95,6 @@ static void *handleRoutingSend(void *args)
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
 	{
-
 		char buffer[5];
 		int msg = randCode(4);
 		sprintf(buffer, "%04d", msg);
@@ -111,5 +109,4 @@ static void *handleRoutingSend(void *args)
 
 		usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }

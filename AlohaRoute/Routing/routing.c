@@ -14,10 +14,18 @@
 #include "../common.h"
 #include "../util.h"
 
-#define RoutingQueueSize 64
+#define RoutingQueueSize 256
 #define MAX_ACTIVE_NODES 32
 #define NODE_TIMEOUT 30
 #define MIN_RSSI -128
+
+typedef enum ParentSelectionStrategy
+{
+    RANDOM_LOWER,
+    RANDOM,
+    NEXT_LOWER,
+    CLOSEST
+} ParentSelectionStrategy;
 
 typedef struct RoutingMessage
 {
@@ -70,6 +78,7 @@ static uint8_t parentAddr;
 static int parentRSSI;
 static ActiveNodes network;
 static uint8_t loopyParent;
+static ParentSelectionStrategy strategy = NEXT_LOWER;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -338,16 +347,16 @@ static void *recvPackets_func(void *args)
                 }
                 msg.next = parentAddr;
 
-                if (!MAC_send(macTemp, msg.next, pkt, pktSize))
+                if (MAC_send(macTemp, msg.next, pkt, pktSize))
+                {
+                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
+                }
+                else
                 {
                     if (debugFlag)
                     {
                         printf("%s - ## Error FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                     }
-                }
-                else
-                {
-                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                 }
                 if (msg.data != NULL)
                 {
@@ -532,8 +541,8 @@ static void *receiveBeacon(void *args)
             trials++;
         }
         usleep(rand() % 1000);
-    } while (trials < maxBeacons || parentAddr == ADDR_BROADCAST);
-    if (parentAddr == ADDR_BROADCAST)
+    } while (trials < maxBeacons || parentAddr == ADDR_SINK);
+    if (parentAddr == ADDR_SINK)
     {
         printf("%s - ## Error: Couldn't select parent. Timed out\n", timestamp());
         exit(EXIT_FAILURE);
@@ -548,7 +557,7 @@ static void selectParent()
 {
     pthread_t send, recv;
     parentRSSI = MIN_RSSI;
-    parentAddr = ADDR_BROADCAST;
+    parentAddr = ADDR_SINK;
 
     if (pthread_create(&send, NULL, sendBeacon, &mac) != 0)
     {
@@ -563,6 +572,7 @@ static void selectParent()
     }
     pthread_join(send, NULL);
     pthread_join(recv, NULL);
+    changeParent();
 }
 
 void updateActiveNodes(uint8_t addr, int RSSI, bool child)
@@ -582,9 +592,10 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
     node->RSSI = RSSI;
     node->lastSeen = time(NULL);
     sem_post(&network.mutex);
-    if (child && parentAddr == addr)
+    if (child && parentAddr == addr && addr < mac.addr)
     {
-        printf("%s - Direct loop with %02d..", timestamp(), addr);
+        printf("%s - Direct loop with %02d..\n", timestamp(), addr);
+        loopyParent = addr;
         changeParent();
     }
 
@@ -595,12 +606,6 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
             printf("%s - ##  New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr);
             printf("%s - ##  Active neighbour count: %0d\n", timestamp(), numActive);
         }
-        // if (!child && RSSI > parentRSSI)
-        // {
-        //     parentAddr = addr;
-        //     parentRSSI = RSSI;
-        //     printf("%s - ## Setting parent: %02d (%02d)\n", timestamp(), addr, RSSI);
-        // }
     }
 }
 
@@ -663,7 +668,7 @@ static void selectNextLowerNeighbour()
 
 static void selectRandomNeighbour()
 {
-    uint8_t newParent = parentAddr;
+    uint8_t newParent = ADDR_SINK;
     unsigned short numActive = network.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
@@ -708,7 +713,7 @@ static void selectRandomNeighbour()
 
 static void selectRandomLowerNeighbour()
 {
-    uint8_t newParent = parentAddr;
+    uint8_t newParent = ADDR_SINK;
     unsigned short numActive = network.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
@@ -752,7 +757,24 @@ static void selectRandomLowerNeighbour()
 
 static void changeParent()
 {
-    selectRandomNeighbour();
+    switch (strategy)
+    {
+    case NEXT_LOWER:
+        selectNextLowerNeighbour();
+        break;
+    case RANDOM:
+        selectRandomNeighbour();
+        break;
+    case RANDOM_LOWER:
+        selectRandomLowerNeighbour();
+        break;
+    case CLOSEST:
+        selectClosestNeighbour();
+        break;
+    default:
+        selectNextLowerNeighbour();
+        break;
+    }
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, parentRSSI);
 }
 
