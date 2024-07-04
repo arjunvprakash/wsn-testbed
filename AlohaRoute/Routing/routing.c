@@ -79,7 +79,7 @@ static uint8_t parentAddr;
 static int parentRSSI;
 static ActiveNodes network;
 static uint8_t loopyParent;
-static ParentSelectionStrategy strategy = NEXT_LOWER;
+static ParentSelectionStrategy strategy = CLOSEST;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -170,6 +170,10 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
+    // send beacon
+    uint8_t beacon = CTRL_BCN;
+    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, 1);
+
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
@@ -187,12 +191,17 @@ int routingReceive(RouteHeader *header, uint8_t *data)
             printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
     }
+
     return msg.len;
 }
 
 // Receive a message via the routing layer
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
+    // send beacon
+    uint8_t beacon = CTRL_BCN;
+    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, 1);
+
     RoutingMessage msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -214,6 +223,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
             printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
     }
+
     return msg.len;
 }
 
