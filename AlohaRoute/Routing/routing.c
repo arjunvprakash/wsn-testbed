@@ -16,7 +16,7 @@
 
 #define RoutingQueueSize 256
 #define MAX_ACTIVE_NODES 32
-#define NODE_TIMEOUT 30
+#define NODE_TIMEOUT 60
 #define MIN_RSSI -128
 
 typedef enum ParentSelectionStrategy
@@ -24,7 +24,8 @@ typedef enum ParentSelectionStrategy
     RANDOM_LOWER,
     RANDOM,
     NEXT_LOWER,
-    CLOSEST
+    CLOSEST,
+    CLOSEST_LOWER
 } ParentSelectionStrategy;
 
 typedef struct RoutingMessage
@@ -103,6 +104,8 @@ static void selectRandomLowerNeighbour();
 static void selectRandomNeighbour();
 static void selectNextLowerNeighbour();
 static void selectClosestNeighbour();
+static void selectClosestLowerNeighbour();
+static void printRoutingStrategy();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -117,6 +120,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     initActiveNodes();
     if (self != ADDR_SINK)
     {
+        printRoutingStrategy();
         selectParent();
     }
 
@@ -160,27 +164,18 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     }
     memcpy(msg.data, data, len);
     sendQ_enqueue(msg);
-
-    // time_t currentTime = time(NULL);
-    // if (currentTime - network.lastCleanupTime > NODE_TIMEOUT)
-    // {
-    //     cleanupInactiveNodes();
-    // }
     return 1;
 }
 
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
-    // Send beacon
-    uint8_t beacon = CTRL_BCN;
-    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, 1);
-
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
     header->numHops = msg.numHops;
+    header->prev = mac.recvH.src_addr;
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -198,10 +193,6 @@ int routingReceive(RouteHeader *header, uint8_t *data)
 // Receive a message via the routing layer
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
-    // Send beacon
-    uint8_t beacon = CTRL_BCN;
-    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, 1);
-
     RoutingMessage msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
@@ -211,6 +202,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     header->RSSI = mac.RSSI;
     header->src = msg.src;
     header->numHops = msg.numHops;
+    header->prev = mac.recvH.src_addr;
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -497,6 +489,7 @@ static void *sendBeacon(void *args)
         }
         usleep(rand() % 100000);
     } while (trials < maxBeacons);
+    // } while (current - start < duration);
 
     if (debugFlag)
     {
@@ -506,14 +499,15 @@ static void *sendBeacon(void *args)
 
 static void *receiveBeacon(void *args)
 {
-
     MAC *m = (MAC *)args;
     int trials = 0;
     if (debugFlag)
     {
         printf("%s - ## Listening for beacons...\n", timestamp());
     }
-
+    time_t start = time(NULL);
+    time_t current;
+    int duration = 10;
     do
     {
         uint8_t beacon;
@@ -525,15 +519,6 @@ static void *receiveBeacon(void *args)
                 uint8_t addr = m->recvH.src_addr;
                 int rssi = m->RSSI;
                 updateActiveNodes(addr, rssi, false);
-                if (m->RSSI > parentRSSI)
-                {
-                    parentAddr = addr;
-                    parentRSSI = rssi;
-                    if (debugFlag)
-                    {
-                        printf("%s - ## Setting parent: %02d (%02d)\n", timestamp(), addr, rssi);
-                    }
-                }
             }
         }
         else
@@ -541,16 +526,7 @@ static void *receiveBeacon(void *args)
             trials++;
         }
         usleep(rand() % 1000);
-    } while (trials < maxBeacons || parentAddr == ADDR_SINK);
-    if (parentAddr == ADDR_SINK)
-    {
-        printf("%s - ## Error: Couldn't select parent. Timed out\n", timestamp());
-        exit(EXIT_FAILURE);
-    }
-    else
-    {
-        printf("%s - Parent :%02d (%d)\n", timestamp(), parentAddr, parentRSSI);
-    }
+    } while (trials < maxBeacons);
 }
 
 static void selectParent()
@@ -570,9 +546,9 @@ static void selectParent()
         printf("Failed to create beacon receive thread");
         exit(1);
     }
-    pthread_join(send, NULL);
+    // pthread_join(send, NULL);
     pthread_join(recv, NULL);
-    changeParent();
+    printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, parentRSSI);
 }
 
 void updateActiveNodes(uint8_t addr, int RSSI, bool child)
@@ -606,6 +582,45 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
             printf("%s - ##  New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr);
             printf("%s - ##  Active neighbour count: %0d\n", timestamp(), numActive);
         }
+        // change parent if new neighbour fits
+        if (mac.addr != ADDR_SINK && !child)
+        {
+            bool changed = false;
+            if (strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
+            {
+                parentAddr = addr;
+                parentRSSI = RSSI;
+                changed = true;
+            }
+            if (strategy == RANDOM && (rand() % 101) < 50)
+            {
+                parentAddr = addr;
+                parentRSSI = RSSI;
+                changed = true;
+            }
+            if (strategy == RANDOM_LOWER && addr < mac.addr && (rand() % 101) < 50)
+            {
+                parentAddr = addr;
+                parentRSSI = RSSI;
+                changed = true;
+            }
+            if (strategy == CLOSEST && RSSI > parentRSSI)
+            {
+                parentAddr = addr;
+                parentRSSI = RSSI;
+                changed = true;
+            }
+            if (strategy == CLOSEST_LOWER && RSSI > parentRSSI && addr < mac.addr)
+            {
+                parentAddr = addr;
+                parentRSSI = RSSI;
+                changed = true;
+            }
+            if (changed)
+            {
+                printf("%s - New Parent: %02d (%02d)\n", timestamp(), parentAddr, parentRSSI);
+            }
+        }
     }
 }
 
@@ -636,6 +651,62 @@ static void selectClosestNeighbour()
     sem_post(&network.mutex);
     parentAddr = newParent;
     parentRSSI = newParentRSSI;
+}
+
+void selectClosestLowerNeighbour()
+{
+    uint8_t newParent = ADDR_SINK;
+    unsigned short numActive = network.numActive;
+    int newParentRSSI = MIN_RSSI;
+
+    sem_wait(&network.mutex);
+    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
+    {
+        NodeInfo node = network.nodes[i];
+        if (node.isActive)
+        {
+            if (!node.isChild && node.RSSI >= parentAddr && node.addr < mac.addr)
+            {
+                if (debugFlag)
+                {
+                    printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
+                }
+                newParent = node.addr;
+                newParentRSSI = node.RSSI;
+            }
+            active++;
+        }
+    }
+    sem_post(&network.mutex);
+    parentAddr = newParent;
+    parentRSSI = newParentRSSI;
+}
+
+void printRoutingStrategy()
+{
+    const char *strategyStr;
+    switch (strategy)
+    {
+    case NEXT_LOWER:
+        strategyStr = "NEXT_LOWER";
+        break;
+    case RANDOM:
+        strategyStr = "RANDOM";
+        break;
+    case RANDOM_LOWER:
+        strategyStr = "RANDOM_LOWER";
+        break;
+    case CLOSEST:
+        strategyStr = "CLOSEST";
+        break;
+    case CLOSEST_LOWER:
+        strategyStr = "CLOSEST_LOWER";
+        break;
+    default:
+        strategyStr = "UNKNOWN";
+        break;
+    }
+    printf("%s - Routing strategy: %s\n", timestamp(), strategyStr);
 }
 
 static void selectNextLowerNeighbour()
@@ -771,6 +842,9 @@ static void changeParent()
     case CLOSEST:
         selectClosestNeighbour();
         break;
+    case CLOSEST_LOWER:
+        selectClosestLowerNeighbour();
+        break;
     default:
         selectNextLowerNeighbour();
         break;
@@ -794,10 +868,11 @@ static void cleanupInactiveNodes()
     for (int i = 0, active = 0; i < MAX_ACTIVE_NODES && active < numActive; i++)
     {
         NodeInfo node = network.nodes[i];
-        if (node.isActive && (currentTime - network.nodes[i].lastSeen) > NODE_TIMEOUT)
+        if (node.isActive && (currentTime - node.lastSeen) > NODE_TIMEOUT)
         {
             NodeInfo *ptr = &node;
             ptr->isActive = false;
+            ptr->isChild = false;
             network.numActive--;
             active++;
             if (parentAddr == node.addr)

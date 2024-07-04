@@ -82,7 +82,7 @@ static void *handleRoutingReceive(void *args)
 		// int msgLen = routingTimedReceive(header, buffer, 2);
 		if (msgLen > 0)
 		{
-			printf("%s - RRX: %02d numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
+			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer);
 			fflush(stdout);
 		}
 
@@ -103,7 +103,7 @@ static void *handleRoutingSend(void *args)
 
 		if (routingSend(dest_addr, buffer, sizeof(buffer)))
 		{
-			printf("%s - RTX: %02d msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("%s - TX: %02d msg: %04d\n", timestamp(), dest_addr, msg);
 			fflush(stdout);
 		}
 
