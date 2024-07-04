@@ -15,8 +15,8 @@
 
 // Configuration flags
 
-static uint8_t debugFlag = 0;
-static unsigned int recvTimeout = 2000;
+static uint8_t debugFlag = 1;
+static unsigned int recvTimeout = 3000;
 static enum NetworkMode nwMode = ROUTING;
 
 static uint8_t self;
@@ -31,13 +31,14 @@ static void *handleRoutingReceive(void *args);
 int main(int argc, char *argv[])
 {
 	self = (uint8_t)atoi(argv[1]);
-	printf("%s - Node: %02X\n", timestamp(), self);
+	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
 	srand(self * time(NULL));
 
 	if (nwMode == ROUTING)
 	{
-		sleepDuration = MIN_SLEEP_TIME * self * 3;
+		// sleepDuration = MIN_SLEEP_TIME * self * 3;
+		sleepDuration = 20000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 		routingInit(self, debugFlag, recvTimeout);
 		RouteHeader header;
@@ -81,13 +82,12 @@ static void *handleRoutingReceive(void *args)
 		// int msgLen = routingTimedReceive(header, buffer, 2);
 		if (msgLen > 0)
 		{
-			printf("%s - RRX: %02X numHops: %02d RSSI: (%02d) msg: %s\n", timestamp(), header->src, header->numHops, header->RSSI, buffer);
+			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer);
 			fflush(stdout);
 		}
 
 		// usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }
 
 static void *handleRoutingSend(void *args)
@@ -95,7 +95,6 @@ static void *handleRoutingSend(void *args)
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
 	{
-
 		char buffer[5];
 		int msg = randCode(4);
 		sprintf(buffer, "%04d", msg);
@@ -104,11 +103,10 @@ static void *handleRoutingSend(void *args)
 
 		if (routingSend(dest_addr, buffer, sizeof(buffer)))
 		{
-			printf("%s - RTX: %02X msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("%s - TX: %02d msg: %04d\n", timestamp(), dest_addr, msg);
 			fflush(stdout);
 		}
 
 		usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }

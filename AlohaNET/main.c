@@ -49,7 +49,6 @@ void *receiveT_func(void *args)
 		fflush(stdout);
 		// usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }
 
 void *sendT_func(void *args)
@@ -71,7 +70,6 @@ void *sendT_func(void *args)
 		fflush(stdout);
 		usleep(sleepDuration * 1000);
 	}
-	return NULL;
 }
 
 int getMsg()
