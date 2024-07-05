@@ -37,7 +37,6 @@ int main(int argc, char *argv[])
 
 	if (nwMode == ROUTING)
 	{
-		// sleepDuration = MIN_SLEEP_TIME * self * 3;
 		sleepDuration = 20000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 		routingInit(self, debugFlag, recvTimeout);

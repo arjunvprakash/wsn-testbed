@@ -27,8 +27,8 @@
 // #define REG0 '\x67'
 
 // dividing packet, ambient noise, transmit power
-#define REG1 '\x32'
-// #define REG1 '\x30'
+// #define REG1 '\x32'
+#define REG1 '\x30'
 
 // channel control 0 - 83, 850.125 + REG2 * 1MHz
 #define REG2 '\x12'
