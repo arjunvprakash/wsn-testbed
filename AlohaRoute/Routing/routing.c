@@ -8,6 +8,8 @@
 #include <time.h>
 #include <unistd.h> //sleep
 
+#include <unistd.h> //sleep
+
 #include "routing.h"
 #include "../ALOHA/ALOHA.h"
 #include "../GPIO/GPIO.h"
@@ -28,15 +30,38 @@ typedef enum ParentSelectionStrategy
     CLOSEST_LOWER
 } ParentSelectionStrategy;
 
+
+#define RoutingQueueSize 256
+#define MAX_ACTIVE_NODES 32
+#define NODE_TIMEOUT 60
+#define MIN_RSSI -128
+
+typedef enum ParentSelectionStrategy
+{
+    RANDOM_LOWER,
+    RANDOM,
+    NEXT_LOWER,
+    CLOSEST,
+    CLOSEST_LOWER
+} ParentSelectionStrategy;
+
 typedef struct RoutingMessage
 {
     uint8_t ctrl;
     uint8_t dest;
+    uint8_t ctrl;
+    uint8_t dest;
     uint8_t src;
+    uint8_t parent; // Parent of the source node
     uint8_t parent; // Parent of the source node
     uint16_t numHops;
     uint16_t len;
+    uint16_t len;
     uint8_t *data;
+
+    uint8_t prev;
+    uint8_t next;
+
 
     uint8_t prev;
     uint8_t next;
@@ -49,6 +74,24 @@ typedef struct RoutingQueue
     struct RoutingMessage packet[RoutingQueueSize];
     sem_t mutex, full, free;
 } RoutingQueue;
+
+typedef struct NodeInfo
+{
+    uint8_t addr;
+    int RSSI;
+    unsigned short hopsToSink;
+    time_t lastSeen;
+    bool isChild;
+    bool isActive;
+} NodeInfo;
+
+typedef struct ActiveNodes
+{
+    NodeInfo nodes[MAX_ACTIVE_NODES];
+    sem_t mutex;
+    unsigned short numActive;
+    time_t lastCleanupTime;
+} ActiveNodes;
 
 typedef struct NodeInfo
 {
@@ -106,11 +149,25 @@ static void selectNextLowerNeighbour();
 static void selectClosestNeighbour();
 static void selectClosestLowerNeighbour();
 static void printRoutingStrategy();
+static void *sendBeacon(void *args);
+static void *receiveBeacon(void *args);
+static void selectParent();
+static void updateActiveNodes(uint8_t addr, int rssi, bool child);
+static void changeParent();
+static void initActiveNodes();
+static void cleanupInactiveNodes();
+static void selectRandomLowerNeighbour();
+static void selectRandomNeighbour();
+static void selectNextLowerNeighbour();
+static void selectClosestNeighbour();
+static void selectClosestLowerNeighbour();
+static void printRoutingStrategy();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
     setDebug(debug);
+    srand(self * time(NULL));
     srand(self * time(NULL));
     MAC_init(&mac, self);
     mac.debug = 0;
@@ -124,8 +181,16 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
         selectParent();
     }
 
+    initActiveNodes();
+    if (self != ADDR_SINK)
+    {
+        printRoutingStrategy();
+        selectParent();
+    }
+
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
+        printf("## Error: Failed to create Routing receive thread");
         printf("## Error: Failed to create Routing receive thread");
         exit(1);
     }
@@ -133,6 +198,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
+            printf("## Error: Failed to create Routing send thread");
             printf("## Error: Failed to create Routing send thread");
             exit(1);
         }
@@ -148,6 +214,7 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.dest = dest;
     msg.src = mac.addr;
     msg.len = len;
+    msg.next = parentAddr;
     msg.next = parentAddr;
     msg.numHops = 0;
     msg.data = (uint8_t *)malloc(len);
@@ -179,6 +246,7 @@ int routingReceive(RouteHeader *header, uint8_t *data)
     header->src = msg.src;
     header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
+    header->prev = mac.recvH.src_addr;
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -190,6 +258,7 @@ int routingReceive(RouteHeader *header, uint8_t *data)
             printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
     }
+
 
     return msg.len;
 }
@@ -210,6 +279,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     header->src = msg.src;
     header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
+    header->prev = mac.recvH.src_addr;
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -221,6 +291,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
             printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
     }
+
 
     return msg.len;
 }
@@ -311,6 +382,8 @@ static void *recvPackets_func(void *args)
         }
         int pktSize = MAC_recv(macTemp, pkt);
         // int pktSize = MAC_timedrecv(macTemp, pkt, 3);
+        int pktSize = MAC_recv(macTemp, pkt);
+        // int pktSize = MAC_timedrecv(macTemp, pkt, 3);
         if (pktSize == 0)
         {
             free(pkt);
@@ -322,13 +395,35 @@ static void *recvPackets_func(void *args)
             RoutingMessage msg = buildRoutingMessage(pkt);
 
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, true);
+
+            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, true);
             if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             {
                 // Keep
                 recvQ_enqueue(msg);
             }
             else // Forward
+            else // Forward
             {
+                if (msg.src == mac.addr && mac.recvH.src_addr != loopyParent)
+                {
+                    loopyParent = mac.recvH.src_addr; // To skip duplicate loop detection
+                    printf("%s - Loop detected %02d (%02d) msg: %s\n", timestamp(), loopyParent, msg.numHops, msg.data);
+                    if (mac.addr > mac.recvH.src_addr) // To avoid both nodes changing parents
+                    {
+                        changeParent();
+                    }
+                    else
+                    {
+                        if (debugFlag)
+                        {
+                            printf("%s - Skipping parent change...\n", timestamp(), loopyParent, msg.numHops, msg.data);
+                        }
+                    }
+                }
+                msg.next = parentAddr;
+
+                if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 if (msg.src == mac.addr && mac.recvH.src_addr != loopyParent)
                 {
                     loopyParent = mac.recvH.src_addr; // To skip duplicate loop detection
@@ -357,6 +452,14 @@ static void *recvPackets_func(void *args)
                     {
                         printf("%s - ## Error FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
                     }
+                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
+                }
+                else
+                {
+                    if (debugFlag)
+                    {
+                        printf("%s - ## Error FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
+                    }
                 }
                 if (msg.data != NULL)
                 {
@@ -368,10 +471,15 @@ static void *recvPackets_func(void *args)
         {
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, false);
         }
+        else if (ctrl == CTRL_BCN)
+        {
+            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, false);
+        }
         else
         {
             if (debugFlag)
             {
+                printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
                 printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
@@ -395,6 +503,9 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
     msg.parent = *pkt;
     pkt += sizeof(msg.parent);
 
+    msg.parent = *pkt;
+    pkt += sizeof(msg.parent);
+
     msg.prev = mac.recvH.src_addr;
 
     uint16_t numHops;
@@ -409,6 +520,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
     if (msg.len > 0)
     {
         msg.data = (uint8_t *)malloc(msg.len);
+        memcpy(msg.data, pkt, msg.len);
         memcpy(msg.data, pkt, msg.len);
     }
     else
@@ -432,9 +544,11 @@ static void *sendPackets_func(void *args)
             continue;
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
+        if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
             printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
+        free(pkt);
         free(pkt);
     }
 }
@@ -455,6 +569,10 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     // Set source as self
     *p = mac.addr;
     p += sizeof(mac.addr);
+
+    // Set parent
+    *p = parentAddr;
+    p += sizeof(parentAddr);
 
     // Set parent
     *p = parentAddr;
@@ -639,6 +757,12 @@ void updateActiveNodes(uint8_t addr, int RSSI, bool child)
 
 static void selectClosestNeighbour()
 {
+    uint8_t newParent = ADDR_SINK;
+    unsigned short numActive = network.numActive;
+    int newParentRSSI = MIN_RSSI;
+
+    sem_wait(&network.mutex);
+    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
     uint8_t newParent = ADDR_SINK;
     unsigned short numActive = network.numActive;
     int newParentRSSI = MIN_RSSI;

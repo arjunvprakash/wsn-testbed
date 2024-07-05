@@ -25,6 +25,7 @@
 // baud rate, parity bit, wireless air speed
 #define REG0 '\x62'
 // #define REG0 '\x67'
+// #define REG0 '\x67'
 
 // dividing packet, ambient noise, transmit power
 // #define REG1 '\x32'
