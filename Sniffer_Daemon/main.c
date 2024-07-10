@@ -15,6 +15,12 @@
 static uint8_t self;
 static uint8_t msg[240];
 
+typedef struct Beacon
+{
+    uint8_t ctrl;
+    uint8_t parent;
+} Beacon;
+
 void *receiveT_func(void *args)
 {
     MAC *mac = (MAC *)args;
@@ -41,7 +47,7 @@ void *receiveT_func(void *args)
         }
         else if (ctrl == CTRL_BCN)
         {
-            printf("%s - [R] Beacon src: %02d (%02d) %s\n", timestamp(), mac->recvH.src_addr, mac->RSSI, msg);
+            printf("%s - [R] Beacon src: %02d (%02d) parent: %02d\n", timestamp(), mac->recvH.src_addr, mac->RSSI, buffer[1]);
         }
 
         fflush(stdout);

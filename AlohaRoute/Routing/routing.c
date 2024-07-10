@@ -107,8 +107,8 @@ static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
 static void setDebug(uint8_t d);
 static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
-static void *sendBeacon(void *args);
-static void *receiveBeacon(void *args);
+static void *sendBeaconHandler(void *args);
+static void *receiveBeaconHandler(void *args);
 static void selectParent();
 static void updateActiveNodes(uint8_t addr, int rssi, uint8_t parent);
 static void changeParent();
@@ -120,6 +120,7 @@ static void selectNextLowerNeighbour();
 static void selectClosestNeighbour();
 static void selectClosestLowerNeighbour();
 static void printRoutingStrategy();
+static void sendBeacon();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -184,12 +185,6 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
-    // send beacon
-    Beacon beacon;
-    beacon.ctrl = CTRL_BCN;
-    beacon.parent = parentAddr;
-    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, sizeof(Beacon));
-
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
@@ -327,8 +322,8 @@ static void *recvPackets_func(void *args)
             free(pkt);
             continue;
         }
-        int pktSize = MAC_recv(macTemp, pkt);
-        // int pktSize = MAC_timedrecv(macTemp, pkt, 3);
+        // int pktSize = MAC_recv(macTemp, pkt);
+        int pktSize = MAC_timedrecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
             free(pkt);
@@ -339,7 +334,7 @@ static void *recvPackets_func(void *args)
         {
             RoutingMessage msg = buildRoutingMessage(pkt);
 
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, mac.addr);
+            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST);
             if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             {
                 // Keep
@@ -377,12 +372,6 @@ static void *recvPackets_func(void *args)
                     }
                 }
 
-                // send beacon
-                Beacon beacon;
-                beacon.ctrl = CTRL_BCN;
-                beacon.parent = parentAddr;
-                MAC_Isend(&mac, ADDR_BROADCAST, &beacon, sizeof(Beacon));
-
                 if (msg.data != NULL)
                 {
                     free(msg.data);
@@ -402,6 +391,7 @@ static void *recvPackets_func(void *args)
             }
         }
         free(pkt);
+        usleep(5000);
     }
 }
 
@@ -462,6 +452,7 @@ static void *sendPackets_func(void *args)
             printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
         free(pkt);
+        usleep(5000);
     }
 }
 
@@ -505,16 +496,7 @@ static void setDebug(uint8_t d)
     debugFlag = d;
 }
 
-static uint8_t *createBeaconPkt()
-{
-    Beacon beacon;
-    uint8_t *beaconPkt;
-    *beaconPkt = CTRL_BCN;
-    beaconPkt += sizeof(beacon.ctrl);
-    *beaconPkt = parentAddr;
-}
-
-static void *sendBeacon(void *args)
+static void *sendBeaconHandler(void *args)
 {
 
     MAC *m = (MAC *)args;
@@ -545,10 +527,27 @@ static void *sendBeacon(void *args)
     {
         printf("%s - ## Sent %d beacons...\n", timestamp(), trials);
     }
+
+    // ### Try
+    // do
+    // {
+    //     current = time(NULL);
+    //     if (current - start > senseDuration)
+    //     {
+    //         beacon.ctrl = CTRL_BCN;
+    //         beacon.parent = parentAddr;
+
+    //         uint8_t *data = (uint8_t *)&beacon;
+    //         MAC_Isend(m, ADDR_BROADCAST, data, sizeof(beacon));
+    //         start = current;
+    //     }
+    //     sleep(senseDuration);
+    // } while (true);
+
     return NULL;
 }
 
-static void *receiveBeacon(void *args)
+static void *receiveBeaconHandler(void *args)
 {
     MAC *m = (MAC *)args;
     int trials = 0;
@@ -561,7 +560,7 @@ static void *receiveBeacon(void *args)
     do
     {
         unsigned char data[sizeof(Beacon)];
-        int len = MAC_timedrecv(m, &data, 1);
+        int len = MAC_timedrecv(m, (unsigned char *)&data, 1);
         if (len > 0)
         {
             Beacon *beacon = (Beacon *)data;
@@ -589,19 +588,21 @@ static void selectParent()
     parentAddr = ADDR_SINK;
     network.nodes[parentAddr].RSSI = MIN_RSSI;
 
-    if (pthread_create(&send, NULL, sendBeacon, &mac) != 0)
+    if (pthread_create(&send, NULL, sendBeaconHandler, &mac) != 0)
     {
         printf("Failed to create beacon send thread");
         exit(1);
     }
 
-    if (pthread_create(&recv, NULL, receiveBeacon, &mac) != 0)
+    if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
     {
         printf("Failed to create beacon receive thread");
         exit(1);
     }
-    pthread_join(send, NULL);
+    // sleep(senseDuration + 1);
+    pthread_detach(send);
     pthread_join(recv, NULL);
+    // pthread_join(send, NULL);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
 
@@ -611,7 +612,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
     NodeInfo *node = &network.nodes[addr];
     unsigned short numActive;
     bool new = !node->isActive;
-    bool child;
+    bool child = false;
     if (new)
     {
         node->addr = addr;
@@ -632,7 +633,10 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
     {
         node->role = NODE;
     }
-    node->parent = parent;
+    if (parent != ADDR_BROADCAST)
+    {
+        node->parent = parent;
+    }
     node->RSSI = RSSI;
     node->lastSeen = time(NULL);
     sem_post(&network.mutex);
@@ -652,9 +656,10 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
         }
     }
     // change parent if new neighbour fits
-    if (mac.addr != ADDR_SINK && !child)
+    if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
     {
         bool changed = false;
+        uint8_t prevParentAddr = parentAddr;
         if (strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
         {
             parentAddr = addr;
@@ -682,6 +687,10 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
         }
         if (changed)
         {
+            sem_wait(&network.mutex);
+            network.nodes[prevParentAddr].role = NODE;
+            network.nodes[addr].role = PARENT;
+            sem_post(&network.mutex);
             printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
         }
     }
@@ -795,7 +804,6 @@ static void selectNextLowerNeighbour()
     sem_post(&network.mutex);
 
     parentAddr = newParent;
-    // parentRSSI = newParentRSSI;
 }
 
 static void selectRandomNeighbour()
@@ -830,7 +838,6 @@ static void selectRandomNeighbour()
     if (p == 0)
     {
         newParent = ADDR_SINK;
-        // parentRSSI = MIN_RSSI;
     }
     else
     {
@@ -840,7 +847,6 @@ static void selectRandomNeighbour()
     }
 
     parentAddr = newParent;
-    // parentRSSI = newParentRSSI;
 }
 
 static void selectRandomLowerNeighbour()
@@ -887,7 +893,7 @@ static void selectRandomLowerNeighbour()
 
 static void changeParent()
 {
-    network.nodes[parentAddr].role = NODE;
+    uint8_t prevParentAddr = parentAddr;
     switch (strategy)
     {
     case NEXT_LOWER:
@@ -909,7 +915,10 @@ static void changeParent()
         selectNextLowerNeighbour();
         break;
     }
+    sem_wait(&network.mutex);
+    network.nodes[prevParentAddr].role = NODE;
     network.nodes[parentAddr].role = PARENT;
+    sem_post(&network.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
 
@@ -965,4 +974,12 @@ static void cleanupInactiveNodes()
         }
     }
     network.lastCleanupTime = time(NULL);
+}
+
+static void sendBeacon()
+{
+    Beacon beacon;
+    beacon.ctrl = CTRL_BCN;
+    beacon.parent = parentAddr;
+    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon));
 }
