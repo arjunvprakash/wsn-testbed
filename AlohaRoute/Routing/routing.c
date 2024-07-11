@@ -121,6 +121,8 @@ static void selectClosestNeighbour();
 static void selectClosestLowerNeighbour();
 static void printRoutingStrategy();
 static void sendBeacon();
+static int buildBeaconPacket(RoutingMessage beacon, uint8_t **beaconPkt);
+static Beacon buildBeacon(uint8_t *pkt);
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -164,7 +166,9 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.src = mac.addr;
     msg.len = len;
     msg.next = parentAddr;
+    msg.parent = parentAddr;
     msg.numHops = 0;
+    printf("### - routingSend: malloc msg.data\n");
     msg.data = (uint8_t *)malloc(len);
     if (msg.data != NULL)
     {
@@ -185,6 +189,12 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
+    // send beacon
+    Beacon beacon;
+    beacon.ctrl = CTRL_BCN;
+    beacon.parent = parentAddr;
+    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, 1);
+
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
@@ -314,18 +324,23 @@ static RoutingMessage recvMsgQ_dequeue()
 static void *recvPackets_func(void *args)
 {
     MAC *macTemp = (MAC *)args;
+    time_t start = time(NULL);
+    time_t current;
     while (1)
     {
+        printf("### - recvPackets_func: malloc pkt\n");
         uint8_t *pkt = (uint8_t *)malloc(240);
         if (pkt == NULL)
         {
+            printf("### - recvPackets_func: free NULL pkt\n");
             free(pkt);
             continue;
         }
-        // int pktSize = MAC_recv(macTemp, pkt);
-        int pktSize = MAC_timedrecv(macTemp, pkt, 1);
+        int pktSize = MAC_recv(macTemp, pkt);
+        // int pktSize = MAC_timedrecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
+            printf("### - recvPackets_func: free empty pkt\n");
             free(pkt);
             continue;
         }
@@ -374,14 +389,21 @@ static void *recvPackets_func(void *args)
 
                 if (msg.data != NULL)
                 {
+                    printf("### - recvPackets_func: free msg.data\n");
                     free(msg.data);
+                }
+                else
+                {
+                    printf("### - recvPackets_func: msg.data == NULL\n");
                 }
             }
         }
         else if (ctrl == CTRL_BCN)
         {
-            Beacon *beacon = (Beacon *)pkt;
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
+            printf("### ctrl == CTRL_BCN\n");
+            Beacon beacon = buildBeacon(pkt);
+            printf("### Beacon src: %02d parent: %02d\n", mac.recvH.src_addr, beacon.parent);
+            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon.parent);
         }
         else
         {
@@ -390,9 +412,27 @@ static void *recvPackets_func(void *args)
                 printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
+        printf("### - recvPackets_func: free pkt\n");
         free(pkt);
-        usleep(5000);
+        current = time(NULL);
+        if (current - start > 30)
+        {
+            printf("### - time to send beacon\n");
+            sendBeacon();
+            start = current;
+        }
+        // usleep(5000);
     }
+}
+
+static Beacon buildBeacon(uint8_t *pkt)
+{
+    printf("### - buildBeacon\n");
+    Beacon beacon;
+    beacon.ctrl = *pkt;
+    pkt += sizeof(beacon.ctrl);
+    beacon.parent = *pkt;
+    return beacon;
 }
 
 // Construct RoutingMessage
@@ -424,6 +464,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
 
     if (msg.len > 0)
     {
+        printf("### - buildRoutingMessage: malloc msg.data\n");
         msg.data = (uint8_t *)malloc(msg.len);
         memcpy(msg.data, pkt, msg.len);
     }
@@ -441,9 +482,20 @@ static void *sendPackets_func(void *args)
     {
         RoutingMessage msg = sendQ_dequeue();
         uint8_t *pkt;
-        unsigned int pktSize = buildRoutingPacket(msg, &pkt);
+        unsigned int pktSize;
+        printf("### - dequed msg ctrl :%02d\n", msg.ctrl);
+        if (msg.ctrl = CTRL_PKT)
+        {
+            pktSize = buildRoutingPacket(msg, &pkt);
+        }
+        else
+        {
+            _PRINT_TRACE_;
+            pktSize = buildBeaconPacket(msg, &pkt);
+        }
         if (pkt == NULL)
         {
+            printf("%s - ## Error : malloc", timestamp());
             free(pkt);
             continue;
         }
@@ -451,15 +503,41 @@ static void *sendPackets_func(void *args)
         {
             printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
+        printf("### - sendPackets_func: free pkt\n");
         free(pkt);
         usleep(5000);
     }
 }
 
+static int buildBeaconPacket(RoutingMessage beacon, uint8_t **beaconPkt)
+{
+    _PRINT_TRACE_;
+    uint16_t beaconPktSize = sizeof(Beacon);
+    printf("### - buildBeaconPacket: malloc beaconPkt\n");
+    *beaconPkt = (uint8_t *)malloc(beaconPktSize);
+    if (*beaconPkt == NULL)
+    {
+        printf("%s - ## Error : malloc", timestamp());
+        return 0;
+    }
+    uint8_t *p = *beaconPkt;
+    *p = beacon.ctrl;
+    p += sizeof(beacon.ctrl);
+    *p = beacon.parent;
+    return beaconPktSize;
+}
+
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 {
     uint16_t routePktSize = msg.len + headerSize;
+    printf("### - buildRoutingPacket: malloc routePkt\n");
     *routePkt = (uint8_t *)malloc(routePktSize);
+
+    if (*routePkt == NULL)
+    {
+        printf("%s - ## Error : malloc", timestamp());
+        return 0;
+    }
 
     uint8_t *p = *routePkt;
     *p = msg.ctrl;
@@ -487,6 +565,7 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 
     // Set msg
     memcpy(p, msg.data, msg.len);
+    printf("### - buildRoutingPacket: free msg.data\n");
     free(msg.data);
     return routePktSize;
 }
@@ -527,22 +606,6 @@ static void *sendBeaconHandler(void *args)
     {
         printf("%s - ## Sent %d beacons...\n", timestamp(), trials);
     }
-
-    // ### Try
-    // do
-    // {
-    //     current = time(NULL);
-    //     if (current - start > senseDuration)
-    //     {
-    //         beacon.ctrl = CTRL_BCN;
-    //         beacon.parent = parentAddr;
-
-    //         uint8_t *data = (uint8_t *)&beacon;
-    //         MAC_Isend(m, ADDR_BROADCAST, data, sizeof(beacon));
-    //         start = current;
-    //     }
-    //     sleep(senseDuration);
-    // } while (true);
 
     return NULL;
 }
@@ -600,9 +663,8 @@ static void selectParent()
         exit(1);
     }
     // sleep(senseDuration + 1);
-    pthread_detach(send);
     pthread_join(recv, NULL);
-    // pthread_join(send, NULL);
+    pthread_join(send, NULL);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
 
@@ -978,8 +1040,9 @@ static void cleanupInactiveNodes()
 
 static void sendBeacon()
 {
-    Beacon beacon;
+    printf("### - %s sending beacon\n", timestamp());
+    RoutingMessage beacon;
     beacon.ctrl = CTRL_BCN;
     beacon.parent = parentAddr;
-    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon));
+    sendQ_enqueue(beacon);
 }

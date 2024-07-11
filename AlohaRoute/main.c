@@ -33,11 +33,11 @@ int main(int argc, char *argv[])
 	self = (uint8_t)atoi(argv[1]);
 	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
-	// srand(self * time(NULL));
+	srand(self * time(NULL));
 
 	if (nwMode == ROUTING)
 	{
-		sleepDuration = 30000;
+		sleepDuration = 10000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 		routingInit(self, debugFlag, recvTimeout);
 		RouteHeader header;
