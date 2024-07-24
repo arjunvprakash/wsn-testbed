@@ -559,7 +559,10 @@ static void *recvMsg_func(void *args)
 			}
 
 			// Acknowledgment senden
-			acknowledgement(mac, recvH);
+			if (recvH.src_addr != ADDR_BROADCAST)
+			{
+				acknowledgement(mac, recvH);
+			}
 		}
 
 		// Kontrollflag unbekannt
@@ -676,7 +679,7 @@ static void *sendMsg_func(void *args)
 			}
 
 			// Auf Acknowledgement warten
-			if (!acknowledged(mac, msg.addr))
+			if (msg.addr != ADDR_BROADCAST && !acknowledged(mac, msg.addr))
 			{
 				if (mac->debug)
 					printf("No ACK received.\n");

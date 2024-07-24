@@ -67,7 +67,7 @@ int main(int argc, char *argv[])
 
 static void *handleRoutingReceive(void *args)
 {
-
+	unsigned int total[25] = {0};
 	RouteHeader *header = (RouteHeader *)args;
 	while (1)
 	{
@@ -76,36 +76,40 @@ static void *handleRoutingReceive(void *args)
 		fflush(stdout);
 
 		// blocking
-		int msgLen = routingReceive(header, buffer);
+		// int msgLen = routingReceive(header, buffer);
 
-		// int msgLen = routingTimedReceive(header, buffer, 2);
+		int msgLen = routingTimedReceive(header, buffer, 1);
 		if (msgLen > 0)
 		{
-			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer);
+			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
 			fflush(stdout);
 		}
-
+		usleep(rand() % 1000);
 		// usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }
 
 static void *handleRoutingSend(void *args)
 {
 	RouteHeader *header = (RouteHeader *)args;
+	unsigned int total;
 	while (1)
 	{
 		char buffer[5];
-		int msg = randCode(4);
+		// int msg = randCode(4);
+		int msg = (self * 1000) + (++total % 1000);
 		sprintf(buffer, "%04d", msg);
 
 		uint8_t dest_addr = ADDR_SINK;
 
 		if (routingSend(dest_addr, buffer, sizeof(buffer)))
 		{
-			printf("%s - TX: %02d msg: %04d\n", timestamp(), dest_addr, msg);
+			printf("%s - TX: %02d msg: %04d total: %02d\n", timestamp(), dest_addr, msg, total);
 			fflush(stdout);
 		}
 
 		usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }
