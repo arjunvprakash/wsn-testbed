@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 	self = (uint8_t)atoi(argv[1]);
 	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
-	// srand(self * time(NULL));
+	srand(self * time(NULL));
 
 	if (nwMode == ROUTING)
 	{
@@ -76,9 +76,9 @@ static void *handleRoutingReceive(void *args)
 		fflush(stdout);
 
 		// blocking
-		int msgLen = routingReceive(header, buffer);
+		// int msgLen = routingReceive(header, buffer);
 
-		// int msgLen = routingTimedReceive(header, buffer, 1);
+		int msgLen = routingTimedReceive(header, buffer, 1);
 		if (msgLen > 0)
 		{
 			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
@@ -87,6 +87,7 @@ static void *handleRoutingReceive(void *args)
 		usleep(rand() % 1000);
 		// usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }
 
 static void *handleRoutingSend(void *args)
@@ -97,7 +98,7 @@ static void *handleRoutingSend(void *args)
 	{
 		char buffer[5];
 		// int msg = randCode(4);
-		int msg = ++total;
+		int msg = (self * 1000) + (++total % 1000);
 		sprintf(buffer, "%04d", msg);
 
 		uint8_t dest_addr = ADDR_SINK;
@@ -110,4 +111,5 @@ static void *handleRoutingSend(void *args)
 
 		usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }

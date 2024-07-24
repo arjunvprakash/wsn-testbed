@@ -106,7 +106,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
 static void setDebug(uint8_t d);
-static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
+static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
 static void selectParent();
@@ -133,17 +133,17 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     sendQ_init();
     recvQ_init();
     initActiveNodes();
+    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+    {
+        printf("## Error: Failed to create Routing receive thread");
+        exit(1);
+    }
     if (self != ADDR_SINK)
     {
         printRoutingStrategy();
         selectParent();
     }
 
-    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
-    {
-        printf("## Error: Failed to create Routing receive thread");
-        exit(1);
-    }
     if (self != ADDR_SINK)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
@@ -208,18 +208,28 @@ int routingReceive(RouteHeader *header, uint8_t *data)
 }
 
 // Receive a message via the routing layer
+// Returns 0 for timeout, -1 for error
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
+
     RoutingMessage msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += timeout;
-    recvMsgQ_timed_dequeue(&msg, &ts);
+
+    int result = recvMsgQ_timed_dequeue(&msg, &ts);
+    if (result <= 0)
+    {
+        return result;
+    }
+
+    // Populate header with message details
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
     header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
+
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -228,24 +238,30 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     {
         if (debugFlag)
         {
-            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
+            printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
     }
 
     return msg.len;
 }
 
-static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
+static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 {
     if (sem_timedwait(&recvQ.full, ts) == -1)
     {
-        return;
+        if (errno == ETIMEDOUT)
+        {
+            return 0;
+        }
+        return -1;
     }
+
     sem_wait(&recvQ.mutex);
     *msg = recvQ.packet[recvQ.begin];
     recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
+    return 1;
 }
 
 static void sendQ_init()
@@ -274,6 +290,13 @@ static void sendQ_enqueue(RoutingMessage msg)
     sendQ.end = (sendQ.end + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
+    // int freeCount, fullCount;
+    // sem_getvalue(&sendQ.free, &freeCount);
+    // sem_getvalue(&sendQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - sendQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
 }
 
 static RoutingMessage sendQ_dequeue()
@@ -284,6 +307,13 @@ static RoutingMessage sendQ_dequeue()
     sendQ.begin = (sendQ.begin + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.free);
+    // int freeCount, fullCount;
+    // sem_getvalue(&sendQ.free, &freeCount);
+    // sem_getvalue(&sendQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - sendQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
     return msg;
 }
 
@@ -295,6 +325,13 @@ static void recvQ_enqueue(RoutingMessage msg)
     recvQ.end = (recvQ.end + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
+    // int freeCount, fullCount;
+    // sem_getvalue(&recvQ.free, &freeCount);
+    // sem_getvalue(&recvQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - recvQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
 }
 
 static RoutingMessage recvMsgQ_dequeue()
@@ -305,6 +342,13 @@ static RoutingMessage recvMsgQ_dequeue()
     recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
+    // int freeCount, fullCount;
+    // sem_getvalue(&recvQ.free, &freeCount);
+    // sem_getvalue(&recvQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - recvMsgQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
     return msg;
 }
 
@@ -392,12 +436,15 @@ static void *recvPackets_func(void *args)
             }
         }
         free(pkt);
-        current = time(NULL);
-        if (current - start > 38)
+        if (0)
         {
-            printf("### %s - Sending beacon\n", timestamp());
-            sendBeacon();
-            start = current;
+            current = time(NULL);
+            if (current - start > 43)
+            {
+                printf("### %s - Sending beacon\n", timestamp());
+                sendBeacon();
+                start = current;
+            }
         }
         usleep(rand() % 1000);
     }
@@ -460,7 +507,7 @@ static void *sendPackets_func(void *args)
             printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
         free(pkt);
-        usleep(5000);
+        usleep(1000);
     }
 }
 
@@ -585,14 +632,15 @@ static void selectParent()
         exit(1);
     }
 
-    if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
-    {
-        printf("Failed to create beacon receive thread");
-        exit(1);
-    }
+    // if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
+    // {
+    //     printf("Failed to create beacon receive thread");
+    //     exit(1);
+    // }
     // sleep(senseDuration + 1);
-    pthread_join(recv, NULL);
+    // pthread_join(recv, NULL);
     pthread_join(send, NULL);
+    sleep(5);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
 
@@ -824,7 +872,6 @@ static void selectRandomNeighbour()
         }
     }
     sem_post(&network.mutex);
-
     if (p == 0)
     {
         newParent = ADDR_SINK;
