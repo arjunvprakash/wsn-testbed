@@ -106,7 +106,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
 static void setDebug(uint8_t d);
-static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
+static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
 static void selectParent();
@@ -168,7 +168,7 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     msg.next = parentAddr;
     msg.parent = parentAddr;
     msg.numHops = 0;
-    printf("### - routingSend: malloc msg.data\n");
+    // printf("### - routingSend: malloc msg.data\n");
     msg.data = (uint8_t *)malloc(len);
     if (msg.data != NULL)
     {
@@ -217,22 +217,28 @@ int routingReceive(RouteHeader *header, uint8_t *data)
 }
 
 // Receive a message via the routing layer
+// Returns 0 for timeout, -1 for error
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
-    // send beacon
-    uint8_t beacon = CTRL_BCN;
-    MAC_Isend(&mac, ADDR_BROADCAST, &beacon, 1);
 
     RoutingMessage msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += timeout;
-    recvMsgQ_timed_dequeue(&msg, &ts);
+
+    int result = recvMsgQ_timed_dequeue(&msg, &ts);
+    if (result <= 0)
+    {
+        return result;
+    }
+
+    // Populate header with message details
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
     header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
+
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
@@ -241,24 +247,30 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     {
         if (debugFlag)
         {
-            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
+            printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
     }
 
     return msg.len;
 }
 
-static void recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
+static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 {
     if (sem_timedwait(&recvQ.full, ts) == -1)
     {
-        return;
+        if (errno == ETIMEDOUT)
+        {
+            return 0;
+        }
+        return -1;
     }
+
     sem_wait(&recvQ.mutex);
     *msg = recvQ.packet[recvQ.begin];
     recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
+    return 1;
 }
 
 static void sendQ_init()
@@ -328,11 +340,11 @@ static void *recvPackets_func(void *args)
     time_t current;
     while (1)
     {
-        printf("### - recvPackets_func: malloc pkt\n");
+        // printf("### - recvPackets_func: malloc pkt\n");
         uint8_t *pkt = (uint8_t *)malloc(240);
         if (pkt == NULL)
         {
-            printf("### - recvPackets_func: free NULL pkt\n");
+            // printf("### - recvPackets_func: free NULL pkt\n");
             free(pkt);
             continue;
         }
@@ -340,7 +352,7 @@ static void *recvPackets_func(void *args)
         // int pktSize = MAC_timedrecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
-            printf("### - recvPackets_func: free empty pkt\n");
+            // printf("### - recvPackets_func: free empty pkt\n");
             free(pkt);
             continue;
         }
@@ -389,12 +401,12 @@ static void *recvPackets_func(void *args)
 
                 if (msg.data != NULL)
                 {
-                    printf("### - recvPackets_func: free msg.data\n");
+                    // printf("### - recvPackets_func: free msg.data\n");
                     free(msg.data);
                 }
                 else
                 {
-                    printf("### - recvPackets_func: msg.data == NULL\n");
+                    // printf("### - recvPackets_func: msg.data == NULL\n");
                 }
             }
         }
@@ -412,12 +424,12 @@ static void *recvPackets_func(void *args)
                 printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
-        printf("### - recvPackets_func: free pkt\n");
+        // printf("### - recvPackets_func: free pkt\n");
         free(pkt);
         current = time(NULL);
         if (current - start > 30)
         {
-            printf("### - time to send beacon\n");
+            // printf("### - time to send beacon\n");
             sendBeacon();
             start = current;
         }
@@ -464,7 +476,7 @@ static RoutingMessage buildRoutingMessage(uint8_t *pkt)
 
     if (msg.len > 0)
     {
-        printf("### - buildRoutingMessage: malloc msg.data\n");
+        // printf("### - buildRoutingMessage: malloc msg.data\n");
         msg.data = (uint8_t *)malloc(msg.len);
         memcpy(msg.data, pkt, msg.len);
     }
@@ -503,7 +515,7 @@ static void *sendPackets_func(void *args)
         {
             printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
         }
-        printf("### - sendPackets_func: free pkt\n");
+        // printf("### - sendPackets_func: free pkt\n");
         free(pkt);
         usleep(5000);
     }
@@ -513,7 +525,7 @@ static int buildBeaconPacket(RoutingMessage beacon, uint8_t **beaconPkt)
 {
     _PRINT_TRACE_;
     uint16_t beaconPktSize = sizeof(Beacon);
-    printf("### - buildBeaconPacket: malloc beaconPkt\n");
+    // printf("### - buildBeaconPacket: malloc beaconPkt\n");
     *beaconPkt = (uint8_t *)malloc(beaconPktSize);
     if (*beaconPkt == NULL)
     {
@@ -530,7 +542,7 @@ static int buildBeaconPacket(RoutingMessage beacon, uint8_t **beaconPkt)
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 {
     uint16_t routePktSize = msg.len + headerSize;
-    printf("### - buildRoutingPacket: malloc routePkt\n");
+    // printf("### - buildRoutingPacket: malloc routePkt\n");
     *routePkt = (uint8_t *)malloc(routePktSize);
 
     if (*routePkt == NULL)
@@ -565,7 +577,7 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
 
     // Set msg
     memcpy(p, msg.data, msg.len);
-    printf("### - buildRoutingPacket: free msg.data\n");
+    // printf("### - buildRoutingPacket: free msg.data\n");
     free(msg.data);
     return routePktSize;
 }
