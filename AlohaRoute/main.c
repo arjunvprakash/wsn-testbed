@@ -84,9 +84,10 @@ static void *handleRoutingReceive(void *args)
 			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
 			fflush(stdout);
 		}
-
+		usleep(rand() % 1000);
 		// usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }
 
 static void *handleRoutingSend(void *args)
@@ -110,4 +111,5 @@ static void *handleRoutingSend(void *args)
 
 		usleep(sleepDuration * 1000);
 	}
+	return NULL;
 }

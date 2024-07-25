@@ -122,7 +122,6 @@ static void selectClosestLowerNeighbour();
 static void printRoutingStrategy();
 static void sendBeacon();
 static int buildBeaconPacket(RoutingMessage beacon, uint8_t **beaconPkt);
-static Beacon buildBeacon(uint8_t *pkt);
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -189,12 +188,6 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
-    // send beacon
-    Beacon beacon;
-    beacon.ctrl = CTRL_BCN;
-    beacon.parent = parentAddr;
-    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, 1);
-
     RoutingMessage msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
@@ -299,6 +292,13 @@ static void sendQ_enqueue(RoutingMessage msg)
     sendQ.end = (sendQ.end + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
+    // int freeCount, fullCount;
+    // sem_getvalue(&sendQ.free, &freeCount);
+    // sem_getvalue(&sendQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - sendQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
 }
 
 static RoutingMessage sendQ_dequeue()
@@ -309,6 +309,13 @@ static RoutingMessage sendQ_dequeue()
     sendQ.begin = (sendQ.begin + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.free);
+    // int freeCount, fullCount;
+    // sem_getvalue(&sendQ.free, &freeCount);
+    // sem_getvalue(&sendQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - sendQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
     return msg;
 }
 
@@ -320,6 +327,13 @@ static void recvQ_enqueue(RoutingMessage msg)
     recvQ.end = (recvQ.end + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
+    // int freeCount, fullCount;
+    // sem_getvalue(&recvQ.free, &freeCount);
+    // sem_getvalue(&recvQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - recvQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
 }
 
 static RoutingMessage recvMsgQ_dequeue()
@@ -330,11 +344,19 @@ static RoutingMessage recvMsgQ_dequeue()
     recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
+    // int freeCount, fullCount;
+    // sem_getvalue(&recvQ.free, &freeCount);
+    // sem_getvalue(&recvQ.full, &fullCount);
+    // if (debugFlag)
+    // {
+    //     printf("%s - recvMsgQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
+    // }
     return msg;
 }
 
 static void *recvPackets_func(void *args)
 {
+    unsigned int total[25] = {0};
     MAC *macTemp = (MAC *)args;
     time_t start = time(NULL);
     time_t current;
@@ -348,8 +370,8 @@ static void *recvPackets_func(void *args)
             free(pkt);
             continue;
         }
-        int pktSize = MAC_recv(macTemp, pkt);
-        // int pktSize = MAC_timedrecv(macTemp, pkt, 1);
+        // int pktSize = MAC_recv(macTemp, pkt);
+        int pktSize = MAC_timedrecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
             // printf("### - recvPackets_func: free empty pkt\n");
@@ -389,7 +411,7 @@ static void *recvPackets_func(void *args)
 
                 if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
-                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
+                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s total: %02d\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data, ++total[msg.src]);
                 }
                 else
                 {
@@ -412,10 +434,9 @@ static void *recvPackets_func(void *args)
         }
         else if (ctrl == CTRL_BCN)
         {
-            printf("### ctrl == CTRL_BCN\n");
-            Beacon beacon = buildBeacon(pkt);
-            printf("### Beacon src: %02d parent: %02d\n", mac.recvH.src_addr, beacon.parent);
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon.parent);
+            Beacon *beacon = (Beacon *)pkt;
+            printf("### %s - Beacon src: %02d parent: %02d\n", timestamp(), mac.recvH.src_addr, beacon->parent);
+            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
         }
         else
         {
@@ -426,27 +447,18 @@ static void *recvPackets_func(void *args)
         }
         // printf("### - recvPackets_func: free pkt\n");
         free(pkt);
-        if (0)
+        if (1)
         {
             current = time(NULL);
-            if (current - start > 32)
+            if (current - start > 43)
             {
+                printf("### %s - Sending beacon\n", timestamp());
                 sendBeacon();
                 start = current;
             }
         }
-        usleep(1000);
+        usleep(rand() % 1000);
     }
-}
-
-static Beacon buildBeacon(uint8_t *pkt)
-{
-    printf("### - buildBeacon\n");
-    Beacon beacon;
-    beacon.ctrl = *pkt;
-    pkt += sizeof(beacon.ctrl);
-    beacon.parent = *pkt;
-    return beacon;
 }
 
 // Construct RoutingMessage
@@ -519,7 +531,7 @@ static void *sendPackets_func(void *args)
         }
         // printf("### - sendPackets_func: free pkt\n");
         free(pkt);
-        usleep(5000);
+        usleep(1000);
     }
 }
 
@@ -676,8 +688,10 @@ static void selectParent()
     //     printf("Failed to create beacon receive thread");
     //     exit(1);
     // }
+    // sleep(senseDuration + 1);
     // pthread_join(recv, NULL);
     pthread_join(send, NULL);
+    sleep(5);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
 
@@ -909,7 +923,6 @@ static void selectRandomNeighbour()
         }
     }
     sem_post(&network.mutex);
-
     if (p == 0)
     {
         newParent = ADDR_SINK;
@@ -1053,9 +1066,8 @@ static void cleanupInactiveNodes()
 
 static void sendBeacon()
 {
-    printf("### - %s sending beacon\n", timestamp());
-    RoutingMessage beacon;
+    Beacon beacon;
     beacon.ctrl = CTRL_BCN;
     beacon.parent = parentAddr;
-    sendQ_enqueue(beacon);
+    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon));
 }
