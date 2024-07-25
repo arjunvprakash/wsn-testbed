@@ -135,17 +135,17 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     sendQ_init();
     recvQ_init();
     initActiveNodes();
+    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+    {
+        printf("## Error: Failed to create Routing receive thread");
+        exit(1);
+    }
     if (self != ADDR_SINK)
     {
         printRoutingStrategy();
         selectParent();
     }
 
-    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
-    {
-        printf("## Error: Failed to create Routing receive thread");
-        exit(1);
-    }
     if (self != ADDR_SINK)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
@@ -426,14 +426,16 @@ static void *recvPackets_func(void *args)
         }
         // printf("### - recvPackets_func: free pkt\n");
         free(pkt);
-        current = time(NULL);
-        if (current - start > 30)
+        if (0)
         {
-            // printf("### - time to send beacon\n");
-            sendBeacon();
-            start = current;
+            current = time(NULL);
+            if (current - start > 32)
+            {
+                sendBeacon();
+                start = current;
+            }
         }
-        // usleep(5000);
+        usleep(1000);
     }
 }
 
@@ -669,13 +671,12 @@ static void selectParent()
         exit(1);
     }
 
-    if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
-    {
-        printf("Failed to create beacon receive thread");
-        exit(1);
-    }
-    // sleep(senseDuration + 1);
-    pthread_join(recv, NULL);
+    // if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
+    // {
+    //     printf("Failed to create beacon receive thread");
+    //     exit(1);
+    // }
+    // pthread_join(recv, NULL);
     pthread_join(send, NULL);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, network.nodes[parentAddr].RSSI);
 }
