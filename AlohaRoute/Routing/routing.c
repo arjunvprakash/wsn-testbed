@@ -147,6 +147,11 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     }
     if (self != ADDR_SINK)
     {
+        printRoutingStrategy();
+        selectParent();
+    }
+    if (self != ADDR_SINK)
+    {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
             printf("## Error: Failed to create Routing send thread");
@@ -382,7 +387,9 @@ static void *recvPackets_func(void *args)
             continue;
         }
         uint8_t ctrl = *pkt;
-        if (ctrl == CTRL_PKT)
+        switch (ctrl)
+        {
+        case CTRL_PKT:
         {
             RoutingMessage msg = buildRoutingMessage(pkt);
 
@@ -429,25 +436,28 @@ static void *recvPackets_func(void *args)
                     free(msg.data);
                 }
             }
+            break;
         }
-        else if (ctrl == CTRL_BCN)
+        case CTRL_BCN:
         {
             Beacon *beacon = (Beacon *)pkt;
             printf("### %s - Beacon src: %02d parent: %02d\n", timestamp(), mac.recvH.src_addr, beacon->parent);
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
+            break;
         }
-        else
+        default:
         {
             if (debugFlag)
             {
                 printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
+        }
         free(pkt);
         if (1)
         {
             current = time(NULL);
-            if (current - start > 43)
+            if (current - start > 37)
             {
                 printf("### %s - Sending beacon\n", timestamp());
                 if (1)
@@ -461,7 +471,7 @@ static void *recvPackets_func(void *args)
                 start = current;
             }
         }
-        usleep(rand() % 1000);
+        usleep(1000);
     }
 }
 
@@ -675,7 +685,6 @@ static void selectParent()
     pthread_t send, recv;
     parentAddr = ADDR_SINK;
     network.nodes[parentAddr].RSSI = MIN_RSSI;
-
     if (pthread_create(&send, NULL, sendBeaconHandler, &mac) != 0)
     {
         printf("Failed to create beacon send thread");
