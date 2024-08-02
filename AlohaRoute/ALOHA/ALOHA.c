@@ -325,7 +325,9 @@ static bool acknowledged(MAC *mac, uint8_t addr)
 		// Nachricht ist ein Acknowledgement, wenn Sender der vorherige Empfänger ist
 		// und Ack-Nummer mit Seq-Nummer übereinstimmt.
 		if (addr == ADDR_BROADCAST || (ack.src_addr == addr && ack.seq == sendSeq[addr]))
+		{
 			return true;
+		}
 		else if (mac->debug)
 		{
 			printf("Wrong ACK -> Expected: src_addr = %02X, seq = %d\n", addr, sendSeq[addr]);
@@ -422,7 +424,7 @@ static void *recvMsg_func(void *args)
 		}
 
 		// Nachricht
-		else if (ctrl == CTRL_MSG || ctrl == CTRL_PKT)
+		else if (ctrl == CTRL_MSG)
 		{
 			// Puffer für den Nachrichtenheader
 			uint8_t header_buffer[MAC_Header_len];
@@ -517,15 +519,20 @@ static void *recvMsg_func(void *args)
 
 			// Wenn eine Nachricht mit einer kleineren oder gleichen Sequenznummer schon empfangen wurde
 			// und Sequenznummer nicht die Startsequenznummer ist
-			if (recvH.seq <= recvSeq[recvH.src_addr] && recvH.seq != 0)
+			// Ignore sequece number for broadcasts
+			if (recvH.dst_addr != ADDR_BROADCAST && recvH.seq <= recvSeq[recvH.src_addr] && recvH.seq != 0)
 			{
 				if (mac->debug)
 					printf("... wurde schon empfangen.\n\n");
 			}
 			else
 			{
-				// aktuelle Sequenznummer speichern
-				recvSeq[recvH.src_addr] = recvH.seq;
+				// Ignore sequece number for broadcasts
+				if (recvH.dst_addr != ADDR_BROADCAST)
+				{
+					// aktuelle Sequenznummer speichern
+					recvSeq[recvH.src_addr] = recvH.seq;
+				}
 
 				// Variable für die Nachricht
 				recvMessage msg;
@@ -559,7 +566,7 @@ static void *recvMsg_func(void *args)
 			}
 
 			// Acknowledgment senden
-			if (recvH.src_addr != ADDR_BROADCAST)
+			if (recvH.dst_addr != ADDR_BROADCAST)
 			{
 				acknowledgement(mac, recvH);
 			}
@@ -682,11 +689,13 @@ static void *sendMsg_func(void *args)
 			if (msg.addr != ADDR_BROADCAST && !acknowledged(mac, msg.addr))
 			{
 				if (mac->debug)
-					printf("No ACK received.\n");
+					printf("No ACK received. addr:%02d seq:%d\n", msg.addr, sendSeq[msg.addr]);
 
 				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
 				if (numtrials >= mac->maxtrials)
+				{
 					break;
+				}
 
 				// Anzahl Sendeversuche inkrementieren
 				numtrials++;
@@ -829,7 +838,9 @@ int MAC_timedrecv(MAC *mac, unsigned char *msg_buffer, unsigned int timeout)
 	// Nachricht aus Warteschlange entfernen, bei Timeout 0 zurückgeben
 	recvMessage msg;
 	if (!recvMsgQ_timeddequeue(&msg, &ts))
+	{
 		return 0;
+	}
 
 	// Nachrichtenheader in der ALOHA-Struktur speichern
 	mac->recvH = msg.header;

@@ -24,7 +24,7 @@ char *timestamp()
 }
 
 // Returns a random value within the range
-int randInRange(int min, int max)
+unsigned long randInRange(unsigned long min, unsigned long max)
 {
     return min + (rand() % (max - min + 1));
 }
