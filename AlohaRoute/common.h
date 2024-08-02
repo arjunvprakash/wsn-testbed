@@ -7,6 +7,7 @@ Constants for subnet group
 
 #define CTRL_PKT '\x45' // Routing layer packet
 #define CTRL_BCN '\x47' // Routing layer beacon
+#define CTRL_TAB '\x48' // Routing table info
 
 #define ADDR_BROADCAST 0XFF
 #define ADDR_SINK 0X01

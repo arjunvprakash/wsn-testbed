@@ -78,8 +78,9 @@ typedef struct ActiveNodes
 {
     NodeInfo nodes[MAX_ACTIVE_NODES];
     sem_t mutex;
-    unsigned short numActive;
+    uint8_t numActive;
     time_t lastCleanupTime;
+    uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
 static RoutingQueue sendQ, recvQ;
@@ -87,13 +88,14 @@ static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
 static uint8_t debugFlag;
-static const unsigned short maxBeacons = 5;
-static const unsigned short headerSize = 8; // [ctrl | dest | src | parent | numHops(2) | len(2) | [data(len)] ]
+static const unsigned short headerSize = 8; // [ ctrl | dest | src | parent | numHops[2] | len[2] | [data[len] ]
 static uint8_t parentAddr;
 static ActiveNodes network;
 static uint8_t loopyParent;
 static ParentSelectionStrategy strategy = CLOSEST_LOWER;
-static const unsigned int senseDuration = 30; // duration for neighbour sensing
+static const unsigned int senseDuration = 30;  // duration for neighbour sensing
+static const unsigned int beaconInterval = 31; // Interval between periodic beacons
+static const bool sendNetworkInfo = true;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -121,10 +123,15 @@ static void selectClosestNeighbour();
 static void selectClosestLowerNeighbour();
 static void printRoutingStrategy();
 static void sendBeacon();
+static void *sendBeaconPeriodic(void *args);
+static void *sendRoutingTable(void *args);
+static RoutingMessage buildRoutingTableMsg();
+static void parseRoutingTablePkt(RoutingMessage tab);
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
+    pthread_t sendBeaconT, sendRoutingTableT;
     setDebug(debug);
     srand(self * time(NULL));
     MAC_init(&mac, self);
@@ -149,6 +156,19 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
             printf("## Error: Failed to create Routing send thread");
+            exit(1);
+        }
+    }
+    if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
+    {
+        printf("## Error: Failed to create sendBeaconPeriodic thread");
+        exit(1);
+    }
+    if (self != ADDR_SINK)
+    {
+        if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable, &mac) != 0)
+        {
+            printf("## Error: Failed to create sendRoutingTable thread");
             exit(1);
         }
     }
@@ -374,15 +394,22 @@ static void *recvPackets_func(void *args)
             continue;
         }
         uint8_t ctrl = *pkt;
-        if (ctrl == CTRL_PKT)
+        if (ctrl == CTRL_PKT || ctrl == CTRL_TAB)
         {
             RoutingMessage msg = buildRoutingMessage(pkt);
-
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST);
             if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             {
-                // Keep
-                recvQ_enqueue(msg);
+                if (ctrl == CTRL_TAB)
+                {
+                    parseRoutingTablePkt(msg);
+                    free(msg.data);
+                }
+                else
+                {
+                    // Keep
+                    recvQ_enqueue(msg);
+                }
             }
             else // Forward
             {
@@ -425,7 +452,7 @@ static void *recvPackets_func(void *args)
         else if (ctrl == CTRL_BCN)
         {
             Beacon *beacon = (Beacon *)pkt;
-            printf("### %s - Beacon src: %02d parent: %02d\n", timestamp(), mac.recvH.src_addr, beacon->parent);
+            // printf("### %s - Beacon src: %02d parent: %02d\n", timestamp(), mac.recvH.src_addr, beacon->parent);
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
         }
         else
@@ -439,9 +466,8 @@ static void *recvPackets_func(void *args)
         if (0)
         {
             current = time(NULL);
-            if (current - start > 43)
+            if (current - start > 33)
             {
-                printf("### %s - Sending beacon\n", timestamp());
                 sendBeacon();
                 start = current;
             }
@@ -574,7 +600,7 @@ static void *sendBeaconHandler(void *args)
         {
             trials++;
         }
-        sleep(1);
+        usleep(randInRange(500000, 1200000));
         current = time(NULL);
     } while (current - start < senseDuration);
 
@@ -648,7 +674,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
 {
     sem_wait(&network.mutex);
     NodeInfo *node = &network.nodes[addr];
-    unsigned short numActive;
+    uint8_t numActive;
     bool new = !node->isActive;
     bool child = false;
     if (new)
@@ -657,6 +683,14 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
         node->isActive = true;
         network.numActive++;
         numActive = network.numActive;
+        if (addr > network.maxAddr)
+        {
+            network.maxAddr = addr;
+        }
+        if (addr < network.minAddr)
+        {
+            network.minAddr = addr;
+        }
     }
     if (addr == parentAddr)
     {
@@ -737,11 +771,11 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
 static void selectClosestNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    unsigned short numActive = network.numActive;
+    uint8_t numActive = network.numActive;
     int newParentRSSI = MIN_RSSI;
 
     sem_wait(&network.mutex);
-    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
+    for (int i = network.minAddr, active = 0; i <= network.maxAddr && active < numActive; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive)
@@ -765,11 +799,11 @@ static void selectClosestNeighbour()
 void selectClosestLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    unsigned short numActive = network.numActive;
+    uint8_t numActive = network.numActive;
     int newParentRSSI = MIN_RSSI;
 
     sem_wait(&network.mutex);
-    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
+    for (int i = network.minAddr, active = 0; i <= network.maxAddr && active < numActive; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive)
@@ -847,13 +881,13 @@ static void selectNextLowerNeighbour()
 static void selectRandomNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    unsigned short numActive = network.numActive;
+    uint8_t numActive = network.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
     int p = 0;
 
     sem_wait(&network.mutex);
-    for (int i = 0, active = 0; active < numActive && i < MAX_ACTIVE_NODES; i++)
+    for (int i = network.minAddr, active = 0; i <= network.maxAddr && active < numActive; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive)
@@ -889,7 +923,7 @@ static void selectRandomNeighbour()
 static void selectRandomLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    unsigned short numActive = network.numActive;
+    uint8_t numActive = network.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
     int p = 0;
@@ -964,6 +998,8 @@ void initActiveNodes()
     sem_init(&network.mutex, 0, 1);
     network.numActive = 0;
     memset(network.nodes, 0, sizeof(network.nodes));
+    network.minAddr = MAX_ACTIVE_NODES - 1;
+    network.maxAddr = 0;
 }
 
 static void cleanupInactiveNodes()
@@ -971,8 +1007,8 @@ static void cleanupInactiveNodes()
     time_t currentTime = time(NULL);
     bool parentInactive = false;
     sem_wait(&network.mutex);
-    unsigned short numActive = network.numActive;
-    for (int i = 0, active = 0; i < MAX_ACTIVE_NODES && active < numActive; i++)
+    uint8_t numActive = network.numActive;
+    for (int i = network.minAddr, active = 0; i < network.maxAddr && active < numActive; i++)
     {
         NodeInfo node = network.nodes[i];
         if (node.isActive && (currentTime - node.lastSeen) > NODE_TIMEOUT)
@@ -1015,8 +1051,125 @@ static void cleanupInactiveNodes()
 
 static void sendBeacon()
 {
+    printf("### %s - Sending beacon\n", timestamp());
     Beacon beacon;
     beacon.ctrl = CTRL_BCN;
     beacon.parent = parentAddr;
-    MAC_Isend(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon));
+    if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
+    {
+        printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
+    }
+}
+
+static void *sendBeaconPeriodic(void *args)
+{
+    while (1)
+    {
+        sendBeacon();
+        sleep(beaconInterval);
+    }
+    return NULL;
+}
+
+static void *sendRoutingTable(void *args)
+{
+    while (1)
+    {
+        RoutingMessage msg = buildRoutingTableMsg();
+        if (msg.data != NULL)
+        {
+            if (debugFlag)
+            {
+                printf("## %s - Sending routing table\n", timestamp());
+            }
+            sendQ_enqueue(msg);
+        }
+        sleep(30);
+    }
+    return NULL;
+}
+
+static RoutingMessage buildRoutingTableMsg()
+{
+    // msg data format : [ numActive | ( addr,active,role,rssi,parent )*numActive ]
+    size_t total = sizeof(network.nodes->addr) + sizeof(network.nodes->isActive) + sizeof(network.nodes->role) + sizeof(network.nodes->RSSI) + sizeof(network.nodes->parent);
+    RoutingMessage msg;
+    msg.ctrl = CTRL_TAB;
+    msg.src = mac.addr;
+    msg.dest = ADDR_SINK;
+    int numActive = network.numActive;
+    msg.len = 1 + (numActive * 8);
+    msg.data = (uint8_t *)malloc(msg.len);
+    if (msg.data == NULL)
+    {
+        printf("## - Error: malloc\n");
+    }
+    sem_wait(&network.mutex);
+    int offset = 0;
+    msg.data[offset++] = numActive;
+    for (int i = network.minAddr, active = 0; i <= network.maxAddr && active < network.numActive; i++)
+    {
+        NodeInfo node = network.nodes[i];
+        if (node.isActive)
+        {
+            msg.data[offset++] = node.addr;
+            msg.data[offset++] = (uint8_t)node.isActive;
+            msg.data[offset++] = (uint8_t)node.role;
+            msg.data[offset++] = node.parent;
+            int rssi = node.RSSI;
+            memcpy(&msg.data[offset], &rssi, sizeof(rssi));
+            offset += sizeof(rssi);
+            active++;
+        }
+    }
+    sem_post(&network.mutex);
+    return msg;
+}
+
+static void parseRoutingTablePkt(RoutingMessage tab)
+{
+    int dataLen = tab.len;
+    uint8_t *data = tab.data;
+    if (data == NULL || dataLen < 1)
+    {
+        printf("Invalid routing table data\n");
+        return;
+    }
+
+    int offset = 0;
+    int numActive = data[offset++];
+    printf("%s - Routing table of Node :%02d\n", timestamp(), tab.src);
+    printf("Active nodes: %d\n", numActive);
+    printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
+
+    for (int i = 0; i < numActive && offset < dataLen; i++)
+    {
+        uint8_t addr = data[offset++];
+        bool active = (bool)data[offset++];
+        NodeRole role = (NodeRole)data[offset++];
+        uint8_t parent = data[offset++];
+
+        int rssi;
+        memcpy(&rssi, &data[offset], sizeof(rssi));
+        offset += sizeof(rssi);
+
+        const char *roleStr;
+        switch (role)
+        {
+        case PARENT:
+            roleStr = "PARENT";
+            break;
+        case CHILD:
+            roleStr = "CHILD";
+            break;
+        case NODE:
+            roleStr = "NODE";
+            break;
+        default:
+            roleStr = "UNKNOWN";
+            break;
+        }
+
+        printf("%02d,\t%02d,\t%d,\t%s,\t%d,\t%02d\n", tab.src, addr, active, roleStr, rssi, parent);
+    }
 }
