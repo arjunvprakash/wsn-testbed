@@ -83,6 +83,21 @@ typedef struct ActiveNodes
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
+typedef struct NodeRoutingTable
+{
+    char *timestamp;
+    uint8_t src;
+    uint8_t numActive;
+    NodeInfo nodes[MAX_ACTIVE_NODES];
+} NodeRoutingTable;
+
+typedef struct RoutingTables
+{
+    NodeRoutingTable table[MAX_ACTIVE_NODES];
+    sem_t mutex, full, free;
+    unsigned int begin, end;
+} RoutingTables;
+
 static RoutingQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
@@ -93,9 +108,11 @@ static uint8_t parentAddr;
 static ActiveNodes network;
 static uint8_t loopyParent;
 static ParentSelectionStrategy strategy = CLOSEST_LOWER;
-static const unsigned int senseDuration = 30;  // duration for neighbour sensing
-static const unsigned int beaconInterval = 31; // Interval between periodic beacons
-static const bool sendNetworkInfo = true;
+static const unsigned int senseDuration = 30;        // duration for neighbour sensing
+static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
+static const unsigned int routingTableInterval = 30; // Interval to sending routing table
+static RoutingTables routingTables;
+static const char *outputCSV = "/home/pi/network.csv";
 
 static void sendQ_init();
 static void recvQ_init();
@@ -127,11 +144,17 @@ static void *sendBeaconPeriodic(void *args);
 static void *sendRoutingTable(void *args);
 static RoutingMessage buildRoutingTableMsg();
 static void parseRoutingTablePkt(RoutingMessage tab);
+static char *getRoleStr(NodeRole role);
+static void routingTables_init();
+static void routingTables_enqueue(NodeRoutingTable table);
+static NodeRoutingTable routingTables_dequeue();
+static void *saveRoutingTable(void *args);
+static void createCSVFile();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 {
-    pthread_t sendBeaconT, sendRoutingTableT;
+    pthread_t sendBeaconT;
     setDebug(debug);
     srand(self * time(NULL));
     MAC_init(&mac, self);
@@ -159,16 +182,30 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
             exit(1);
         }
     }
+    // Beacon thread
     if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
     {
         printf("## Error: Failed to create sendBeaconPeriodic thread");
         exit(1);
     }
+    // Routingtable thread
     if (self != ADDR_SINK)
     {
+        pthread_t sendRoutingTableT;
         if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable, &mac) != 0)
         {
             printf("## Error: Failed to create sendRoutingTable thread");
+            exit(1);
+        }
+    }
+    else
+    {
+        pthread_t saveRoutingTableT;
+        routingTables_init();
+        createCSVFile();
+        if (pthread_create(&saveRoutingTableT, NULL, saveRoutingTable, &mac) != 0)
+        {
+            printf("## Error: Failed to create saveRoutingTableT thread");
             exit(1);
         }
     }
@@ -310,13 +347,6 @@ static void sendQ_enqueue(RoutingMessage msg)
     sendQ.end = (sendQ.end + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
-    // int freeCount, fullCount;
-    // sem_getvalue(&sendQ.free, &freeCount);
-    // sem_getvalue(&sendQ.full, &fullCount);
-    // if (debugFlag)
-    // {
-    //     printf("%s - sendQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
-    // }
 }
 
 static RoutingMessage sendQ_dequeue()
@@ -327,13 +357,6 @@ static RoutingMessage sendQ_dequeue()
     sendQ.begin = (sendQ.begin + 1) % RoutingQueueSize;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.free);
-    // int freeCount, fullCount;
-    // sem_getvalue(&sendQ.free, &freeCount);
-    // sem_getvalue(&sendQ.full, &fullCount);
-    // if (debugFlag)
-    // {
-    //     printf("%s - sendQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
-    // }
     return msg;
 }
 
@@ -345,13 +368,6 @@ static void recvQ_enqueue(RoutingMessage msg)
     recvQ.end = (recvQ.end + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
-    // int freeCount, fullCount;
-    // sem_getvalue(&recvQ.free, &freeCount);
-    // sem_getvalue(&recvQ.full, &fullCount);
-    // if (debugFlag)
-    // {
-    //     printf("%s - recvQ_enqueue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
-    // }
 }
 
 static RoutingMessage recvMsgQ_dequeue()
@@ -362,13 +378,6 @@ static RoutingMessage recvMsgQ_dequeue()
     recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
-    // int freeCount, fullCount;
-    // sem_getvalue(&recvQ.free, &freeCount);
-    // sem_getvalue(&recvQ.full, &fullCount);
-    // if (debugFlag)
-    // {
-    //     printf("%s - recvMsgQ_dequeue: src=%d, dest=%d, free=%d, full=%d\n", timestamp(), msg.src, msg.dest, freeCount, fullCount);
-    // }
     return msg;
 }
 
@@ -1084,7 +1093,7 @@ static void *sendRoutingTable(void *args)
             }
             sendQ_enqueue(msg);
         }
-        sleep(30);
+        sleep(routingTableInterval);
     }
     return NULL;
 }
@@ -1128,6 +1137,7 @@ static RoutingMessage buildRoutingTableMsg()
 
 static void parseRoutingTablePkt(RoutingMessage tab)
 {
+    NodeRoutingTable table;
     int dataLen = tab.len;
     uint8_t *data = tab.data;
     if (data == NULL || dataLen < 1)
@@ -1138,38 +1148,121 @@ static void parseRoutingTablePkt(RoutingMessage tab)
 
     int offset = 0;
     int numActive = data[offset++];
+    table.numActive = numActive;
+    table.timestamp = timestamp();
+    table.src = tab.src;
     printf("%s - Routing table of Node :%02d\n", timestamp(), tab.src);
     printf("Active nodes: %d\n", numActive);
-    printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
+    // printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
 
     for (int i = 0; i < numActive && offset < dataLen; i++)
     {
         uint8_t addr = data[offset++];
+        table.nodes[i].addr = addr;
         bool active = (bool)data[offset++];
+        table.nodes[i].isActive = active;
         NodeRole role = (NodeRole)data[offset++];
+        table.nodes[i].role = role;
         uint8_t parent = data[offset++];
+        table.nodes[i].parent = parent;
 
         int rssi;
         memcpy(&rssi, &data[offset], sizeof(rssi));
         offset += sizeof(rssi);
+        table.nodes[i].RSSI = rssi;
 
-        const char *roleStr;
-        switch (role)
+        const char *roleStr = getRoleStr(role);
+        // printf("%02d,\t%02d,\t%d,\t%s,\t%d,\t%02d\n", tab.src, addr, active, roleStr, rssi, parent);
+    }
+    routingTables_enqueue(table);
+}
+
+static char *getRoleStr(NodeRole role)
+{
+    char *roleStr;
+    switch (role)
+    {
+    case PARENT:
+        roleStr = "PARENT";
+        break;
+    case CHILD:
+        roleStr = "CHILD";
+        break;
+    case NODE:
+        roleStr = "NODE";
+        break;
+    default:
+        roleStr = "UNKNOWN";
+        break;
+    }
+    return roleStr;
+}
+static void routingTables_init()
+{
+    routingTables.begin = 0;
+    routingTables.end = 0;
+    sem_init(&routingTables.full, 0, 0);
+    sem_init(&routingTables.free, 0, MAX_ACTIVE_NODES);
+    sem_init(&routingTables.mutex, 0, 1);
+}
+
+static void routingTables_enqueue(NodeRoutingTable table)
+{
+    sem_wait(&routingTables.free);
+    sem_wait(&routingTables.mutex);
+    routingTables.table[routingTables.end] = table;
+    routingTables.end = (routingTables.end + 1) % MAX_ACTIVE_NODES;
+    sem_post(&routingTables.mutex);
+    sem_post(&routingTables.full);
+}
+
+static NodeRoutingTable routingTables_dequeue()
+{
+    sem_wait(&routingTables.full);
+    sem_wait(&routingTables.mutex);
+    NodeRoutingTable table = routingTables.table[routingTables.begin];
+    routingTables.begin = (routingTables.begin + 1) % MAX_ACTIVE_NODES;
+    sem_post(&routingTables.mutex);
+    sem_post(&routingTables.free);
+    return table;
+}
+
+static void *saveRoutingTable(void *args)
+{
+    while (1)
+    {
+        NodeRoutingTable table = routingTables_dequeue();
+        FILE *file = fopen(outputCSV, "a");
+        if (file == NULL)
         {
-        case PARENT:
-            roleStr = "PARENT";
-            break;
-        case CHILD:
-            roleStr = "CHILD";
-            break;
-        case NODE:
-            roleStr = "NODE";
-            break;
-        default:
-            roleStr = "UNKNOWN";
-            break;
+            printf("## - Error opening csv file!\n");
+            exit(1);
         }
+        for (int i = 0; i < table.numActive; i++)
+        {
+            NodeInfo node = table.nodes[i];
+            fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+            printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+        }
+        fclose(file);
+        usleep(10000000);
+    }
+}
 
-        printf("%02d,\t%02d,\t%d,\t%s,\t%d,\t%02d\n", tab.src, addr, active, roleStr, rssi, parent);
+static void createCSVFile()
+{
+    FILE *file = fopen(outputCSV, "w");
+    if (file == NULL)
+    {
+        printf("## - Error opening csv file!\n");
+        exit(1);
+    }
+    const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent\n";
+    fprintf(file, "%s", header);
+    fclose(file);
+
+    if (debugFlag)
+    {
+        printf("%s - CSV file: %s created\n", timestamp, outputCSV);
     }
 }
