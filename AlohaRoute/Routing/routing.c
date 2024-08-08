@@ -442,14 +442,11 @@ static void *recvPackets_func(void *args)
 
                 if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
-                    printf("%s - FWD: %02d (%02d) -> %02d msg: %s total: %02d\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data, ++total[msg.src]);
+                    printf("%s - FWD: %02d (%02d) -> %02d total: %02d\n", timestamp(), msg.src, msg.numHops, parentAddr, ++total[msg.src]);
                 }
                 else
                 {
-                    if (debugFlag)
-                    {
-                        printf("%s - ## Error FWD: %02d (%02d) -> %02d msg: %s\n", timestamp(), msg.src, msg.numHops, msg.next, msg.data);
-                    }
+                    printf("%s - ## Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
                 }
 
                 if (msg.data != NULL)
@@ -1009,6 +1006,7 @@ void initActiveNodes()
     memset(network.nodes, 0, sizeof(network.nodes));
     network.minAddr = MAX_ACTIVE_NODES - 1;
     network.maxAddr = 0;
+    network.lastCleanupTime = time(NULL);
 }
 
 static void cleanupInactiveNodes()
@@ -1075,6 +1073,11 @@ static void *sendBeaconPeriodic(void *args)
     while (1)
     {
         sendBeacon();
+        time_t current = time(NULL);
+        if (current - network.lastCleanupTime > NODE_TIMEOUT)
+        {
+            cleanupInactiveNodes();
+        }
         sleep(beaconInterval);
     }
     return NULL;
@@ -1101,7 +1104,6 @@ static void *sendRoutingTable(void *args)
 static RoutingMessage buildRoutingTableMsg()
 {
     // msg data format : [ numActive | ( addr,active,role,rssi,parent )*numActive ]
-    size_t total = sizeof(network.nodes->addr) + sizeof(network.nodes->isActive) + sizeof(network.nodes->role) + sizeof(network.nodes->RSSI) + sizeof(network.nodes->parent);
     RoutingMessage msg;
     msg.ctrl = CTRL_TAB;
     msg.src = mac.addr;
@@ -1151,8 +1153,7 @@ static void parseRoutingTablePkt(RoutingMessage tab)
     table.numActive = numActive;
     table.timestamp = timestamp();
     table.src = tab.src;
-    printf("%s - Routing table of Node :%02d\n", timestamp(), tab.src);
-    printf("Active nodes: %d\n", numActive);
+    printf("%s - Routing table of Node :%02d nodes:%d\n", timestamp(), tab.src, numActive);
     // printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
 
     for (int i = 0; i < numActive && offset < dataLen; i++)
@@ -1229,6 +1230,7 @@ static NodeRoutingTable routingTables_dequeue()
 
 static void *saveRoutingTable(void *args)
 {
+    time_t start = time(NULL);
     while (1)
     {
         NodeRoutingTable table = routingTables_dequeue();
@@ -1238,13 +1240,21 @@ static void *saveRoutingTable(void *args)
             printf("## - Error opening csv file!\n");
             exit(1);
         }
+        printf("### Writing to CSV\n");
         for (int i = 0; i < table.numActive; i++)
         {
             NodeInfo node = table.nodes[i];
             fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
-            printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+            // printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
         }
         fclose(file);
+        time_t current = time(NULL);
+        if (current - start > NODE_TIMEOUT)
+        {
+            printf("### Generating graph...\n");
+            system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
+            start = current;
+        }
         usleep(10000000);
     }
 }
@@ -1260,9 +1270,19 @@ static void createCSVFile()
     const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent\n";
     fprintf(file, "%s", header);
     fclose(file);
-
+    char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt";
+    char *out = (debugFlag != 0) ? "" : " &>/dev/null";
     if (debugFlag)
     {
-        printf("%s - CSV file: %s created\n", timestamp, outputCSV);
+        printf("### CSV file: %s created\n", outputCSV);
+        printf("### Installing dependencies...\n");
+    }
+
+    char *full_cmd = malloc(strlen(cmd) + strlen(out) + 2);
+    sprintf(full_cmd, "%s%s", cmd, out);
+    if (system(full_cmd) != 0)
+    {
+        printf("## Error installing dependencies\n");
+        exit(EXIT_FAILURE);
     }
 }

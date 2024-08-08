@@ -4,12 +4,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from flask import Flask 
 from flask import render_template 
-
-import pandas as pd
-import numpy as np
-import networkx as nx
-import matplotlib.pyplot as plt
-
+from datetime import datetime
 
 df = pd.read_csv('/home/pi/network.csv')
 # df = pd.read_csv('/kaggle/input/network/network.csv')
@@ -22,21 +17,15 @@ df_parent = parents.drop_duplicates(subset='Source')
 print(df_parent)
 
 G=nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
-pos = nx.spring_layout(G)
+pos = nx.spring_layout(G, seed=25)
 nx.draw(G, pos, with_labels=True, node_size=1500, alpha=0.75, arrows=True)
 edge_labels = nx.get_edge_attributes(G, 'RSSI')
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
-plt.show()
+# plt.show()
 
-plt.savefig('network_graph.png')
+dt = datetime.now()
+timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+plt.title('Network Map')
+plt.xlabel(f'{timestamp}')
+plt.savefig(f'network_graph_{timestamp}.png')
 plt.close()
-
-app = Flask(__name__)
-
-@app.route("/") 
-def hello(): 
-    message = "Network Graph"
-    return render_template('index.html', message=message) 
-  
-if __name__ == "__main__": 
-    app.run(debug=True, ssl_context=('/home/pi/cert.pem', '/home/pi/key.pem'))
