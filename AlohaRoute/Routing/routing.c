@@ -6,7 +6,9 @@
 #include <stdlib.h>    // rand, malloc, free, exit
 #include <string.h>    // memcpy, strerror
 #include <time.h>
-#include <unistd.h> //sleep
+#include <unistd.h>   // sleep, exec
+#include <signal.h>   // signal
+#include <sys/wait.h> // waitpid
 
 #include "routing.h"
 #include "../ALOHA/ALOHA.h"
@@ -112,7 +114,8 @@ static const unsigned int senseDuration = 30;        // duration for neighbour s
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
 static RoutingTables routingTables;
-static const char *outputCSV = "/home/pi/network.csv";
+static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/output/network.csv";
+static pid_t serverPid;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -150,6 +153,8 @@ static void routingTables_enqueue(NodeRoutingTable table);
 static NodeRoutingTable routingTables_dequeue();
 static void *saveRoutingTable(void *args);
 static void createCSVFile();
+static void createHttpServer();
+static void signalHandler(int signum);
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -458,7 +463,7 @@ static void *recvPackets_func(void *args)
         else if (ctrl == CTRL_BCN)
         {
             Beacon *beacon = (Beacon *)pkt;
-            // printf("### %s - Beacon src: %02d parent: %02d\n", timestamp(), mac.recvH.src_addr, beacon->parent);
+            // printf("### %s - Beacon src: %02d (%d) parent: %02d\n", timestamp(), mac.recvH.src_addr, mac.RSSI, beacon->parent);
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
         }
         else
@@ -678,6 +683,7 @@ static void selectParent()
 
 void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
 {
+    // printf("### Inside updateActiveNodes addr:%02d (%d)\n", addr, RSSI);
     sem_wait(&network.mutex);
     NodeInfo *node = &network.nodes[addr];
     uint8_t numActive;
@@ -729,13 +735,14 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
     {
         if (debugFlag)
         {
-            printf("%s - ##  New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr);
+            printf("%s - ##  New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr, RSSI);
             printf("%s - ##  Active neighbour count: %0d\n", timestamp(), numActive);
         }
     }
     // change parent if new neighbour fits
     if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
     {
+        // printf("### inside change block parent:%02d (%d)\n", parentAddr, network.nodes[parentAddr].RSSI);
         bool changed = false;
         uint8_t prevParentAddr = parentAddr;
         if (strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
@@ -760,6 +767,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
         }
         if (strategy == CLOSEST_LOWER && RSSI >= network.nodes[parentAddr].RSSI && addr < mac.addr)
         {
+            printf("### Changing parent prev: %02d (%d) new: %02d (%d)\n", prevParentAddr, network.nodes[prevParentAddr].RSSI, addr, RSSI);
             parentAddr = addr;
             changed = true;
         }
@@ -770,6 +778,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
             network.nodes[addr].role = PARENT;
             sem_post(&network.mutex);
             printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
+            sendBeacon();
         }
     }
 }
@@ -1245,7 +1254,7 @@ static void *saveRoutingTable(void *args)
         {
             NodeInfo node = table.nodes[i];
             fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
-            // printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+            printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
         }
         fclose(file);
         time_t current = time(NULL);
@@ -1261,16 +1270,18 @@ static void *saveRoutingTable(void *args)
 
 static void createCSVFile()
 {
+    system("mkdir output && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' 'output/index.html'");
+    createHttpServer();
     FILE *file = fopen(outputCSV, "w");
     if (file == NULL)
     {
-        printf("## - Error opening csv file!\n");
+        printf("## - Error creating csv file!\n");
         exit(1);
     }
     const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent\n";
     fprintf(file, "%s", header);
     fclose(file);
-    char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt";
+    char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt &>/dev/null";
     char *out = (debugFlag != 0) ? "" : " &>/dev/null";
     if (debugFlag)
     {
@@ -1280,9 +1291,56 @@ static void createCSVFile()
 
     char *full_cmd = malloc(strlen(cmd) + strlen(out) + 2);
     sprintf(full_cmd, "%s%s", cmd, out);
-    if (system(full_cmd) != 0)
+    if (system(cmd) != 0)
     {
         printf("## Error installing dependencies\n");
         exit(EXIT_FAILURE);
+    }
+}
+
+static void createHttpServer()
+{
+    signal(SIGINT, signalHandler);
+    signal(SIGTERM, signalHandler);
+
+    serverPid = fork();
+    if (serverPid == 0)
+    {
+        // system("cd /home/pi/sw_workspace/AlohaRoute/Debug/output");
+        // system("python3 -m http.server 8000 --bind 0.0.0.0");
+        // while (1)
+        // {
+        //     sleep(100);
+        // }
+        chdir("/home/pi/sw_workspace/AlohaRoute/Debug/output");
+        if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
+        {
+            printf("## Error starting HTTP server\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+    else if (serverPid > 0)
+    {
+        printf("HTTP server started with PID: %ld\n", serverPid);
+    }
+    else
+    {
+        printf("## Error creating HTTP server\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+static void signalHandler(int signum)
+{
+    if (signum == SIGINT || signum == SIGTERM)
+    {
+        if (serverPid != -1)
+        {
+            kill(serverPid, SIGTERM);
+            int status;
+            waitpid(serverPid, &status, 0);
+            printf("HTTP server stopped.\n");
+        }
+        exit(0);
     }
 }
