@@ -38,7 +38,7 @@ def set_positions_v2(node, x, y):
             child_x = x + x_factor * spacing            
             set_positions_v2(child, child_x, y - 1)            
 
-df = pd.read_csv('/home/pi/sw_workspace/AlohaRoute/Debug/output/network.csv')
+df = pd.read_csv('/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv')
 # df = pd.read_csv('/kaggle/input/network/network.csv')
 
 df['Timestamp'] = pd.to_datetime(df['Timestamp'])
@@ -50,7 +50,7 @@ df_parent = df_parent[df_parent.Address > 1]
 df_parent.sort_values(by='Address')
 print(df_parent)
 
-G = nx.from_pandas_edgelist(df_parent, 'Address', 'Parent', create_using=nx.DiGraph(), edge_attr='RSSI')
+G = nx.from_pandas_edgelist(df_parent, 'Address', 'Parent', create_using=nx.DiGraph()) #, edge_attr='RSSI'
 
 pos = {}
 
@@ -66,7 +66,7 @@ nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax)
 dt = datetime.now()
 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 ax.set_title(f'Network Graph\n{timestamp}')
-# plt.savefig(f'network_graph_{timestamp}.png')
-plt.savefig('/home/pi/sw_workspace/AlohaRoute/Debug/output/network_graph.png')
+plt.savefig(f'/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph_{timestamp}.png')
+plt.savefig('/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph.png')
 # plt.show()
 plt.close()

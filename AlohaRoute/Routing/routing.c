@@ -9,6 +9,7 @@
 #include <unistd.h>   // sleep, exec
 #include <signal.h>   // signal
 #include <sys/wait.h> // waitpid
+#include <execinfo.h> // backtrace
 
 #include "routing.h"
 #include "../ALOHA/ALOHA.h"
@@ -104,7 +105,7 @@ static RoutingQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
-static uint8_t debugFlag;
+static LogLevel loglevel;
 static const unsigned short headerSize = 8; // [ ctrl | dest | src | parent | numHops[2] | len[2] | [data[len] ]
 static uint8_t parentAddr;
 static ActiveNodes network;
@@ -114,7 +115,7 @@ static const unsigned int senseDuration = 30;        // duration for neighbour s
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
 static RoutingTables routingTables;
-static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/output/network.csv";
+static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static pid_t serverPid;
 
 static void sendQ_init();
@@ -127,7 +128,7 @@ static void *recvPackets_func(void *args);
 static RoutingMessage buildRoutingMessage(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
-static void setDebug(uint8_t d);
+static void setDebug(LogLevel d);
 static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
@@ -155,6 +156,8 @@ static void *saveRoutingTable(void *args);
 static void createCSVFile();
 static void createHttpServer();
 static void signalHandler(int signum);
+static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
+static void installDependencies();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -171,7 +174,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
         printf("## Error: Failed to create Routing receive thread");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     if (self != ADDR_SINK)
     {
@@ -184,14 +187,14 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
             printf("## Error: Failed to create Routing send thread");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     // Beacon thread
     if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
     {
         printf("## Error: Failed to create sendBeaconPeriodic thread");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     // Routingtable thread
     if (self != ADDR_SINK)
@@ -200,7 +203,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
         if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable, &mac) != 0)
         {
             printf("## Error: Failed to create sendRoutingTable thread");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     else
@@ -208,10 +211,12 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
         pthread_t saveRoutingTableT;
         routingTables_init();
         createCSVFile();
+        installDependencies();
+        createHttpServer();
         if (pthread_create(&saveRoutingTableT, NULL, saveRoutingTable, &mac) != 0)
         {
             printf("## Error: Failed to create saveRoutingTableT thread");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
     }
     return 1;
@@ -235,10 +240,7 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
     }
     else
     {
-        if (debugFlag)
-        {
-            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
-        }
+        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
     memcpy(msg.data, data, len);
     sendQ_enqueue(msg);
@@ -260,10 +262,7 @@ int routingReceive(RouteHeader *header, uint8_t *data)
     }
     else
     {
-        if (debugFlag)
-        {
-            printf("%s - ## Error: msg.data is NULL %s:%s\n", timestamp(), __FILE__, __LINE__);
-        }
+        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 
     return msg.len;
@@ -298,10 +297,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     }
     else
     {
-        if (debugFlag)
-        {
-            printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
-        }
+        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 
     return msg.len;
@@ -437,9 +433,9 @@ static void *recvPackets_func(void *args)
                     }
                     else
                     {
-                        if (debugFlag)
+                        if (loglevel >= DEBUG)
                         {
-                            printf("%s - Skipping parent change...\n", timestamp(), loopyParent, msg.numHops, msg.data);
+                            printf("%s - Skipping parent change... loopyParent:%02d\n", timestamp(), loopyParent);
                         }
                     }
                 }
@@ -463,12 +459,15 @@ static void *recvPackets_func(void *args)
         else if (ctrl == CTRL_BCN)
         {
             Beacon *beacon = (Beacon *)pkt;
-            // printf("### %s - Beacon src: %02d (%d) parent: %02d\n", timestamp(), mac.recvH.src_addr, mac.RSSI, beacon->parent);
+            if (loglevel >= DEBUG)
+            {
+                printf("### %s - Beacon src: %02d (%d) parent: %02d\n", timestamp(), mac.recvH.src_addr, mac.RSSI, beacon->parent);
+            }
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent);
         }
         else
         {
-            if (debugFlag)
+            if (loglevel >= DEBUG)
             {
                 printf("%s - ## Routing : Unknown control flag %02d \n", timestamp(), ctrl);
             }
@@ -485,6 +484,7 @@ static void *recvPackets_func(void *args)
         }
         usleep(rand() % 1000);
     }
+    return NULL;
 }
 
 // Construct RoutingMessage
@@ -541,11 +541,12 @@ static void *sendPackets_func(void *args)
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
-            printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
+            printf("%s - ## Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
         free(pkt);
         usleep(1000);
     }
+    return NULL;
 }
 
 static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
@@ -583,9 +584,9 @@ static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
     return routePktSize;
 }
 
-static void setDebug(uint8_t d)
+static void setDebug(LogLevel d)
 {
-    debugFlag = d;
+    loglevel = d;
 }
 
 static void *sendBeaconHandler(void *args)
@@ -593,7 +594,7 @@ static void *sendBeaconHandler(void *args)
 
     MAC *m = (MAC *)args;
     int trials = 0;
-    if (debugFlag)
+    if (loglevel >= DEBUG)
     {
         printf("%s - ## Sending beacons...\n", timestamp());
     }
@@ -615,7 +616,7 @@ static void *sendBeaconHandler(void *args)
         current = time(NULL);
     } while (current - start < senseDuration);
 
-    if (debugFlag)
+    if (loglevel >= DEBUG)
     {
         printf("%s - ## Sent %d beacons...\n", timestamp(), trials);
     }
@@ -626,7 +627,7 @@ static void *receiveBeaconHandler(void *args)
 {
     MAC *m = (MAC *)args;
     int trials = 0;
-    if (debugFlag)
+    if (loglevel >= DEBUG)
     {
         printf("%s - ## Listening for beacons...\n", timestamp());
     }
@@ -650,7 +651,7 @@ static void *receiveBeaconHandler(void *args)
         usleep(rand() % 1000);
         current = time(NULL);
     } while (current - start <= senseDuration);
-    if (debugFlag)
+    if (loglevel >= DEBUG)
     {
         printf("%s - ## Received %d beacons...\n", timestamp(), trials);
     }
@@ -666,7 +667,7 @@ static void selectParent()
     if (pthread_create(&send, NULL, sendBeaconHandler, &mac) != 0)
     {
         printf("Failed to create beacon send thread");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
 
     // if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
@@ -733,7 +734,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
 
     if (new)
     {
-        if (debugFlag)
+        if (loglevel >= DEBUG)
         {
             printf("%s - ##  New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr, RSSI);
             printf("%s - ##  Active neighbour count: %0d\n", timestamp(), numActive);
@@ -765,7 +766,7 @@ void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent)
             parentAddr = addr;
             changed = true;
         }
-        if (strategy == CLOSEST_LOWER && RSSI >= network.nodes[parentAddr].RSSI && addr < mac.addr)
+        if (strategy == CLOSEST_LOWER && RSSI > network.nodes[parentAddr].RSSI && addr < mac.addr)
         {
             printf("### Changing parent prev: %02d (%d) new: %02d (%d)\n", prevParentAddr, network.nodes[prevParentAddr].RSSI, addr, RSSI);
             parentAddr = addr;
@@ -797,7 +798,7 @@ static void selectClosestNeighbour()
         {
             if (node.role != CHILD && node.RSSI > newParentRSSI)
             {
-                if (debugFlag)
+                if (loglevel >= DEBUG)
                 {
                     printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
                 }
@@ -825,7 +826,7 @@ void selectClosestLowerNeighbour()
         {
             if (node.role != CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr)
             {
-                if (debugFlag)
+                if (loglevel >= DEBUG)
                 {
                     printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
                 }
@@ -877,7 +878,7 @@ static void selectNextLowerNeighbour()
         NodeInfo node = network.nodes[i];
         if (node.isActive)
         {
-            if (debugFlag)
+            if (loglevel >= DEBUG)
             {
                 printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
             }
@@ -909,7 +910,7 @@ static void selectRandomNeighbour()
         {
             if (node.addr != ADDR_SINK && node.role != CHILD && node.addr != parentAddr)
             {
-                if (debugFlag)
+                if (loglevel >= DEBUG)
                 {
                     printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
                 }
@@ -951,7 +952,7 @@ static void selectRandomLowerNeighbour()
         {
             if (node.addr != ADDR_SINK && node.role != CHILD && node.addr < parentAddr)
             {
-                if (debugFlag)
+                if (loglevel >= DEBUG)
                 {
                     printf("%s - ##  Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
                 }
@@ -1038,26 +1039,19 @@ static void cleanupInactiveNodes()
             {
                 parentInactive = true;
             }
-
-            if (debugFlag)
-            {
-                printf("%s - ## Inactive: %02d\n", timestamp(), node.addr);
-            }
+            printf("%s - Inactive: %02d\n", timestamp(), node.addr);
         }
     }
     numActive = network.numActive;
     sem_post(&network.mutex);
     if (parentInactive)
     {
-        if (debugFlag)
-        {
-            printf("%s - ##  Parent inactive: %02d\n", timestamp(), parentAddr);
-        }
+        printf("%s - ##  Parent inactive: %02d\n", timestamp(), parentAddr);
         changeParent();
     }
     else
     {
-        if (debugFlag)
+        if (loglevel >= DEBUG)
         {
             printf("%s - ##  Active neighbour count: %d\n", timestamp(), numActive);
         }
@@ -1067,13 +1061,13 @@ static void cleanupInactiveNodes()
 
 static void sendBeacon()
 {
-    printf("### %s - Sending beacon\n", timestamp());
+    printf("%s - Sending beacon\n", timestamp());
     Beacon beacon;
     beacon.ctrl = CTRL_BCN;
     beacon.parent = parentAddr;
     if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
     {
-        printf("%s - ## Error: MAC_send failed %s:%s\n", timestamp(), __FILE__, __LINE__);
+        printf("%s - ## Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 }
 
@@ -1094,16 +1088,17 @@ static void *sendBeaconPeriodic(void *args)
 
 static void *sendRoutingTable(void *args)
 {
+    sleep(routingTableInterval);
     while (1)
     {
-        RoutingMessage msg = buildRoutingTableMsg();
-        if (msg.data != NULL)
+        if (network.numActive > 0)
         {
-            if (debugFlag)
+            RoutingMessage msg = buildRoutingTableMsg();
+            if (msg.data != NULL)
             {
-                printf("## %s - Sending routing table\n", timestamp());
+                printf("%s - Sending routing table\n", timestamp());
+                sendQ_enqueue(msg);
             }
-            sendQ_enqueue(msg);
         }
         sleep(routingTableInterval);
     }
@@ -1127,6 +1122,10 @@ static RoutingMessage buildRoutingTableMsg()
     sem_wait(&network.mutex);
     int offset = 0;
     msg.data[offset++] = numActive;
+    if (loglevel >= DEBUG)
+    {
+        printf("Address,\tActive,\tRole,\tRSSI,\tParent\n");
+    }
     for (int i = network.minAddr, active = 0; i <= network.maxAddr && active < network.numActive; i++)
     {
         NodeInfo node = network.nodes[i];
@@ -1140,6 +1139,10 @@ static RoutingMessage buildRoutingTableMsg()
             memcpy(&msg.data[offset], &rssi, sizeof(rssi));
             offset += sizeof(rssi);
             active++;
+            if (loglevel >= DEBUG)
+            {
+                printf("%02d,\t%d,\t%s,\t%d,\t%02d\n", node.addr, node.isActive, getRoleStr(node.role), rssi, node.parent);
+            }
         }
     }
     sem_post(&network.mutex);
@@ -1163,7 +1166,10 @@ static void parseRoutingTablePkt(RoutingMessage tab)
     table.timestamp = timestamp();
     table.src = tab.src;
     printf("%s - Routing table of Node :%02d nodes:%d\n", timestamp(), tab.src, numActive);
-    // printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
+    if (loglevel >= DEBUG)
+    {
+        printf("Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent\n");
+    }
 
     for (int i = 0; i < numActive && offset < dataLen; i++)
     {
@@ -1182,7 +1188,10 @@ static void parseRoutingTablePkt(RoutingMessage tab)
         table.nodes[i].RSSI = rssi;
 
         const char *roleStr = getRoleStr(role);
-        // printf("%02d,\t%02d,\t%d,\t%s,\t%d,\t%02d\n", tab.src, addr, active, roleStr, rssi, parent);
+        if (loglevel >= DEBUG)
+        {
+            printf("%02d,\t%02d,\t%d,\t%s,\t%d,\t%02d\n", tab.src, addr, active, roleStr, rssi, parent);
+        }
     }
     routingTables_enqueue(table);
 }
@@ -1237,24 +1246,63 @@ static NodeRoutingTable routingTables_dequeue()
     return table;
 }
 
+static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
+{
+    if (sem_timedwait(&routingTables.full, ts) == -1)
+    {
+        if (errno == ETIMEDOUT)
+        {
+            return 0;
+        }
+        return -1;
+    }
+
+    sem_wait(&routingTables.mutex);
+    *tab = routingTables.table[routingTables.begin];
+    routingTables.begin = (routingTables.begin + 1) % MAX_ACTIVE_NODES;
+    sem_post(&routingTables.mutex);
+    sem_post(&routingTables.free);
+    return 1;
+}
+
 static void *saveRoutingTable(void *args)
 {
+    // sleep(NODE_TIMEOUT);
     time_t start = time(NULL);
     while (1)
     {
-        NodeRoutingTable table = routingTables_dequeue();
+        NodeRoutingTable table;
+        table = routingTables_dequeue();
+        // struct timespec ts;
+        // clock_gettime(CLOCK_REALTIME, &ts);
+        // ts.tv_sec += 2;
+
+        // int result = routingTables_timed_dequeue(&table, &ts);
+        // if (result <= 0)
+        // {
+        //     printf("routingTables_timed_dequeue returned :%d\n", result);
+        //     continue;
+        // }
+
         FILE *file = fopen(outputCSV, "a");
         if (file == NULL)
         {
             printf("## - Error opening csv file!\n");
-            exit(1);
+            exit(EXIT_FAILURE);
         }
-        printf("### Writing to CSV\n");
+        if (loglevel >= DEBUG)
+        {
+            printf("### Writing to CSV\n");
+            printf("Timestamp, Source, Address, Active, Role, RSSI, Parent\n");
+        }
         for (int i = 0; i < table.numActive; i++)
         {
             NodeInfo node = table.nodes[i];
             fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
-            printf("### - %s,%02d,%02d,%d,%s,%d,%02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+            if (loglevel >= DEBUG)
+            {
+                printf("%s, %02d, %02d, %d, %s, %d, %02d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent);
+            }
         }
         fclose(file);
         time_t current = time(NULL);
@@ -1264,34 +1312,69 @@ static void *saveRoutingTable(void *args)
             system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
             start = current;
         }
-        usleep(10000000);
+        // usleep(5000000);
+        sleep(2);
     }
 }
 
 static void createCSVFile()
 {
-    system("mkdir output && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' 'output/index.html'");
-    createHttpServer();
+    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir - p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html' ";
+    if (system(cmd) != 0)
+    {
+        printf("## - Error creating results dir!\n");
+        exit(EXIT_FAILURE);
+    }
     FILE *file = fopen(outputCSV, "w");
     if (file == NULL)
     {
         printf("## - Error creating csv file!\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent\n";
     fprintf(file, "%s", header);
     fclose(file);
-    char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt &>/dev/null";
-    char *out = (debugFlag != 0) ? "" : " &>/dev/null";
-    if (debugFlag)
+    if (loglevel >= DEBUG)
     {
         printf("### CSV file: %s created\n", outputCSV);
-        printf("### Installing dependencies...\n");
     }
+}
 
-    char *full_cmd = malloc(strlen(cmd) + strlen(out) + 2);
-    sprintf(full_cmd, "%s%s", cmd, out);
-    if (system(cmd) != 0)
+static void installDependencies()
+{
+    int pid = fork();
+    if (pid == 0)
+    {
+        if (loglevel >= DEBUG)
+        {
+            printf("### Installing dependencies...\n");
+            fflush(stdout);
+        }
+        // ###
+        // if (loglevel == INFO)
+        {
+            freopen("/dev/null", "w", stdout);
+        }
+        char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt";
+        // if (execl("/bin/sh", "sh", "-c", cmd, NULL) != 0)
+        if (execl("/usr/bin/pip", "pip", "install", "-r", "/home/pi/sw_workspace/AlohaRoute/logs/requirements.txt", NULL) != 0)
+        // if (system(cmd) != 0)
+        {
+            fprintf(stderr, "## Error installing dependencies\n");
+            exit(EXIT_FAILURE);
+        }
+        exit(EXIT_SUCCESS);
+    }
+    else if (pid > 0)
+    {
+        wait(NULL);
+        if (loglevel >= DEBUG)
+        {
+            printf("### Installed dependencies...\n");
+            fflush(stdout);
+        }
+    }
+    else
     {
         printf("## Error installing dependencies\n");
         exit(EXIT_FAILURE);
@@ -1300,28 +1383,34 @@ static void createCSVFile()
 
 static void createHttpServer()
 {
-    signal(SIGINT, signalHandler);
-    signal(SIGTERM, signalHandler);
-
     serverPid = fork();
     if (serverPid == 0)
     {
-        // system("cd /home/pi/sw_workspace/AlohaRoute/Debug/output");
-        // system("python3 -m http.server 8000 --bind 0.0.0.0");
-        // while (1)
-        // {
-        //     sleep(100);
-        // }
-        chdir("/home/pi/sw_workspace/AlohaRoute/Debug/output");
+        freopen("/dev/null", "w", stdout);
+        chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
         if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
         {
             printf("## Error starting HTTP server\n");
             exit(EXIT_FAILURE);
         }
+        exit(EXIT_SUCCESS);
     }
     else if (serverPid > 0)
     {
-        printf("HTTP server started with PID: %ld\n", serverPid);
+        wait(NULL);
+        if (loglevel >= DEBUG)
+        {
+            printf("HTTP server started on port: %d with PID: %d\n", 8000, serverPid);
+        }
+        else
+        {
+            printf("HTTP server started on port: %d\n", 8000);
+        }
+        signal(SIGSEGV, signalHandler);
+        signal(SIGABRT, signalHandler);
+        signal(SIGFPE, signalHandler);
+        signal(SIGILL, signalHandler);
+        signal(SIGTERM, signalHandler);
     }
     else
     {
@@ -1332,15 +1421,21 @@ static void createHttpServer()
 
 static void signalHandler(int signum)
 {
-    if (signum == SIGINT || signum == SIGTERM)
+
+    if (loglevel >= DEBUG)
     {
-        if (serverPid != -1)
-        {
-            kill(serverPid, SIGTERM);
-            int status;
-            waitpid(serverPid, &status, 0);
-            printf("HTTP server stopped.\n");
-        }
-        exit(0);
+        printf("### Received signal :%d\n", signum);
     }
+    // if (serverPid > 0)
+    {
+        if (loglevel >= DEBUG)
+        {
+            printf("### Stopping HTTP server pid:%d\n", serverPid);
+        }
+        kill(serverPid, SIGTERM);
+        int status;
+        waitpid(serverPid, &status, 0);
+        printf("HTTP server stopped.\n");
+    }
+    exit(EXIT_SUCCESS);
 }

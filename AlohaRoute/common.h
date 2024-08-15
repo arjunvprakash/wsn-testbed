@@ -27,4 +27,11 @@ typedef enum NetworkMode
 
 #define _PRINT_TRACE_ printf("### Trace: - %s:%d\n", __FILE__, __LINE__);
 
+typedef enum LogLevel
+{
+    INFO,
+    DEBUG,
+    TRACE
+} LogLevel;
+
 #endif

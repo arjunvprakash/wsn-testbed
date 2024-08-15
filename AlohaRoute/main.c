@@ -15,7 +15,7 @@
 
 // Configuration flags
 
-static uint8_t debugFlag = 1;
+static LogLevel loglevel = TRACE;
 static unsigned int recvTimeout = 3000;
 static enum NetworkMode nwMode = ROUTING;
 
@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
 	{
 		sleepDuration = 20000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
-		routingInit(self, debugFlag, recvTimeout);
+		routingInit(self, loglevel, recvTimeout);
 		RouteHeader header;
 
 		if (self != ADDR_SINK)
