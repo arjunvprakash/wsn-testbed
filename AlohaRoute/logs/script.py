@@ -50,7 +50,7 @@ df_parent = df_parent[df_parent.Address > 1]
 df_parent.sort_values(by='Address')
 print(df_parent)
 
-G = nx.from_pandas_edgelist(df_parent, 'Address', 'Parent', create_using=nx.DiGraph()) #, edge_attr='RSSI'
+G = nx.from_pandas_edgelist(df_parent, 'Address', 'Parent', create_using=nx.DiGraph(), edge_attr='ParentRSSI') #, edge_attr='RSSI'
 
 pos = {}
 
@@ -60,7 +60,7 @@ set_positions_v2(root_node, 0, 0)
 fig, ax = plt.subplots(figsize=(12, 8))
 
 nx.draw(G, pos, with_labels=True, node_size=1500, alpha=0.75, arrows=True, ax=ax)
-edge_labels = nx.get_edge_attributes(G, 'RSSI')
+edge_labels = nx.get_edge_attributes(G, 'ParentRSSI')
 nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax)
 
 dt = datetime.now()

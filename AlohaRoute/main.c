@@ -15,7 +15,7 @@
 
 // Configuration flags
 
-static LogLevel loglevel = TRACE;
+static LogLevel loglevel = INFO;
 static unsigned int recvTimeout = 3000;
 static enum NetworkMode nwMode = ROUTING;
 
