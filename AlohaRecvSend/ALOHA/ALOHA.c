@@ -592,20 +592,22 @@ static void* sendMsg_func(void* args) {
 		unsigned int numtrials = 1;
 
 		while (1) {
+			// ###
 			// Wenn Noise zu hoch
 			if (ambientNoise(mac) <= mac->noiseThreshold) {
-				if (mac->debug)
+				// ###
+				// if (mac->debug)
 					printf("Noise is too high.\n");
 
 				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
-				if (numtrials >= mac->maxtrials)
-					break;
+				// if (numtrials >= mac->maxtrials)
+				// 	break;
 
 				// 5 bis 10 Sekunden warten
 				msleep(5000 + rand() % 5001);
 
 				// Anzahl Sendeversuche inkrementieren
-				numtrials++;
+				// numtrials++;
 
 				continue;
 			}
