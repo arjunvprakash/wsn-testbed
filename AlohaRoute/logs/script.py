@@ -70,7 +70,7 @@ edge_labels = nx.get_edge_attributes(G1, 'ParentRSSI')
 nx.draw_networkx_edge_labels(G1, pos1, edge_labels=edge_labels, ax=ax1)
 ax1.set_title('Network Tree')
 
-df_parent_edges = df_parent[['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+df_parent_edges = df_parent[['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'}).sort_values('Source')
 # df_combined = pd.concat([df_neighbour[['Timestamp', 'Source', 'Address', 'RSSI']], 
 #                          df_parent_edges[['Timestamp', 'Source', 'Address', 'RSSI']]])
 # df_combined.sort_values(by='Timestamp', ascending=False)
@@ -84,6 +84,8 @@ for _, row in df_parent_edges.iterrows():
     address = row['Address']
     rssi = row['RSSI']
     G2.add_edge(source, address, RSSI=rssi)
+
+
 
 pos2 = nx.circular_layout(G2)
 nx.draw(G2, pos2, with_labels=True, node_size=1500, alpha=0.75, arrows=False, ax=ax2, edge_color='grey', style=':')

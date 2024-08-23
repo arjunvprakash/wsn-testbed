@@ -160,6 +160,7 @@ static void createHttpServer();
 static void signalHandler(int signum);
 static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
 static void installDependencies();
+static void writeToCSVFile(NodeRoutingTable table);
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -1236,6 +1237,7 @@ static char *getRoleStr(NodeRole role)
     }
     return roleStr;
 }
+
 static void routingTables_init()
 {
     routingTables.begin = 0;
@@ -1310,29 +1312,7 @@ static void *saveRoutingTable(void *args)
             // printf("routingTables_timed_dequeue returned: %d\n", result);
             continue;
         }
-
-        FILE *file = fopen(outputCSV, "a");
-        if (file == NULL)
-        {
-            printf("## - Error opening csv file!\n");
-            exit(EXIT_FAILURE);
-        }
-        if (loglevel >= DEBUG)
-        {
-            printf("### Writing to CSV\n");
-            printf("Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI\n");
-        }
-        for (int i = 0; i < table.numActive; i++)
-        {
-            NodeInfo node = table.nodes[i];
-            fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d,%d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
-            if (loglevel >= DEBUG)
-            {
-                printf("%s, %02d, %02d, %d, %s, %d, %02d, %d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
-            }
-        }
-        fclose(file);
-        fflush(stdout);
+        writeToCSVFile(table);
         time_t current = time(NULL);
         if (current - start > NODE_TIMEOUT)
         {
@@ -1343,6 +1323,32 @@ static void *saveRoutingTable(void *args)
         // usleep(5000000);
         sleep(2);
     }
+}
+
+static void writeToCSVFile(NodeRoutingTable table)
+{
+    FILE *file = fopen(outputCSV, "a");
+    if (file == NULL)
+    {
+        printf("## - Error opening csv file!\n");
+        exit(EXIT_FAILURE);
+    }
+    if (loglevel >= DEBUG)
+    {
+        printf("### Writing to CSV\n");
+        printf("Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI\n");
+    }
+    for (int i = 0; i < table.numActive; i++)
+    {
+        NodeInfo node = table.nodes[i];
+        fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d,%d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+        if (loglevel >= DEBUG)
+        {
+            printf("%s, %02d, %02d, %d, %s, %d, %02d, %d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+        }
+    }
+    fclose(file);
+    fflush(stdout);
 }
 
 static void createCSVFile()
@@ -1372,11 +1378,12 @@ static void createCSVFile()
 static void installDependencies()
 {
     int pid = fork();
+    printf("### Inside installDependencies, forked; local_pid:%d\n", pid);
     if (pid == 0)
     {
         if (loglevel >= DEBUG)
         {
-            printf("### pid:%d ppid:%d\n", getpid(), getppid());
+            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
             printf("### Installing dependencies...\n");
             fflush(stdout);
         }
@@ -1391,8 +1398,12 @@ static void installDependencies()
         // if (system(cmd) != 0)
         {
             fprintf(stderr, "## Error installing dependencies\n");
+            fclose(stdout);
+            fclose(stderr);
             exit(EXIT_FAILURE);
         }
+        fclose(stdout);
+        fclose(stderr);
         exit(EXIT_SUCCESS);
     }
     else if (pid > 0)
@@ -1400,7 +1411,7 @@ static void installDependencies()
         wait(NULL);
         if (loglevel >= DEBUG)
         {
-            printf("### pid:%d ppid:%d\n", getpid(), getppid());
+            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
             printf("### Installed dependencies...\n");
             fflush(stdout);
         }
@@ -1417,13 +1428,18 @@ static void createHttpServer()
     serverPid = fork();
     if (serverPid == 0)
     {
+        printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
         freopen("/dev/null", "w", stdout);
         chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
         if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
         {
             printf("## Error starting HTTP server\n");
+            fclose(stdout);
+            fclose(stderr);
             exit(EXIT_FAILURE);
         }
+        fclose(stdout);
+        fclose(stderr);
         exit(EXIT_SUCCESS);
     }
     else if (serverPid > 0)
@@ -1431,12 +1447,12 @@ static void createHttpServer()
         wait(NULL);
         if (loglevel >= DEBUG)
         {
-            printf("### pid:%d ppid:%d\n", getpid(), getppid());
+            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
             printf("HTTP server started on port: %d with PID: %d\n", 8000, serverPid);
         }
         else
         {
-            printf("### pid:%d ppid:%d\n", getpid(), getppid());
+            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
             printf("HTTP server started on port: %d\n", 8000);
         }
         signal(SIGSEGV, signalHandler);
@@ -1455,16 +1471,17 @@ static void createHttpServer()
 static void signalHandler(int signum)
 {
 
+    printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
+
     if (loglevel >= DEBUG)
     {
-        printf("### pid:%d ppid:%d\n", getpid(), getppid());
         printf("### Received signal :%d\n", signum);
     }
     // if (serverPid > 0)
     {
         if (loglevel >= DEBUG)
         {
-            printf("### pid:%d ppid:%d\n", getpid(), getppid());
+            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
             printf("### Stopping HTTP server pid:%d\n", serverPid);
         }
         kill(serverPid, SIGTERM);
