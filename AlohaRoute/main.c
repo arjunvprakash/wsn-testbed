@@ -11,7 +11,7 @@
 #include "GPIO/GPIO.h"
 #include "common.h"
 #include "util.h"
-#include "Routing/routing.h"
+#include "STRP/STRP.h"
 
 // Configuration flags
 
@@ -31,6 +31,7 @@ static void *handleRoutingReceive(void *args);
 int main(int argc, char *argv[])
 {
 	self = (uint8_t)atoi(argv[1]);
+	printf("### pid:%d ppid:%d\n", getpid(), getppid());
 	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
 	srand(self * time(NULL));

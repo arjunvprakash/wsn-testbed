@@ -1,5 +1,5 @@
-#ifndef ROUTING_h
-#define ROUTING_H
+#ifndef STRP_h
+#define STRP_H
 
 #include <stdint.h>
 #include "../ALOHA/ALOHA.h"

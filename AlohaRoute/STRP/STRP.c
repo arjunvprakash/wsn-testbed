@@ -11,7 +11,7 @@
 #include <sys/wait.h> // waitpid
 #include <execinfo.h> // backtrace
 
-#include "routing.h"
+#include "STRP.h"
 #include "../ALOHA/ALOHA.h"
 #include "../GPIO/GPIO.h"
 #include "../common.h"
@@ -1309,7 +1309,7 @@ static void *saveRoutingTable(void *args)
         int result = routingTables_timed_dequeue(&table, &ts);
         if (result <= 0)
         {
-            // printf("routingTables_timed_dequeue returned: %d\n", result);
+            printf("routingTables_timed_dequeue returned: %d\n", result);
             continue;
         }
         writeToCSVFile(table);
@@ -1353,7 +1353,7 @@ static void writeToCSVFile(NodeRoutingTable table)
 
 static void createCSVFile()
 {
-    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html' ";
+    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html'";
     if (system(cmd) != 0)
     {
         printf("## - Error creating results dir!\n");
@@ -1377,27 +1377,31 @@ static void createCSVFile()
 
 static void installDependencies()
 {
-    int pid = fork();
-    printf("### Inside installDependencies, forked; local_pid:%d\n", pid);
+    int pid = fork();    
     if (pid == 0)
     {
         if (loglevel >= DEBUG)
         {
-            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
+            printf("### Inside installDependencies, forked; local_pid:%d\n", pid);
+            // printf("### installDependencies:  local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
             printf("### Installing dependencies...\n");
             fflush(stdout);
         }
         // ###
         // if (loglevel == INFO)
-        {
-            freopen("/dev/null", "w", stdout);
-        }
-        char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt";
+        // {
+        //     freopen("/dev/null", "w", stdout);
+        // }
+        
+        char *cmd = "bash -c \"python -m pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null\"";
         // if (execl("/bin/sh", "sh", "-c", cmd, NULL) != 0)
-        if (execl("/usr/bin/pip", "pip", "install", "-r", "/home/pi/sw_workspace/AlohaRoute/logs/requirements.txt", NULL) != 0)
-        // if (system(cmd) != 0)
+        // if (execl("/usr/bin/pip", "pip", "install", "-r", "/home/pi/sw_workspace/AlohaRoute/logs/requirements.txt", NULL) != 0)
+        int result = system(cmd);
+        printf("### Result of %s : %d\n",*cmd,result);
+        fflush(stdout);
+        if (result != 0)
         {
-            fprintf(stderr, "## Error installing dependencies\n");
+            fprintf(stderr, "## Error installing dependencies. Exiting...\n");
             fclose(stdout);
             fclose(stderr);
             exit(EXIT_FAILURE);
@@ -1409,9 +1413,10 @@ static void installDependencies()
     else if (pid > 0)
     {
         wait(NULL);
+        fflush(stdout);
         if (loglevel >= DEBUG)
         {
-            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
+            // printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
             printf("### Installed dependencies...\n");
             fflush(stdout);
         }
@@ -1428,10 +1433,20 @@ static void createHttpServer()
     serverPid = fork();
     if (serverPid == 0)
     {
-        printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-        freopen("/dev/null", "w", stdout);
+        // printf("### createHttpServer : local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
+        // freopen("/dev/null", "w", stdout);
         chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
-        if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
+        // Kill the http server if running
+        char *cleanup = "fuser 8000/tcp >/dev/null && kill -9 $(fuser 8000/tcp) || true";
+        if(system(cleanup)!=0) {
+            printf("## Error cleaning up the HTTP server\n");
+            exit(EXIT_FAILURE);
+        } else {
+            printf("## Successfully cleaned up the HTTP server\n");
+        }
+        char *cmd = "python3 -m http.server 8000 --bind 0.0.0.0 &";
+        // if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
+        if (system(cmd) != 0)
         {
             printf("## Error starting HTTP server\n");
             fclose(stdout);
@@ -1447,12 +1462,12 @@ static void createHttpServer()
         wait(NULL);
         if (loglevel >= DEBUG)
         {
-            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
+            // printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
             printf("HTTP server started on port: %d with PID: %d\n", 8000, serverPid);
         }
         else
         {
-            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
+            // printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
             printf("HTTP server started on port: %d\n", 8000);
         }
         signal(SIGSEGV, signalHandler);
