@@ -13,6 +13,9 @@ A simple, but fully autonomous tree-based routing protocol in combination with a
 ```bash
 sudo apt update
 sudo apt install python3-pip
+# Required to fix the import error for numpy
+sudo apt-get install libopenblas-dev
+sudo apt-get install libopenjp2-7
 pip --version
 ``` 
 

@@ -156,11 +156,12 @@ static void routingTables_enqueue(NodeRoutingTable table);
 static NodeRoutingTable routingTables_dequeue();
 static void *saveRoutingTable(void *args);
 static void createCSVFile();
-static void createHttpServer();
 static void signalHandler(int signum);
 static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
-static void installDependencies();
 static void writeToCSVFile(NodeRoutingTable table);
+static int killProcessOnPort(int port);
+static void installDependencies();
+static void createHttpServer();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -604,6 +605,7 @@ static void *sendBeaconHandler(void *args)
     if (loglevel >= DEBUG)
     {
         printf("%s - ## Sending beacons...\n", timestamp());
+        fflush(stdout);
     }
 
     time_t start = time(NULL);
@@ -619,6 +621,7 @@ static void *sendBeaconHandler(void *args)
     if (loglevel >= DEBUG)
     {
         printf("%s - ## Sent %d beacons...\n", timestamp(), trials);
+        fflush(stdout);
     }
     return NULL;
 }
@@ -1309,7 +1312,7 @@ static void *saveRoutingTable(void *args)
         int result = routingTables_timed_dequeue(&table, &ts);
         if (result <= 0)
         {
-            printf("routingTables_timed_dequeue returned: %d\n", result);
+            // printf("routingTables_timed_dequeue returned: %d\n", result);
             continue;
         }
         writeToCSVFile(table);
@@ -1317,7 +1320,14 @@ static void *saveRoutingTable(void *args)
         if (current - start > NODE_TIMEOUT)
         {
             printf("### Generating graph...\n");
-            system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
+            // system("bash -c \"cd /home/pi/sw_workspace/AlohaRoute/Debug && source ./my_env/bin/activate && python /home/pi/sw_workspace/AlohaRoute/logs/script.py\"");
+            char cmd[100];
+            sprintf(cmd, "python /home/pi/sw_workspace/AlohaRoute/logs/script.py %d", ADDR_SINK);
+            // system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
+            if (system(cmd) != 0)
+            {
+                printf("### Error generating graph...\n");
+            }
             start = current;
         }
         // usleep(5000000);
@@ -1370,117 +1380,81 @@ static void createCSVFile()
     fclose(file);
     if (loglevel >= DEBUG)
     {
-        printf("### pid:%d ppid:%d\n", getpid(), getppid());
         printf("### CSV file: %s created\n", outputCSV);
     }
 }
 
 static void installDependencies()
 {
-    int pid = fork();    
-    if (pid == 0)
+
+    // if (loglevel >= DEBUG)
     {
-        if (loglevel >= DEBUG)
-        {
-            printf("### Inside installDependencies, forked; local_pid:%d\n", pid);
-            // printf("### installDependencies:  local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
-            printf("### Installing dependencies...\n");
-            fflush(stdout);
-        }
-        // ###
-        // if (loglevel == INFO)
-        // {
-        //     freopen("/dev/null", "w", stdout);
-        // }
-        
-        char *cmd = "bash -c \"python -m pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null\"";
-        // if (execl("/bin/sh", "sh", "-c", cmd, NULL) != 0)
-        // if (execl("/usr/bin/pip", "pip", "install", "-r", "/home/pi/sw_workspace/AlohaRoute/logs/requirements.txt", NULL) != 0)
-        int result = system(cmd);
-        printf("### Result of %s : %d\n",*cmd,result);
+        printf("### Installing dependencies...\n");
         fflush(stdout);
-        if (result != 0)
-        {
-            fprintf(stderr, "## Error installing dependencies. Exiting...\n");
-            fclose(stdout);
-            fclose(stderr);
-            exit(EXIT_FAILURE);
-        }
-        fclose(stdout);
-        fclose(stderr);
-        exit(EXIT_SUCCESS);
     }
-    else if (pid > 0)
+    chdir("/home/pi/sw_workspace/AlohaRoute/Debug");
+    // char *setenv_cmd = "bash -c \"cd /home/pi/sw_workspace/AlohaRoute/Debug && python -m venv my_env && source ./my_env/bin/activate && pip install -r ../logs/requirements.txt > /dev/null & \"";
+    char *setenv_cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null &";
+    if (loglevel >= DEBUG)
     {
-        wait(NULL);
+        printf("### Executing command : %s\n", setenv_cmd);
+    }
+    fflush(stdout);
+    if (system(setenv_cmd) != 0)
+    {
+        printf("## Error installing dependencies. Exiting...\n");
         fflush(stdout);
-        if (loglevel >= DEBUG)
-        {
-            // printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
-            printf("### Installed dependencies...\n");
-            fflush(stdout);
-        }
-    }
-    else
-    {
-        printf("## Error installing dependencies\n");
         exit(EXIT_FAILURE);
+    }
+    printf("### Successfully installed dependencies...\n");
+}
+
+// Check if a process is running on the specified TCP port and kill it
+int killProcessOnPort(int port)
+{
+    char cmd[100];
+    sprintf(cmd, "fuser %d/tcp", port);
+    FILE *fp = popen(cmd, "r");
+    if (fp != NULL)
+    {
+        char buffer[256];
+        if (fgets(buffer, sizeof(buffer), fp) != NULL)
+        {
+            printf("%s", buffer);
+            char *process_id = strtok(buffer, " ");
+            char kill_cmd[100];
+            sprintf(kill_cmd, "kill -9 %s", process_id);
+            system(kill_cmd);
+            printf("Process killed.\n");
+        }
+        pclose(fp);
     }
 }
 
 static void createHttpServer()
 {
-    serverPid = fork();
-    if (serverPid == 0)
+
+    chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
+
+    killProcessOnPort(8000);
+    char *cmd = "python3 -m http.server 8000 --bind 0.0.0.0 > /dev/null 2>&1 &";
+    if (system(cmd) != 0)
     {
-        // printf("### createHttpServer : local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-        // freopen("/dev/null", "w", stdout);
-        chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
-        // Kill the http server if running
-        char *cleanup = "fuser 8000/tcp >/dev/null && kill -9 $(fuser 8000/tcp) || true";
-        if(system(cleanup)!=0) {
-            printf("## Error cleaning up the HTTP server\n");
-            exit(EXIT_FAILURE);
-        } else {
-            printf("## Successfully cleaned up the HTTP server\n");
-        }
-        char *cmd = "python3 -m http.server 8000 --bind 0.0.0.0 &";
-        // if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
-        if (system(cmd) != 0)
-        {
-            printf("## Error starting HTTP server\n");
-            fclose(stdout);
-            fclose(stderr);
-            exit(EXIT_FAILURE);
-        }
+        printf("## Error starting HTTP server\n");
         fclose(stdout);
         fclose(stderr);
-        exit(EXIT_SUCCESS);
-    }
-    else if (serverPid > 0)
-    {
-        wait(NULL);
-        if (loglevel >= DEBUG)
-        {
-            // printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-            printf("HTTP server started on port: %d with PID: %d\n", 8000, serverPid);
-        }
-        else
-        {
-            // printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-            printf("HTTP server started on port: %d\n", 8000);
-        }
-        signal(SIGSEGV, signalHandler);
-        signal(SIGABRT, signalHandler);
-        signal(SIGFPE, signalHandler);
-        signal(SIGILL, signalHandler);
-        signal(SIGTERM, signalHandler);
-    }
-    else
-    {
-        printf("## Error creating HTTP server\n");
         exit(EXIT_FAILURE);
     }
+
+    // if (loglevel >= DEBUG)
+    {
+        printf("HTTP server started on port: %d\n", 8000);
+    }
+    signal(SIGSEGV, signalHandler);
+    signal(SIGABRT, signalHandler);
+    signal(SIGFPE, signalHandler);
+    signal(SIGILL, signalHandler);
+    signal(SIGTERM, signalHandler);
 }
 
 static void signalHandler(int signum)

@@ -31,15 +31,16 @@ static void *handleRoutingReceive(void *args);
 int main(int argc, char *argv[])
 {
 	self = (uint8_t)atoi(argv[1]);
-	printf("### pid:%d ppid:%d\n", getpid(), getppid());
 	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
 	srand(self * time(NULL));
+	fflush(stdout);
 
 	if (nwMode == ROUTING)
 	{
 		sleepDuration = 20000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
+		fflush(stdout);
 		routingInit(self, loglevel, recvTimeout);
 		RouteHeader header;
 
