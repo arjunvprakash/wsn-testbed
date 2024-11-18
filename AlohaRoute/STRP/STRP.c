@@ -431,7 +431,7 @@ static void *recvPackets_func(void *args)
             }
             else // Forward
             {
-                if (msg.src == mac.addr && mac.recvH.src_addr != loopyParent)
+                if ((msg.src == mac.addr || msg.src == parentAddr) && mac.recvH.src_addr != loopyParent)
                 {
                     loopyParent = mac.recvH.src_addr; // To skip duplicate loop detection
                     printf("%s - Loop detected %02d (%02d) msg: %s\n", timestamp(), loopyParent, msg.numHops, msg.data);
