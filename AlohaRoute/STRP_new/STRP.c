@@ -16,20 +16,21 @@
 #include "../GPIO/GPIO.h"
 #include "../common.h"
 #include "../util.h"
+#include "../TopoMap/TopoMap.h"
 
 #define PACKETQ_SIZE 256
 #define MAX_ACTIVE_NODES 32
 #define NODE_TIMEOUT 60
 #define MIN_RSSI -128
 
-typedef enum ParentSelectionStrategy
-{
-    RANDOM_LOWER,
-    RANDOM,
-    NEXT_LOWER,
-    CLOSEST,
-    CLOSEST_LOWER
-} ParentSelectionStrategy;
+// typedef enum ParentSelectionStrategy
+// {
+//     RANDOM_LOWER,
+//     RANDOM,
+//     NEXT_LOWER,
+//     CLOSEST,
+//     CLOSEST_LOWER
+// } ParentSelectionStrategy;
 
 typedef enum NodeRole
 {
@@ -67,41 +68,41 @@ typedef struct PacketQueue
     sem_t mutex, full, free;
 } PacketQueue;
 
-typedef struct NodeInfo
-{
-    uint8_t addr;
-    int RSSI;
-    unsigned short hopsToSink;
-    time_t lastSeen;
-    NodeRole role;
-    uint8_t parent;
-    bool isActive;
-    int parentRSSI;
-} NodeInfo;
+// typedef struct NodeInfo
+// {
+//     uint8_t addr;
+//     int RSSI;
+//     unsigned short hopsToSink;
+//     time_t lastSeen;
+//     NodeRole role;
+//     uint8_t parent;
+//     bool isActive;
+//     int parentRSSI;
+// } NodeInfo;
 
-typedef struct ActiveNodes
-{
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-    sem_t mutex;
-    uint8_t numActive;
-    time_t lastCleanupTime;
-    uint8_t minAddr, maxAddr;
-} ActiveNodes;
+// typedef struct ActiveNodes
+// {
+//     NodeInfo nodes[MAX_ACTIVE_NODES];
+//     sem_t mutex;
+//     uint8_t numActive;
+//     time_t lastCleanupTime;
+//     uint8_t minAddr, maxAddr;
+// } ActiveNodes;
 
-typedef struct NodeRoutingTable
-{
-    char *timestamp;
-    uint8_t src;
-    uint8_t numActive;
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-} NodeRoutingTable;
+// typedef struct NodeRoutingTable
+// {
+//     char *timestamp;
+//     uint8_t src;
+//     uint8_t numActive;
+//     NodeInfo nodes[MAX_ACTIVE_NODES];
+// } NodeRoutingTable;
 
-typedef struct TableQueue
-{
-    NodeRoutingTable table[MAX_ACTIVE_NODES];
-    sem_t mutex, full, free;
-    unsigned int begin, end;
-} TableQueue;
+// typedef struct TableQueue
+// {
+//     NodeRoutingTable table[MAX_ACTIVE_NODES];
+//     sem_t mutex, full, free;
+//     unsigned int begin, end;
+// } TableQueue;
 
 static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
@@ -117,7 +118,7 @@ static const unsigned int senseDuration = 30;        // duration for neighbour s
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
 static TableQueue tableQ;
-static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
+// static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static pid_t serverPid;
 
 static void sendQ_init();
@@ -150,7 +151,7 @@ static void *sendBeaconPeriodic(void *args);
 static void *sendRoutingTable(void *args);
 static DataPacket buildRoutingTablePkt();
 static void parseRoutingTablePkt(DataPacket tab);
-static char *getRoleStr(NodeRole role);
+// static char *getRoleStr(NodeRole role);
 static void tableQ_init();
 static void tableQ_enqueue(NodeRoutingTable table);
 static NodeRoutingTable tableQ_dequeue();
@@ -1220,7 +1221,7 @@ static void parseRoutingTablePkt(DataPacket tab)
     tableQ_enqueue(table);
 }
 
-static char *getRoleStr(NodeRole role)
+char *getRoleStr(NodeRole role)
 {
     char *roleStr;
     switch (role)
@@ -1335,54 +1336,54 @@ static void *saveRoutingTable(void *args)
     }
 }
 
-static void writeToCSVFile(NodeRoutingTable table)
-{
-    FILE *file = fopen(outputCSV, "a");
-    if (file == NULL)
-    {
-        printf("## - Error opening csv file!\n");
-        exit(EXIT_FAILURE);
-    }
-    if (loglevel >= DEBUG)
-    {
-        printf("### Writing to CSV\n");
-        printf("Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI\n");
-    }
-    for (int i = 0; i < table.numActive; i++)
-    {
-        NodeInfo node = table.nodes[i];
-        fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d,%d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
-        if (loglevel >= DEBUG)
-        {
-            printf("%s, %02d, %02d, %d, %s, %d, %02d, %d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
-        }
-    }
-    fclose(file);
-    fflush(stdout);
-}
+// static void writeToCSVFile(NodeRoutingTable table)
+// {
+//     FILE *file = fopen(outputCSV, "a");
+//     if (file == NULL)
+//     {
+//         printf("## - Error opening csv file!\n");
+//         exit(EXIT_FAILURE);
+//     }
+//     if (loglevel >= DEBUG)
+//     {
+//         printf("### Writing to CSV\n");
+//         printf("Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI\n");
+//     }
+//     for (int i = 0; i < table.numActive; i++)
+//     {
+//         NodeInfo node = table.nodes[i];
+//         fprintf(file, "%s,%02d,%02d,%d,%s,%d,%02d,%d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+//         if (loglevel >= DEBUG)
+//         {
+//             printf("%s, %02d, %02d, %d, %s, %d, %02d, %d\n", table.timestamp, table.src, node.addr, node.isActive, getRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+//         }
+//     }
+//     fclose(file);
+//     fflush(stdout);
+// }
 
-static void createCSVFile()
-{
-    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html'";
-    if (system(cmd) != 0)
-    {
-        printf("## - Error creating results dir!\n");
-        exit(EXIT_FAILURE);
-    }
-    FILE *file = fopen(outputCSV, "w");
-    if (file == NULL)
-    {
-        printf("## - Error creating csv file!\n");
-        exit(EXIT_FAILURE);
-    }
-    const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent,ParentRSSI\n";
-    fprintf(file, "%s", header);
-    fclose(file);
-    if (loglevel >= DEBUG)
-    {
-        printf("### CSV file: %s created\n", outputCSV);
-    }
-}
+// static void createCSVFile()
+// {
+//     const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html'";
+//     if (system(cmd) != 0)
+//     {
+//         printf("## - Error creating results dir!\n");
+//         exit(EXIT_FAILURE);
+//     }
+//     FILE *file = fopen(outputCSV, "w");
+//     if (file == NULL)
+//     {
+//         printf("## - Error creating csv file!\n");
+//         exit(EXIT_FAILURE);
+//     }
+//     const char *header = "Timestamp,Source,Address,Active,Role,RSSI,Parent,ParentRSSI\n";
+//     fprintf(file, "%s", header);
+//     fclose(file);
+//     if (loglevel >= DEBUG)
+//     {
+//         printf("### CSV file: %s created\n", outputCSV);
+//     }
+// }
 
 static void installDependencies()
 {
