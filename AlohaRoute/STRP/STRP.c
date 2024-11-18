@@ -116,6 +116,7 @@ static ParentSelectionStrategy strategy = CLOSEST_LOWER;
 static const unsigned int senseDuration = 30;        // duration for neighbour sensing
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
+static const unsigned int  graphUpdateInterval = 60; // Interval to generate graph
 static TableQueue tableQ;
 static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static pid_t serverPid;
@@ -1317,7 +1318,7 @@ static void *saveRoutingTable(void *args)
         }
         writeToCSVFile(table);
         time_t current = time(NULL);
-        if (current - start > NODE_TIMEOUT)
+        if (current - start > graphUpdateInterval)
         {
             printf("### Generating graph...\n");
             // system("bash -c \"cd /home/pi/sw_workspace/AlohaRoute/Debug && source ./my_env/bin/activate && python /home/pi/sw_workspace/AlohaRoute/logs/script.py\"");
