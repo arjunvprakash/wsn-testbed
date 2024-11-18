@@ -43,3 +43,13 @@ bash -c './AlohaRoute <addr> # Address of the respective node/sink
 ssh -L 8000:localhost:8000 pi@sink
 ```
 3. On the client. open http://localhost:8000/ on the browser.
+
+## Functional Overview
+
+![Node: State Diagram](https://github.com/user-attachments/assets/498ceb98-5ee0-46b6-a2e8-7865197b7c7a)
+
+![Sink: State Diagram](https://github.com/user-attachments/assets/61f38c28-a1f6-45cd-a0e0-7a96af3caffd)
+
+## Architecture
+
+![Architecture](https://github.com/user-attachments/assets/2a767383-09fb-4f22-9d32-f471772b138a)
