@@ -44,6 +44,15 @@ ssh -L 8000:localhost:8000 pi@sink
 ```
 3. On the client. open http://localhost:8000/ on the browser.
 
+## Results Samples
+
+![network_graph_2024-08-21 18%3A29%3A21](https://github.com/user-attachments/assets/c3171cee-83f8-456c-8e2f-d6f553f0e296)
+![network_graph_2024-08-21 18%3A27%3A59](https://github.com/user-attachments/assets/9f58df68-840c-4bc7-974b-743b55e98aa7)
+![network_graph_2nodes](https://github.com/user-attachments/assets/cf218bf2-39a8-45b8-9f5f-6d62913d972c)
+![network_graph](https://github.com/user-attachments/assets/cbe31ae0-7998-4695-b664-abddb38d3f26)
+
+
+
 ## Functional Overview
 
 ![Node: State Diagram](https://github.com/user-attachments/assets/498ceb98-5ee0-46b6-a2e8-7865197b7c7a)
