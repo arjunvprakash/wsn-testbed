@@ -1,0 +1,193 @@
+2024-11-20T16:13:38 - Node: 07
+2024-11-20T16:13:38 - Network Mode: ROUTING
+2024-11-20T16:13:38 - Sleep duration: 20000 ms
+2024-11-20T16:13:39 - Sending beacon
+### CSV file: /home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv created
+### Installing dependencies...
+### Executing command : pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null &
+### Successfully installed dependencies...
+HTTP server started on port: 8000
+### 2024-11-20T16:13:40 - Beacon src: 08 (-16) parent: 07(-64)
+2024-11-20T16:13:40 - ##  New child: 08 (-16)
+2024-11-20T16:13:40 - ##  Active neighbour count: 1
+### 2024-11-20T16:13:41 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:42 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:43 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:43 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:44 - Beacon src: 08 (-14) parent: 07(-15)
+### 2024-11-20T16:13:45 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:45 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:46 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:46 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:47 - Beacon src: 08 (-15) parent: 07(-15)
+### 2024-11-20T16:13:48 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:49 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:50 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:50 - Beacon src: 08 (-15) parent: 07(-15)
+### 2024-11-20T16:13:51 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:52 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:53 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:54 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:54 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:55 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:56 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:57 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:58 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:13:59 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:00 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:01 - Beacon src: 08 (-15) parent: 07(-15)
+### 2024-11-20T16:14:02 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:03 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:04 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:05 - Beacon src: 08 (-14) parent: 07(-15)
+### 2024-11-20T16:14:06 - Beacon src: 08 (-16) parent: 07(-15)
+### 2024-11-20T16:14:07 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:14:11 - Sending beacon
+### 2024-11-20T16:14:13 - Beacon src: 08 (-64) parent: 07(-15)
+2024-11-20T16:14:14 - RX: 08 (-16) src: 08 hops: 01 msg: 8001 total: 01
+2024-11-20T16:14:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8002 total: 02
+2024-11-20T16:14:42 - Sending beacon
+2024-11-20T16:14:42 - ##  Active neighbour count: 1
+2024-11-20T16:14:43 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:14:43, 08, 07, 1, PARENT, -15, 00, 0
+### Generating graph...
+### 2024-11-20T16:14:44 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:14:53 - RX: 08 (-14) src: 08 hops: 01 msg: 8003 total: 03
+2024-11-20T16:15:13 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:15:13, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:15:13 - RX: 08 (-16) src: 08 hops: 01 msg: 8004 total: 04
+2024-11-20T16:15:13 - Sending beacon
+### 2024-11-20T16:15:15 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:15:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8005 total: 05
+2024-11-20T16:15:43 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:15:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:15:44 - Sending beacon
+2024-11-20T16:15:44 - ##  Active neighbour count: 1
+### 2024-11-20T16:15:46 - Beacon src: 08 (-14) parent: 07(-15)
+2024-11-20T16:15:53 - RX: 08 (-16) src: 08 hops: 01 msg: 8006 total: 06
+2024-11-20T16:16:13 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:16:13, 08, 07, 1, PARENT, -15, 00, 0
+### Generating graph...
+2024-11-20T16:16:13 - RX: 08 (-16) src: 08 hops: 01 msg: 8007 total: 07
+2024-11-20T16:16:15 - Sending beacon
+### 2024-11-20T16:16:17 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:16:33 - RX: 08 (-15) src: 08 hops: 01 msg: 8008 total: 08
+2024-11-20T16:16:43 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:16:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:16:46 - Sending beacon
+2024-11-20T16:16:46 - ##  Active neighbour count: 1
+### 2024-11-20T16:16:48 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:16:53 - RX: 08 (-16) src: 08 hops: 01 msg: 8009 total: 09
+2024-11-20T16:17:13 - Routing table of Node :08 nodes:1
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:17:13, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:17:13 - RX: 08 (-14) src: 08 hops: 01 msg: 8010 total: 10
+2024-11-20T16:17:17 - Sending beacon
+### 2024-11-20T16:17:19 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:17:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8011 total: 11
+2024-11-20T16:17:43 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:17:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:17:43, 08, 08, 1, NODE, -91, 07, -15
+### Generating graph...
+2024-11-20T16:17:48 - Sending beacon
+2024-11-20T16:17:48 - ##  Active neighbour count: 1
+### 2024-11-20T16:17:50 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:17:53 - RX: 08 (-16) src: 08 hops: 01 msg: 8012 total: 12
+2024-11-20T16:18:13 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:18:13, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:18:13, 08, 08, 1, NODE, -91, 07, -15
+2024-11-20T16:18:13 - RX: 08 (-16) src: 08 hops: 01 msg: 8013 total: 13
+2024-11-20T16:18:19 - Sending beacon
+### 2024-11-20T16:18:21 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:18:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8014 total: 14
+2024-11-20T16:18:43 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:18:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:18:43, 08, 08, 1, NODE, -91, 07, -15
+2024-11-20T16:18:51 - Sending beacon
+2024-11-20T16:18:51 - ##  Active neighbour count: 1
+### 2024-11-20T16:18:52 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:18:53 - RX: 08 (-16) src: 08 hops: 01 msg: 8015 total: 15
+2024-11-20T16:19:13 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:19:13, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:19:13, 08, 08, 1, NODE, -91, 07, -15
+### Generating graph...
+2024-11-20T16:19:13 - RX: 08 (-16) src: 08 hops: 01 msg: 8016 total: 16
+2024-11-20T16:19:22 - Sending beacon
+### 2024-11-20T16:19:23 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:19:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8017 total: 17
+2024-11-20T16:19:43 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:19:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:19:43, 08, 08, 1, NODE, -91, 07, -15
+2024-11-20T16:19:53 - Sending beacon
+2024-11-20T16:19:53 - ##  Active neighbour count: 1
+2024-11-20T16:19:53 - RX: 08 (-16) src: 08 hops: 01 msg: 8018 total: 18
+### 2024-11-20T16:19:54 - Beacon src: 08 (-16) parent: 07(-15)
+2024-11-20T16:20:13 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:20:13, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:20:13, 08, 08, 1, NODE, -91, 07, -15
+2024-11-20T16:20:13 - RX: 08 (-14) src: 08 hops: 01 msg: 8019 total: 19
+2024-11-20T16:20:24 - Sending beacon
+### 2024-11-20T16:20:25 - Beacon src: 08 (-14) parent: 07(-15)
+2024-11-20T16:20:33 - RX: 08 (-16) src: 08 hops: 01 msg: 8020 total: 20
+2024-11-20T16:20:43 - Routing table of Node :08 nodes:2
+Source,	Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+08,	07,	1,	PARENT,	-15,	00,	0
+08,	08,	1,	NODE,	-91,	07,	-15
+### Writing to CSV
+Timestamp, Source, Address, Active, Role, RSSI, Parent, ParentRSSI
+2024-11-20T16:20:43, 08, 07, 1, PARENT, -15, 00, 0
+2024-11-20T16:20:43, 08, 08, 1, NODE, -91, 07, -15
+### Generating graph...

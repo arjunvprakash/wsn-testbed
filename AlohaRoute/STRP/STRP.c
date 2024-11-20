@@ -1414,22 +1414,11 @@ static void installDependencies()
 int killProcessOnPort(int port)
 {
     char cmd[100];
-    sprintf(cmd, "fuser %d/tcp", port);
-    FILE *fp = popen(cmd, "r");
-    if (fp != NULL)
-    {
-        char buffer[256];
-        if (fgets(buffer, sizeof(buffer), fp) != NULL)
-        {
-            printf("%s", buffer);
-            char *process_id = strtok(buffer, " ");
-            char kill_cmd[100];
-            sprintf(kill_cmd, "kill -9 %s", process_id);
-            system(kill_cmd);
-            printf("Process killed.\n");
-        }
-        pclose(fp);
+    sprintf(cmd, "fuser %d/tcp 2>/dev/null | xargs -r kill -9", port);
+    if(system(cmd) != 0) {
+        printf("## Error terminating process bound to port %d\n",port);
     }
+    
 }
 
 static void createHttpServer()
@@ -1450,12 +1439,7 @@ static void createHttpServer()
     // if (loglevel >= DEBUG)
     {
         printf("HTTP server started on port: %d\n", 8000);
-    }
-    signal(SIGSEGV, signalHandler);
-    signal(SIGABRT, signalHandler);
-    signal(SIGFPE, signalHandler);
-    signal(SIGILL, signalHandler);
-    signal(SIGTERM, signalHandler);
+    }   
 }
 
 static void signalHandler(int signum)
