@@ -11,7 +11,7 @@
 #include "GPIO/GPIO.h"
 #include "common.h"
 #include "util.h"
-#include "Routing/routing.h"
+#include "STRP/STRP.h"
 
 // Configuration flags
 
@@ -34,11 +34,13 @@ int main(int argc, char *argv[])
 	printf("%s - Node: %02d\n", timestamp(), self);
 	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
 	srand(self * time(NULL));
+	fflush(stdout);
 
 	if (nwMode == ROUTING)
 	{
 		sleepDuration = 20000;
 		printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
+		fflush(stdout);
 		routingInit(self, loglevel, recvTimeout);
 		RouteHeader header;
 

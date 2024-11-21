@@ -1,0 +1,114 @@
+2024-11-20T16:13:36 - Node: 08
+2024-11-20T16:13:36 - Network Mode: ROUTING
+2024-11-20T16:13:36 - Sleep duration: 20000 ms
+2024-11-20T16:13:38 - Routing strategy: CLOSEST_LOWER
+2024-11-20T16:13:38 - ## Sending beacons...
+### 2024-11-20T16:13:39 - Beacon src: 07 (-64) parent: 00(0)
+2024-11-20T16:13:39 - ##  New neighbour: 07 (-64)
+2024-11-20T16:13:39 - ##  Active neighbour count: 1
+### 2024-11-20T16:13:40 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:14:08 - ## Sent 35 beacons...
+### 2024-11-20T16:14:11 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:14:13 - Parent: 07 (-15)
+2024-11-20T16:14:13 - Sending beacon
+2024-11-20T16:14:13 - TX: 07 msg: 8001 total: 01
+2024-11-20T16:14:33 - TX: 07 msg: 8002 total: 02
+### 2024-11-20T16:14:42 - Beacon src: 07 (-15) parent: 00(0)
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:14:43 - Sending routing table
+2024-11-20T16:14:44 - Sending beacon
+2024-11-20T16:14:44 - ##  Active neighbour count: 1
+2024-11-20T16:14:53 - TX: 07 msg: 8003 total: 03
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:15:13 - Sending routing table
+2024-11-20T16:15:13 - TX: 07 msg: 8004 total: 04
+### 2024-11-20T16:15:13 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:15:15 - Sending beacon
+2024-11-20T16:15:33 - TX: 07 msg: 8005 total: 05
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:15:43 - Sending routing table
+### 2024-11-20T16:15:44 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:15:46 - Sending beacon
+2024-11-20T16:15:46 - ##  Active neighbour count: 1
+2024-11-20T16:15:53 - TX: 07 msg: 8006 total: 06
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:16:13 - Sending routing table
+2024-11-20T16:16:13 - TX: 07 msg: 8007 total: 07
+### 2024-11-20T16:16:16 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:16:17 - Sending beacon
+2024-11-20T16:16:33 - TX: 07 msg: 8008 total: 08
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:16:43 - Sending routing table
+### 2024-11-20T16:16:47 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:16:48 - Sending beacon
+2024-11-20T16:16:48 - ##  Active neighbour count: 1
+2024-11-20T16:16:53 - TX: 07 msg: 8009 total: 09
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+2024-11-20T16:17:13 - Sending routing table
+2024-11-20T16:17:13 - TX: 07 msg: 8010 total: 10
+### 2024-11-20T16:17:18 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:17:19 - Sending beacon
+### 2024-11-20T16:17:26 - Beacon src: 08 (-91) parent: 07(-15)
+2024-11-20T16:17:26 - ##  New neighbour: 08 (-91)
+2024-11-20T16:17:26 - ##  Active neighbour count: 2
+### Inside change block parent:07 (-15)
+2024-11-20T16:17:33 - TX: 07 msg: 8011 total: 11
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:17:43 - Sending routing table
+### 2024-11-20T16:17:49 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:17:50 - Sending beacon
+2024-11-20T16:17:50 - ##  Active neighbour count: 2
+2024-11-20T16:17:53 - TX: 07 msg: 8012 total: 12
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:18:13 - Sending routing table
+2024-11-20T16:18:13 - TX: 07 msg: 8013 total: 13
+### 2024-11-20T16:18:20 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:18:21 - Sending beacon
+2024-11-20T16:18:33 - TX: 07 msg: 8014 total: 14
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:18:43 - Sending routing table
+### 2024-11-20T16:18:51 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:18:52 - Sending beacon
+2024-11-20T16:18:52 - ##  Active neighbour count: 2
+2024-11-20T16:18:53 - TX: 07 msg: 8015 total: 15
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:19:13 - Sending routing table
+2024-11-20T16:19:13 - TX: 07 msg: 8016 total: 16
+### 2024-11-20T16:19:22 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:19:23 - Sending beacon
+2024-11-20T16:19:33 - TX: 07 msg: 8017 total: 17
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:19:43 - Sending routing table
+### 2024-11-20T16:19:53 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:19:53 - TX: 07 msg: 8018 total: 18
+2024-11-20T16:19:54 - Sending beacon
+2024-11-20T16:19:54 - ##  Active neighbour count: 2
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:20:13 - Sending routing table
+2024-11-20T16:20:13 - TX: 07 msg: 8019 total: 19
+### 2024-11-20T16:20:24 - Beacon src: 07 (-15) parent: 00(0)
+2024-11-20T16:20:25 - Sending beacon
+2024-11-20T16:20:33 - TX: 07 msg: 8020 total: 20
+Address,	Active,	Role,	RSSI,	Parent,	ParentRSSI
+07,	1,	PARENT,	-15,	00,	0
+08,	1,	NODE,	-91,	07,	-15
+2024-11-20T16:20:43 - Sending routing table
+

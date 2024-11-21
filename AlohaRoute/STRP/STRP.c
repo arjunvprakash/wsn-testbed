@@ -11,13 +11,13 @@
 #include <sys/wait.h> // waitpid
 #include <execinfo.h> // backtrace
 
-#include "routing.h"
+#include "STRP.h"
 #include "../ALOHA/ALOHA.h"
 #include "../GPIO/GPIO.h"
 #include "../common.h"
 #include "../util.h"
 
-#define RoutingQueueSize 256
+#define PACKETQ_SIZE 256
 #define MAX_ACTIVE_NODES 32
 #define NODE_TIMEOUT 60
 #define MIN_RSSI -128
@@ -45,7 +45,7 @@ typedef struct Beacon
     int parentRSSI;
 } Beacon;
 
-typedef struct RoutingMessage
+typedef struct DataPacket
 {
     uint8_t ctrl;
     uint8_t dest;
@@ -58,14 +58,14 @@ typedef struct RoutingMessage
     uint8_t prev;
     uint8_t next;
 
-} RoutingMessage;
+} DataPacket;
 
-typedef struct RoutingQueue
+typedef struct PacketQueue
 {
     unsigned int begin, end;
-    struct RoutingMessage packet[RoutingQueueSize];
+    struct DataPacket packet[PACKETQ_SIZE];
     sem_t mutex, full, free;
-} RoutingQueue;
+} PacketQueue;
 
 typedef struct NodeInfo
 {
@@ -96,14 +96,14 @@ typedef struct NodeRoutingTable
     NodeInfo nodes[MAX_ACTIVE_NODES];
 } NodeRoutingTable;
 
-typedef struct RoutingTables
+typedef struct TableQueue
 {
     NodeRoutingTable table[MAX_ACTIVE_NODES];
     sem_t mutex, full, free;
     unsigned int begin, end;
-} RoutingTables;
+} TableQueue;
 
-static RoutingQueue sendQ, recvQ;
+static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
@@ -116,22 +116,23 @@ static ParentSelectionStrategy strategy = CLOSEST_LOWER;
 static const unsigned int senseDuration = 30;        // duration for neighbour sensing
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
-static RoutingTables routingTables;
+static const unsigned int  graphUpdateInterval = 60; // Interval to generate graph
+static TableQueue tableQ;
 static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static pid_t serverPid;
 
 static void sendQ_init();
 static void recvQ_init();
-static void sendQ_enqueue(RoutingMessage msg);
-static RoutingMessage sendQ_dequeue();
-static void recvQ_enqueue(RoutingMessage msg);
-static RoutingMessage recvMsgQ_dequeue();
+static void sendQ_enqueue(DataPacket msg);
+static DataPacket sendQ_dequeue();
+static void recvQ_enqueue(DataPacket msg);
+static DataPacket recvMsgQ_dequeue();
 static void *recvPackets_func(void *args);
-static RoutingMessage buildRoutingMessage(uint8_t *pkt);
+static DataPacket deserializePacket(uint8_t *pkt);
 static void *sendPackets_func(void *args);
-static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt);
+static int serializePacket(DataPacket msg, uint8_t **routePkt);
 static void setDebug(LogLevel d);
-static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts);
+static int recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
 static void selectParent();
@@ -148,19 +149,20 @@ static void printRoutingStrategy();
 static void sendBeacon();
 static void *sendBeaconPeriodic(void *args);
 static void *sendRoutingTable(void *args);
-static RoutingMessage buildRoutingTableMsg();
-static void parseRoutingTablePkt(RoutingMessage tab);
+static DataPacket buildRoutingTablePkt();
+static void parseRoutingTablePkt(DataPacket tab);
 static char *getRoleStr(NodeRole role);
-static void routingTables_init();
-static void routingTables_enqueue(NodeRoutingTable table);
-static NodeRoutingTable routingTables_dequeue();
+static void tableQ_init();
+static void tableQ_enqueue(NodeRoutingTable table);
+static NodeRoutingTable tableQ_dequeue();
 static void *saveRoutingTable(void *args);
 static void createCSVFile();
-static void createHttpServer();
 static void signalHandler(int signum);
-static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
-static void installDependencies();
+static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
 static void writeToCSVFile(NodeRoutingTable table);
+static int killProcessOnPort(int port);
+static void installDependencies();
+static void createHttpServer();
 
 // Initialize the routing layer
 int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
@@ -216,7 +218,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
     else
     {
         pthread_t saveRoutingTableT;
-        routingTables_init();
+        tableQ_init();
         createCSVFile();
         installDependencies();
         createHttpServer();
@@ -232,7 +234,7 @@ int routingInit(uint8_t self, uint8_t debug, unsigned int timeout)
 // Send a message via the routing layer
 int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 {
-    RoutingMessage msg;
+    DataPacket msg;
     msg.ctrl = CTRL_PKT;
     msg.dest = dest;
     msg.src = mac.addr;
@@ -257,7 +259,7 @@ int routingSend(uint8_t dest, uint8_t *data, unsigned int len)
 // Receive a message via the routing layer
 int routingReceive(RouteHeader *header, uint8_t *data)
 {
-    RoutingMessage msg = recvMsgQ_dequeue();
+    DataPacket msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
@@ -280,12 +282,12 @@ int routingReceive(RouteHeader *header, uint8_t *data)
 int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout)
 {
 
-    RoutingMessage msg;
+    DataPacket msg;
     struct timespec ts;
     clock_gettime(CLOCK_REALTIME, &ts);
     ts.tv_sec += timeout;
 
-    int result = recvMsgQ_timed_dequeue(&msg, &ts);
+    int result = recvQ_timed_dequeue(&msg, &ts);
     if (result <= 0)
     {
         return result;
@@ -310,7 +312,7 @@ int routingTimedReceive(RouteHeader *header, uint8_t *data, unsigned int timeout
     return msg.len;
 }
 
-static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
+static int recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts)
 {
     if (sem_timedwait(&recvQ.full, ts) == -1)
     {
@@ -323,7 +325,7 @@ static int recvMsgQ_timed_dequeue(RoutingMessage *msg, struct timespec *ts)
 
     sem_wait(&recvQ.mutex);
     *msg = recvQ.packet[recvQ.begin];
-    recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
+    recvQ.begin = (recvQ.begin + 1) % PACKETQ_SIZE;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
     return 1;
@@ -334,7 +336,7 @@ static void sendQ_init()
     sendQ.begin = 0;
     sendQ.end = 0;
     sem_init(&sendQ.full, 0, 0);
-    sem_init(&sendQ.free, 0, RoutingQueueSize);
+    sem_init(&sendQ.free, 0, PACKETQ_SIZE);
     sem_init(&sendQ.mutex, 0, 1);
 }
 
@@ -343,47 +345,47 @@ static void recvQ_init()
     recvQ.begin = 0;
     recvQ.end = 0;
     sem_init(&recvQ.full, 0, 0);
-    sem_init(&recvQ.free, 0, RoutingQueueSize);
+    sem_init(&recvQ.free, 0, PACKETQ_SIZE);
     sem_init(&recvQ.mutex, 0, 1);
 }
 
-static void sendQ_enqueue(RoutingMessage msg)
+static void sendQ_enqueue(DataPacket msg)
 {
     sem_wait(&sendQ.free);
     sem_wait(&sendQ.mutex);
     sendQ.packet[sendQ.end] = msg;
-    sendQ.end = (sendQ.end + 1) % RoutingQueueSize;
+    sendQ.end = (sendQ.end + 1) % PACKETQ_SIZE;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
 }
 
-static RoutingMessage sendQ_dequeue()
+static DataPacket sendQ_dequeue()
 {
     sem_wait(&sendQ.full);
     sem_wait(&sendQ.mutex);
-    RoutingMessage msg = sendQ.packet[sendQ.begin];
-    sendQ.begin = (sendQ.begin + 1) % RoutingQueueSize;
+    DataPacket msg = sendQ.packet[sendQ.begin];
+    sendQ.begin = (sendQ.begin + 1) % PACKETQ_SIZE;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.free);
     return msg;
 }
 
-static void recvQ_enqueue(RoutingMessage msg)
+static void recvQ_enqueue(DataPacket msg)
 {
     sem_wait(&recvQ.free);
     sem_wait(&recvQ.mutex);
     recvQ.packet[recvQ.end] = msg;
-    recvQ.end = (recvQ.end + 1) % RoutingQueueSize;
+    recvQ.end = (recvQ.end + 1) % PACKETQ_SIZE;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.full);
 }
 
-static RoutingMessage recvMsgQ_dequeue()
+static DataPacket recvMsgQ_dequeue()
 {
     sem_wait(&recvQ.full);
     sem_wait(&recvQ.mutex);
-    RoutingMessage msg = recvQ.packet[recvQ.begin];
-    recvQ.begin = (recvQ.begin + 1) % RoutingQueueSize;
+    DataPacket msg = recvQ.packet[recvQ.begin];
+    recvQ.begin = (recvQ.begin + 1) % PACKETQ_SIZE;
     sem_post(&recvQ.mutex);
     sem_post(&recvQ.free);
     return msg;
@@ -391,7 +393,7 @@ static RoutingMessage recvMsgQ_dequeue()
 
 static void *recvPackets_func(void *args)
 {
-    unsigned int total[25] = {0};
+    unsigned int total[MAX_ACTIVE_NODES] = {0};
     MAC *macTemp = (MAC *)args;
     time_t start = time(NULL);
     time_t current;
@@ -413,7 +415,7 @@ static void *recvPackets_func(void *args)
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT || ctrl == CTRL_TAB)
         {
-            RoutingMessage msg = buildRoutingMessage(pkt);
+            DataPacket msg = deserializePacket(pkt);
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
             if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             {
@@ -430,7 +432,7 @@ static void *recvPackets_func(void *args)
             }
             else // Forward
             {
-                if (msg.src == mac.addr && mac.recvH.src_addr != loopyParent)
+                if ((msg.src == mac.addr || msg.src == parentAddr) && mac.recvH.src_addr != loopyParent)
                 {
                     loopyParent = mac.recvH.src_addr; // To skip duplicate loop detection
                     printf("%s - Loop detected %02d (%02d) msg: %s\n", timestamp(), loopyParent, msg.numHops, msg.data);
@@ -495,9 +497,9 @@ static void *recvPackets_func(void *args)
 }
 
 // Construct RoutingMessage
-static RoutingMessage buildRoutingMessage(uint8_t *pkt)
+static DataPacket deserializePacket(uint8_t *pkt)
 {
-    RoutingMessage msg;
+    DataPacket msg;
     msg.ctrl = *pkt;
     pkt += sizeof(msg.ctrl);
 
@@ -538,9 +540,9 @@ static void *sendPackets_func(void *args)
     MAC *macTemp = (MAC *)args;
     while (1)
     {
-        RoutingMessage msg = sendQ_dequeue();
+        DataPacket msg = sendQ_dequeue();
         uint8_t *pkt;
-        unsigned int pktSize = buildRoutingPacket(msg, &pkt);
+        unsigned int pktSize = serializePacket(msg, &pkt);
         if (pkt == NULL)
         {
             free(pkt);
@@ -556,7 +558,7 @@ static void *sendPackets_func(void *args)
     return NULL;
 }
 
-static int buildRoutingPacket(RoutingMessage msg, uint8_t **routePkt)
+static int serializePacket(DataPacket msg, uint8_t **routePkt)
 {
     uint16_t routePktSize = msg.len + headerSize;
     *routePkt = (uint8_t *)malloc(routePktSize);
@@ -604,6 +606,7 @@ static void *sendBeaconHandler(void *args)
     if (loglevel >= DEBUG)
     {
         printf("%s - ## Sending beacons...\n", timestamp());
+        fflush(stdout);
     }
 
     time_t start = time(NULL);
@@ -619,6 +622,7 @@ static void *sendBeaconHandler(void *args)
     if (loglevel >= DEBUG)
     {
         printf("%s - ## Sent %d beacons...\n", timestamp(), trials);
+        fflush(stdout);
     }
     return NULL;
 }
@@ -1098,7 +1102,7 @@ static void *sendRoutingTable(void *args)
     {
         if (neighbours.numActive > 0)
         {
-            RoutingMessage msg = buildRoutingTableMsg();
+            DataPacket msg = buildRoutingTablePkt();
             if (msg.data != NULL)
             {
                 printf("%s - Sending routing table\n", timestamp());
@@ -1117,10 +1121,10 @@ static void *sendRoutingTable(void *args)
     return NULL;
 }
 
-static RoutingMessage buildRoutingTableMsg()
+static DataPacket buildRoutingTablePkt()
 {
     // msg data format : [ numActive | ( addr,active,role,parent,rssi )*numActive ]
-    RoutingMessage msg;
+    DataPacket msg;
     msg.ctrl = CTRL_TAB;
     msg.src = mac.addr;
     msg.dest = ADDR_SINK;
@@ -1165,7 +1169,7 @@ static RoutingMessage buildRoutingTableMsg()
     return msg;
 }
 
-static void parseRoutingTablePkt(RoutingMessage tab)
+static void parseRoutingTablePkt(DataPacket tab)
 {
     NodeRoutingTable table;
     int dataLen = tab.len;
@@ -1214,7 +1218,7 @@ static void parseRoutingTablePkt(RoutingMessage tab)
         }
     }
     fflush(stdout);
-    routingTables_enqueue(table);
+    tableQ_enqueue(table);
 }
 
 static char *getRoleStr(NodeRole role)
@@ -1238,39 +1242,39 @@ static char *getRoleStr(NodeRole role)
     return roleStr;
 }
 
-static void routingTables_init()
+static void tableQ_init()
 {
-    routingTables.begin = 0;
-    routingTables.end = 0;
-    sem_init(&routingTables.full, 0, 0);
-    sem_init(&routingTables.free, 0, MAX_ACTIVE_NODES);
-    sem_init(&routingTables.mutex, 0, 1);
+    tableQ.begin = 0;
+    tableQ.end = 0;
+    sem_init(&tableQ.full, 0, 0);
+    sem_init(&tableQ.free, 0, MAX_ACTIVE_NODES);
+    sem_init(&tableQ.mutex, 0, 1);
 }
 
-static void routingTables_enqueue(NodeRoutingTable table)
+static void tableQ_enqueue(NodeRoutingTable table)
 {
-    sem_wait(&routingTables.free);
-    sem_wait(&routingTables.mutex);
-    routingTables.table[routingTables.end] = table;
-    routingTables.end = (routingTables.end + 1) % MAX_ACTIVE_NODES;
-    sem_post(&routingTables.mutex);
-    sem_post(&routingTables.full);
+    sem_wait(&tableQ.free);
+    sem_wait(&tableQ.mutex);
+    tableQ.table[tableQ.end] = table;
+    tableQ.end = (tableQ.end + 1) % MAX_ACTIVE_NODES;
+    sem_post(&tableQ.mutex);
+    sem_post(&tableQ.full);
 }
 
-static NodeRoutingTable routingTables_dequeue()
+static NodeRoutingTable tableQ_dequeue()
 {
-    sem_wait(&routingTables.full);
-    sem_wait(&routingTables.mutex);
-    NodeRoutingTable table = routingTables.table[routingTables.begin];
-    routingTables.begin = (routingTables.begin + 1) % MAX_ACTIVE_NODES;
-    sem_post(&routingTables.mutex);
-    sem_post(&routingTables.free);
+    sem_wait(&tableQ.full);
+    sem_wait(&tableQ.mutex);
+    NodeRoutingTable table = tableQ.table[tableQ.begin];
+    tableQ.begin = (tableQ.begin + 1) % MAX_ACTIVE_NODES;
+    sem_post(&tableQ.mutex);
+    sem_post(&tableQ.free);
     return table;
 }
 
-static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
+static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
 {
-    if (sem_timedwait(&routingTables.full, ts) == -1)
+    if (sem_timedwait(&tableQ.full, ts) == -1)
     {
         if (errno == ETIMEDOUT)
         {
@@ -1279,11 +1283,11 @@ static int routingTables_timed_dequeue(NodeRoutingTable *tab, struct timespec *t
         return -1;
     }
 
-    sem_wait(&routingTables.mutex);
-    *tab = routingTables.table[routingTables.begin];
-    routingTables.begin = (routingTables.begin + 1) % MAX_ACTIVE_NODES;
-    sem_post(&routingTables.mutex);
-    sem_post(&routingTables.free);
+    sem_wait(&tableQ.mutex);
+    *tab = tableQ.table[tableQ.begin];
+    tableQ.begin = (tableQ.begin + 1) % MAX_ACTIVE_NODES;
+    sem_post(&tableQ.mutex);
+    sem_post(&tableQ.free);
     return 1;
 }
 
@@ -1301,23 +1305,30 @@ static void *saveRoutingTable(void *args)
             // printf("saveRoutingTable : loop\n");
         }
         NodeRoutingTable table;
-        // table = routingTables_dequeue();
+        // table = tableQ_dequeue();
         struct timespec ts;
         clock_gettime(CLOCK_REALTIME, &ts);
         ts.tv_sec += 1;
 
-        int result = routingTables_timed_dequeue(&table, &ts);
+        int result = tableQ_timed_dequeue(&table, &ts);
         if (result <= 0)
         {
-            // printf("routingTables_timed_dequeue returned: %d\n", result);
+            // printf("tableQ_timed_dequeue returned: %d\n", result);
             continue;
         }
         writeToCSVFile(table);
         time_t current = time(NULL);
-        if (current - start > NODE_TIMEOUT)
+        if (current - start > graphUpdateInterval)
         {
             printf("### Generating graph...\n");
-            system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
+            // system("bash -c \"cd /home/pi/sw_workspace/AlohaRoute/Debug && source ./my_env/bin/activate && python /home/pi/sw_workspace/AlohaRoute/logs/script.py\"");
+            char cmd[100];
+            sprintf(cmd, "python /home/pi/sw_workspace/AlohaRoute/logs/script.py %d", ADDR_SINK);
+            // system("python /home/pi/sw_workspace/AlohaRoute/logs/script.py");
+            if (system(cmd) != 0)
+            {
+                printf("### Error generating graph...\n");
+            }
             start = current;
         }
         // usleep(5000000);
@@ -1353,7 +1364,7 @@ static void writeToCSVFile(NodeRoutingTable table)
 
 static void createCSVFile()
 {
-    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html' ";
+    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html'";
     if (system(cmd) != 0)
     {
         printf("## - Error creating results dir!\n");
@@ -1370,102 +1381,65 @@ static void createCSVFile()
     fclose(file);
     if (loglevel >= DEBUG)
     {
-        printf("### pid:%d ppid:%d\n", getpid(), getppid());
         printf("### CSV file: %s created\n", outputCSV);
     }
 }
 
 static void installDependencies()
 {
-    int pid = fork();
-    printf("### Inside installDependencies, forked; local_pid:%d\n", pid);
-    if (pid == 0)
+
+    // if (loglevel >= DEBUG)
     {
-        if (loglevel >= DEBUG)
-        {
-            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
-            printf("### Installing dependencies...\n");
-            fflush(stdout);
-        }
-        // ###
-        // if (loglevel == INFO)
-        {
-            freopen("/dev/null", "w", stdout);
-        }
-        char *cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt";
-        // if (execl("/bin/sh", "sh", "-c", cmd, NULL) != 0)
-        if (execl("/usr/bin/pip", "pip", "install", "-r", "/home/pi/sw_workspace/AlohaRoute/logs/requirements.txt", NULL) != 0)
-        // if (system(cmd) != 0)
-        {
-            fprintf(stderr, "## Error installing dependencies\n");
-            fclose(stdout);
-            fclose(stderr);
-            exit(EXIT_FAILURE);
-        }
-        fclose(stdout);
-        fclose(stderr);
-        exit(EXIT_SUCCESS);
+        printf("### Installing dependencies...\n");
+        fflush(stdout);
     }
-    else if (pid > 0)
+    chdir("/home/pi/sw_workspace/AlohaRoute/Debug");
+    // char *setenv_cmd = "bash -c \"cd /home/pi/sw_workspace/AlohaRoute/Debug && python -m venv my_env && source ./my_env/bin/activate && pip install -r ../logs/requirements.txt > /dev/null & \"";
+    char *setenv_cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null &";
+    if (loglevel >= DEBUG)
     {
-        wait(NULL);
-        if (loglevel >= DEBUG)
-        {
-            printf("### local_pid:%d pid:%d ppid:%d\n", pid, getpid(), getppid());
-            printf("### Installed dependencies...\n");
-            fflush(stdout);
-        }
+        printf("### Executing command : %s\n", setenv_cmd);
     }
-    else
+    fflush(stdout);
+    if (system(setenv_cmd) != 0)
     {
-        printf("## Error installing dependencies\n");
+        printf("## Error installing dependencies. Exiting...\n");
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
+    printf("### Successfully installed dependencies...\n");
+}
+
+// Check if a process is running on the specified TCP port and kill it
+int killProcessOnPort(int port)
+{
+    char cmd[100];
+    sprintf(cmd, "fuser %d/tcp 2>/dev/null | xargs -r kill -9", port);
+    if(system(cmd) != 0) {
+        printf("## Error terminating process bound to port %d\n",port);
+    }
+    
 }
 
 static void createHttpServer()
 {
-    serverPid = fork();
-    if (serverPid == 0)
+
+    chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
+
+    killProcessOnPort(8000);
+    char *cmd = "python3 -m http.server 8000 --bind 0.0.0.0 > /dev/null 2>&1 &";
+    if (system(cmd) != 0)
     {
-        printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-        freopen("/dev/null", "w", stdout);
-        chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
-        if (execl("/usr/bin/python3", "python3", "-m", "http.server", "8000", "--bind", "0.0.0.0", NULL) != 0)
-        {
-            printf("## Error starting HTTP server\n");
-            fclose(stdout);
-            fclose(stderr);
-            exit(EXIT_FAILURE);
-        }
+        printf("## Error starting HTTP server\n");
         fclose(stdout);
         fclose(stderr);
-        exit(EXIT_SUCCESS);
-    }
-    else if (serverPid > 0)
-    {
-        wait(NULL);
-        if (loglevel >= DEBUG)
-        {
-            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-            printf("HTTP server started on port: %d with PID: %d\n", 8000, serverPid);
-        }
-        else
-        {
-            printf("### local_serverPid:%d pid:%d ppid:%d\n", serverPid, getpid(), getppid());
-            printf("HTTP server started on port: %d\n", 8000);
-        }
-        signal(SIGSEGV, signalHandler);
-        signal(SIGABRT, signalHandler);
-        signal(SIGFPE, signalHandler);
-        signal(SIGILL, signalHandler);
-        signal(SIGTERM, signalHandler);
-    }
-    else
-    {
-        printf("## Error creating HTTP server\n");
         exit(EXIT_FAILURE);
     }
+
+    // if (loglevel >= DEBUG)
+    {
+        printf("HTTP server started on port: %d\n", 8000);
+    }   
 }
 
 static void signalHandler(int signum)
