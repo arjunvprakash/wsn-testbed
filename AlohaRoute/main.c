@@ -15,7 +15,7 @@
 
 // Configuration flags
 
-static LogLevel loglevel = DEBUG;
+static LogLevel loglevel = INFO;
 static unsigned int recvTimeout = 3000;
 static enum NetworkMode nwMode = ROUTING;
 
@@ -32,7 +32,11 @@ int main(int argc, char *argv[])
 {
 	self = (uint8_t)atoi(argv[1]);
 	printf("%s - Node: %02d\n", timestamp(), self);
-	printf("%s - Network Mode: %s\n", timestamp(), (nwMode == ROUTING ? "ROUTING" : "UNKNOWN"));
+	printf("%s - Role : %s\n", timestamp(), self == ADDR_SINK ? "SINK" : "NODE");
+	if (self != ADDR_SINK)
+	{
+		printf("%s - ADDR_SINK : %02d\n", timestamp(), ADDR_SINK);
+	}
 	srand(self * time(NULL));
 	fflush(stdout);
 
@@ -43,7 +47,6 @@ int main(int argc, char *argv[])
 		fflush(stdout);
 		routingInit(self, loglevel, recvTimeout);
 		RouteHeader header;
-
 		if (self != ADDR_SINK)
 		{
 			if (pthread_create(&sendT, NULL, handleRoutingSend, &header) != 0)

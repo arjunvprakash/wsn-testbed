@@ -10,7 +10,7 @@ Constants for subnet group
 #define CTRL_TAB '\x48' // Routing table info
 
 #define ADDR_BROADCAST 0XFF
-#define ADDR_SINK 0X07
+#define ADDR_SINK 0XE
 #define POOL_SIZE 3
 extern uint8_t NODE_POOL[POOL_SIZE];
 

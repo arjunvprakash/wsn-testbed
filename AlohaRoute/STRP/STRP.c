@@ -116,7 +116,7 @@ static ParentSelectionStrategy strategy = CLOSEST_LOWER;
 static const unsigned int senseDuration = 30;        // duration for neighbour sensing
 static const unsigned int beaconInterval = 31;       // Interval between periodic beacons
 static const unsigned int routingTableInterval = 30; // Interval to sending routing table
-static const unsigned int  graphUpdateInterval = 60; // Interval to generate graph
+static const unsigned int graphUpdateInterval = 60;  // Interval to generate graph
 static TableQueue tableQ;
 static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static pid_t serverPid;
@@ -751,7 +751,6 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     // change parent if new neighbour fits
     if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
     {
-        printf("### Inside change block parent:%02d (%d)\n", parentAddr, neighbours.nodes[parentAddr].RSSI);
         bool changed = false;
         uint8_t prevParentAddr = parentAddr;
         if (strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
@@ -1415,10 +1414,10 @@ int killProcessOnPort(int port)
 {
     char cmd[100];
     sprintf(cmd, "fuser %d/tcp 2>/dev/null | xargs -r kill -9", port);
-    if(system(cmd) != 0) {
-        printf("## Error terminating process bound to port %d\n",port);
+    if (system(cmd) != 0)
+    {
+        printf("## Error terminating process bound to port %d\n", port);
     }
-    
 }
 
 static void createHttpServer()
@@ -1439,7 +1438,7 @@ static void createHttpServer()
     // if (loglevel >= DEBUG)
     {
         printf("HTTP server started on port: %d\n", 8000);
-    }   
+    }
 }
 
 static void signalHandler(int signum)
