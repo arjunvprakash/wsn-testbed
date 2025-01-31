@@ -70,9 +70,9 @@ df.sort_values(by='Timestamp', ascending=False, inplace=True)
 
 # Network Tree
 # Filter Active direct parent nodes
-df_p1 = df[(df['Active'] == True) & (df['Role'] == 'PARENT')][['Timestamp', 'Source', 'Address', 'RSSI']]
+df_p1 = df[(df['State'] == 'ACTIVE') & (df['Role'] == 'PARENT')][['Timestamp', 'Source', 'Address', 'RSSI']]
 # Select data of indirect parent nodes
-df_p2 = df[df['Active'] == True][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
+df_p2 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
 df_p2.columns = ['Timestamp', 'Source', 'Address', 'RSSI']
 df_parent = pd.concat([df_p1, df_p2], ignore_index=True)
 df_parent.drop_duplicates(subset=['Source',], keep='first', inplace=True)
@@ -81,9 +81,9 @@ df_parent.sort_values(by='Source', ascending=True, inplace=True)
 
 #Adjacency graph
 # Filter Active adjacent nodes
-df1 = df[df['Active'] == True][['Timestamp', 'Source', 'Address', 'RSSI']]
+df1 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Source', 'Address', 'RSSI']]
 # Select data of indirect parent nodes
-df2 = df[df['Active'] == True][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
+df2 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
 df2.columns = ['Timestamp', 'Source', 'Address', 'RSSI']
 df_neighbour = pd.concat([df1, df2], ignore_index=True)
 

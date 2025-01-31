@@ -2,28 +2,20 @@
 #define TOPOMAP_H
 
 #include <stdint.h>
-#include "../STRP/STRP.h"
+
+#include "../common.h"
 
 // Structs
-typedef struct NodeRoutingTable
-{
-    char *timestamp;
-    uint8_t src;
-    uint8_t numActive;
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-} NodeRoutingTable;
 
-typedef struct TableQueue
+typedef struct TopoMap_Config
 {
-    NodeRoutingTable table[MAX_ACTIVE_NODES];
-    sem_t mutex, full, free;
-    unsigned int begin, end;
-} TableQueue;
+    uint8_t self;
+    LogLevel loglevel;
+    unsigned int routingTableIntervalS; // Interval to send routing table to sink
+    unsigned int graphUpdateIntervalS;  // Interval to generate graph
+} TopoMap_Config;
 
 // Function Declarations
-
-void topomapInitialize();
-void writeToCSVFile(NodeRoutingTable table);
-
+void TopoMap_init(TopoMap_Config config);
 
 #endif
