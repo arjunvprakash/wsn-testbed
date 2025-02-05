@@ -62,44 +62,61 @@ args = parseArgs()
 root_node = int(args.sink)
 
 df = pd.read_csv('/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv')
-#df = pd.read_csv('/kaggle/input/network/network.csv')
-#df = pd.read_csv('/kaggle/input/network-1/network_1.csv')
 
-df['Timestamp'] = pd.to_datetime(df['Timestamp'])
+### ------------ Data Preparation ------------ ###
+df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s')
 df.sort_values(by='Timestamp', ascending=False, inplace=True)
 
-# Network Tree
-# Filter Active direct parent nodes
-df_p1 = df[(df['State'] == 'ACTIVE') & (df['Role'] == 'PARENT')][['Timestamp', 'Source', 'Address', 'RSSI']]
-# Select data of indirect parent nodes
-df_p2 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
-df_p2.columns = ['Timestamp', 'Source', 'Address', 'RSSI']
-df_parent = pd.concat([df_p1, df_p2], ignore_index=True)
+all_nodes = pd.unique(df[['Source', 'Address', 'Parent']].values.ravel('K'))
+all_nodes.sort()
+print("all_nodes: ", all_nodes)
+
+### Data extraction for Network Tree
+###     Direct parent info
+df_p1 = df[(df['State'] != "UNKNOWN") & (df['Role'] == 'PARENT')][['Timestamp', 'State', 'Source', 'Address', 'RSSI']]
+###     Direct child info
+df_p2 = df[(df['State'] != "UNKNOWN") & (df['Role'] == 'CHILD')][['Timestamp', 'State', 'Source', 'Address', 'RSSI']]
+df_p2.columns = ['Timestamp', 'State', 'Address', 'Source', 'RSSI']
+### Indirect parent info
+df_p3 = df[df['State'] != "UNKNOWN"][['Timestamp', 'State', 'Address', 'Parent', 'ParentRSSI']]
+df_p3.columns = ['Timestamp', 'State', 'Source', 'Address', 'RSSI']
+###     Combine
+df_parent = pd.concat([df_p1, df_p2, df_p3], ignore_index=True)
 df_parent.drop_duplicates(subset=['Source',], keep='first', inplace=True)
 df_parent.sort_values(by='Source', ascending=True, inplace=True)
-#print(df_parent)
+###     Edges only for ACTIVE nodes
+tree_edges = df_parent[df_parent['State'] == 'ACTIVE']
+print("df_parent : \n", df_parent)
 
-#Adjacency graph
-# Filter Active adjacent nodes
-df1 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Source', 'Address', 'RSSI']]
-# Select data of indirect parent nodes
-df2 = df[df['State'] == 'ACTIVE'][['Timestamp', 'Address', 'Parent', 'ParentRSSI']]
-df2.columns = ['Timestamp', 'Source', 'Address', 'RSSI']
+
+### Data extraction for Network Tree
+###     Direct adjacency
+df1 = df[df['State'] != "UNKNOWN"][['Timestamp', 'State', 'Source', 'Address', 'RSSI']]
+###     Indirect parent info
+df2 = df[df['State'] != "UNKNOWN"][['Timestamp', 'State', 'Address', 'Parent', 'ParentRSSI']]
+df2.columns = ['Timestamp', 'State', 'Source', 'Address', 'RSSI']
+###     Combine
 df_neighbour = pd.concat([df1, df2], ignore_index=True)
-
-# df_neighbour.drop_duplicates(subset=['Source','Address'], keep='first', inplace=True)
 df_neighbour['key'] = df_neighbour.apply(lambda row: tuple(sorted([row['Source'], row['Address']])), axis=1)
 df_neighbour = df_neighbour.sort_values(by='Timestamp', ascending=False)
 df_neighbour = df_neighbour.drop_duplicates(subset='key', keep='first')
+df_neighbour.sort_values(by='key', ascending=True, inplace=True)
+graph_edges = df_neighbour[df_neighbour['State'] == 'ACTIVE']
 df_neighbour = df_neighbour.drop('key', axis=1)
-#print(df_neighbour)
+print("df_neighbour: \n", df_neighbour)
 
+### Draw Network Tree
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
 if not df_parent.empty:
-    G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
+    #G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
+    G1 = nx.DiGraph()
+    G1.add_nodes_from(all_nodes)
+    G1.add_node(root_node) 
+    for _, row in tree_edges.iterrows():
+        G1.add_edge(row['Source'], row['Address'], RSSI=row['RSSI'])
     pos1 = {}
     set_positions_v2(root_node, 0, 0)
-    G1.add_node(root_node)
+    
     if 0 in G1:
         G1.remove_node(0)
         
@@ -115,8 +132,13 @@ else:
     ax1.set_title('Network Tree')
 
 
+### Draw Adjacency Graph
 if not df_neighbour.empty:
-    G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
+    #G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
+    G2 = nx.Graph()
+    G2.add_nodes_from(all_nodes)
+    for _, row in graph_edges.iterrows():
+        G2.add_edge(row['Source'], row['Address'], RSSI=row['RSSI'])
     if 0 in G2:
         G2.remove_node(0)
 

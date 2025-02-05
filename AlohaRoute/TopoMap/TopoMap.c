@@ -11,6 +11,8 @@
 #include "../util.h"
 #include "../STRP/STRP.h"
 
+#define HTTP_PORT 8000
+
 static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
 static TopoMap_Config config;
 
@@ -19,7 +21,7 @@ static int killProcessOnPort(int port);
 static void installDependencies();
 static void createCSVFile();
 static void generateGraph();
-static void createHttpServer();
+static void createHttpServer(int port);
 static void *recvRoutingTable_func(void *args);
 static void *sendRoutingTable_func(void *args);
 
@@ -33,16 +35,16 @@ static void writeToCSVFile(NodeRoutingTable table)
     }
     if (config.loglevel >= DEBUG)
     {
-        printf("### Writing to CSV\n");
+        printf("# %s - Writing to CSV\n", timestamp());
         printf("Timestamp, Source, Address, State, Role, RSSI, Parent, ParentRSSI\n");
     }
-    for (int i = 0; i < table.numActive; i++)
+    for (int i = 0; i < table.numNodes; i++)
     {
         NodeInfo node = table.nodes[i];
-        fprintf(file, "%s,%02d,%02d,%s,%s,%d,%02d,%d\n", table.timestamp, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+        fprintf(file, "%d,%02d,%02d,%s,%s,%d,%02d,%d\n", node.lastSeen, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
         if (config.loglevel >= DEBUG)
         {
-            printf("%s, %02d, %02d, %s, %s, %d, %02d, %d\n", table.timestamp, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+            printf("%d, %02d, %02d, %s, %s, %d, %02d, %d\n", node.lastSeen, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
         }
     }
     fclose(file);
@@ -68,7 +70,7 @@ static void createCSVFile()
     fclose(file);
     if (config.loglevel >= DEBUG)
     {
-        printf("### CSV file: %s created\n", outputCSV);
+        printf("# %s - CSV file: %s created\n", timestamp(), outputCSV);
     }
 }
 
@@ -79,7 +81,7 @@ static void generateGraph()
     sprintf(cmd, "python /home/pi/sw_workspace/AlohaRoute/logs/script.py %d", ADDR_SINK);
     if (system(cmd) != 0)
     {
-        printf("### Error generating graph...\n");
+        printf("# Error generating graph...\n");
     }
 }
 
@@ -88,69 +90,49 @@ static void installDependencies()
 
     if (config.loglevel >= DEBUG)
     {
-        printf("### Installing dependencies...\n");
+        printf("# %s - Installing dependencies...\n", timestamp());
         fflush(stdout);
     }
     chdir("/home/pi/sw_workspace/AlohaRoute/Debug");
     char *setenv_cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null &";
     if (config.loglevel == TRACE)
     {
-        printf("### Executing command : %s\n", setenv_cmd);
+        printf("## %s - Executing command : %s\n", timestamp(), setenv_cmd);
     }
     fflush(stdout);
     if (system(setenv_cmd) != 0)
     {
-        printf("## Error installing dependencies. Exiting...\n");
+        printf("### Error installing dependencies. Exiting...\n");
         fflush(stdout);
         exit(EXIT_FAILURE);
     }
     if (config.loglevel >= DEBUG)
     {
-        printf("### Successfully installed dependencies...\n");
+        printf("%s - # Successfully installed dependencies...\n", timestamp());
     }
 }
 
 // Check if a process is running on the specified TCP port and kill it
-int killProcessOnPortV1(int port)
-{
-    char cmd[100];
-    sprintf(cmd, "fuser -k %d/tcp > /dev/null", port);
-    FILE *fp = popen(cmd, "r");
-    if (fp != NULL)
-    {
-        char buffer[256];
-        if (fgets(buffer, sizeof(buffer), fp) != NULL)
-        {
-            char *process_id = strtok(buffer, " ");
-            char kill_cmd[100];
-            sprintf(kill_cmd, "kill -9 %s", process_id);
-            system(kill_cmd);
-            printf("Process %s killed.\n", process_id);
-        }
-        pclose(fp);
-    }
-}
-
 int killProcessOnPort(int port)
 {
     char cmd[100];
     sprintf(cmd, "fuser -k %d/tcp > /dev/null 2>&1", port);
     if (config.loglevel >= DEBUG)
     {
-        printf("### Port %d freed\n", port);
+        printf("# %s - Port %d freed\n", timestamp(), port);
     }
 }
 
-static void createHttpServer()
+static void createHttpServer(int port)
 {
 
     chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
-
-    killProcessOnPort(8000);
-    char *cmd = "python3 -m http.server 8000 --bind 0.0.0.0 > /dev/null 2>&1 &";
+    killProcessOnPort(port);
+    char cmd[100];
+    sprintf(cmd, "python3 -m http.server %d --bind 0.0.0.0 > httplogs.txt 2>&1 &", port);
     if (system(cmd) != 0)
     {
-        printf("## Error starting HTTP server\n");
+        printf("### Error starting HTTP server\n");
         fclose(stdout);
         fclose(stderr);
         exit(EXIT_FAILURE);
@@ -158,7 +140,7 @@ static void createHttpServer()
 
     if (config.loglevel >= DEBUG)
     {
-        printf("### HTTP server started on port: %d\n", 8000);
+        printf("# %s - HTTP server started on port: %d\n", timestamp(), 8000);
     }
 }
 
@@ -172,7 +154,7 @@ static void *sendRoutingTable_func(void *args)
         {
             if (config.loglevel >= DEBUG)
             {
-                printf("%s - STRP_sendRoutingTable : No active neighbours\n");
+                printf("# %s - STRP_sendRoutingTable : No active neighbours\n");
             }
         }
         sleep(config.routingTableIntervalS);
@@ -188,7 +170,7 @@ void TopoMap_init(TopoMap_Config c)
         pthread_t sendRoutingTableT;
         if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable_func, NULL) != 0)
         {
-            printf("## Error: Failed to create sendRoutingTable thread");
+            printf("### Error: Failed to create sendRoutingTable thread");
             exit(EXIT_FAILURE);
         }
     }
@@ -196,11 +178,11 @@ void TopoMap_init(TopoMap_Config c)
     {
         installDependencies();
         createCSVFile();
-        createHttpServer();
+        createHttpServer(HTTP_PORT);
         pthread_t recvRoutingTableT;
         if (pthread_create(&recvRoutingTableT, NULL, recvRoutingTable_func, NULL) != 0)
         {
-            printf("## Error: Failed to create recvRoutingTable thread");
+            printf("### Error: Failed to create recvRoutingTable thread");
             exit(EXIT_FAILURE);
         }
     }

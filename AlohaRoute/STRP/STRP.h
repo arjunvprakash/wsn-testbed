@@ -52,6 +52,7 @@ typedef struct
     NodeInfo nodes[MAX_ACTIVE_NODES];
     sem_t mutex;
     uint8_t numActive;
+    uint8_t numNodes;
     time_t lastCleanupTime;
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
@@ -60,7 +61,7 @@ typedef struct NodeRoutingTable
 {
     char *timestamp;
     uint8_t src;
-    uint8_t numActive;
+    uint8_t numNodes;
     NodeInfo nodes[MAX_ACTIVE_NODES];
 } NodeRoutingTable;
 

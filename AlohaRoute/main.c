@@ -45,16 +45,16 @@ int main(int argc, char *argv[])
 	fflush(stdout);
 	STRP_Config strp;
 	strp.beaconIntervalS = 10;
-	strp.loglevel = INFO;
+	strp.loglevel = DEBUG;
 	strp.nodeTimeoutS = 60;
 	strp.recvTimeoutMs = 3000;
 	strp.self = self;
-	strp.senseDurationS = 30;
+	strp.senseDurationS = 15;
 	strp.strategy = NEXT_LOWER;
 	STRP_init(strp);
 
 	TopoMap_Config topomap;
-	topomap.graphUpdateIntervalS = 60;
+	topomap.graphUpdateIntervalS = 30;
 	topomap.loglevel = DEBUG;
 	topomap.routingTableIntervalS = 15;
 	topomap.self = self;
