@@ -36,7 +36,7 @@ static void writeToCSVFile(NodeRoutingTable table)
     if (config.loglevel >= DEBUG)
     {
         printf("# %s - Writing to CSV\n", timestamp());
-        printf("Timestamp, Source, Address, State, Role, RSSI, Parent, ParentRSSI\n");
+        printf("# Timestamp, Source, Address, State, Role, RSSI, Parent, ParentRSSI\n");
     }
     for (int i = 0; i < table.numNodes; i++)
     {
@@ -44,7 +44,7 @@ static void writeToCSVFile(NodeRoutingTable table)
         fprintf(file, "%d,%02d,%02d,%s,%s,%d,%02d,%d\n", node.lastSeen, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
         if (config.loglevel >= DEBUG)
         {
-            printf("%d, %02d, %02d, %s, %s, %d, %02d, %d\n", node.lastSeen, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
+            printf("# %d, %02d, %02d, %s, %s, %d, %02d, %d\n", node.lastSeen, table.src, node.addr, getNodeStateStr(node.state), getNodeRoleStr(node.role), node.RSSI, node.parent, node.parentRSSI);
         }
     }
     fclose(file);
@@ -196,17 +196,21 @@ static void *recvRoutingTable_func(void *args)
         NodeRoutingTable table;
         STRP_Header header;
 
-        int result = STRP_timedRecvRoutingTable(&header, &table, 2);
-        if (result <= 0)
+        int result = STRP_timedRecvRoutingTable(&header, &table, 1);
+        if (result)
         {
-            continue;
+            writeToCSVFile(table);
         }
-        writeToCSVFile(table);
         time_t current = time(NULL);
         if (current - start > config.graphUpdateIntervalS)
         {
-            generateGraph();
-            start = current;
+            NodeRoutingTable t = getSinkRoutingTable();
+            if (t.numNodes > 0)
+            {
+                writeToCSVFile(t);
+                generateGraph();
+                start = current;
+            }
         }
         sleep(2);
     }

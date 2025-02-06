@@ -94,5 +94,6 @@ int STRP_timedRecvRoutingTable(STRP_Header *header, NodeRoutingTable *table, uns
 NodeRoutingTable STRP_recvRoutingTable(STRP_Header *header);
 char *getNodeStateStr(NodeState state);
 char *getNodeRoleStr(NodeRole role);
+NodeRoutingTable getSinkRoutingTable();
 
 #endif

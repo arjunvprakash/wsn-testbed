@@ -103,9 +103,10 @@ static void tableQ_init();
 static void tableQ_enqueue(NodeRoutingTable table);
 static NodeRoutingTable tableQ_dequeue();
 static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
-char *getNodeStateStr(NodeState state);
-char *getNodeRoleStr(NodeRole role);
+char *getNodeStateStr(const NodeState state);
+char *getNodeRoleStr(const NodeRole role);
 static char *getRoutingStrategyStr();
+static NodeRoutingTable ActiveNodesToNRT(const ActiveNodes activeNodes, uint8_t src);
 
 // Initialize the STRP
 int STRP_init(STRP_Config c)
@@ -170,7 +171,7 @@ int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     }
     else
     {
-        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
     memcpy(msg.data, data, len);
     sendQ_enqueue(msg);
@@ -192,7 +193,7 @@ int STRP_recvMsg(STRP_Header *header, uint8_t *data)
     }
     else
     {
-        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 
     return msg.len;
@@ -271,7 +272,7 @@ int STRP_timedRecvMsg(STRP_Header *header, uint8_t *data, unsigned int timeout)
     }
     else
     {
-        printf("%s - ## Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 
     return msg.len;
@@ -421,7 +422,7 @@ static void *recvPackets_func(void *args)
                 }
                 else
                 {
-                    printf("%s - ## Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
+                    printf("# %s - Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
                 }
 
                 if (msg.data != NULL)
@@ -515,7 +516,7 @@ static void *sendPackets_func(void *args)
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
-            printf("%s - ## Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
+            printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
         free(pkt);
         usleep(1000);
@@ -653,14 +654,14 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
         printf("## %s - Inside updateActiveNodes addr:%02d (%d) parent:%02d(%d)\n", timestamp(), addr, RSSI, parent, parentRSSI);
     }
     sem_wait(&neighbours.mutex);
-    NodeInfo *node = &neighbours.nodes[addr];
+    NodeInfo *nodePtr = &neighbours.nodes[addr];
     uint8_t numActive;
-    bool new = node->state == UNKNOWN;
+    bool new = nodePtr->state == UNKNOWN;
     bool child = false;
     if (new)
     {
-        node->addr = addr;
-        node->state = ACTIVE;
+        nodePtr->addr = addr;
+        nodePtr->state = ACTIVE;
         neighbours.numActive++;
         neighbours.numNodes++;
         numActive = neighbours.numActive;
@@ -673,26 +674,34 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
             neighbours.minAddr = addr;
         }
     }
+    else
+    {
+        if (nodePtr->state == INACTIVE)
+        {
+            nodePtr->state = ACTIVE;
+            neighbours.numActive++;
+        }
+    }
     if (addr == parentAddr)
     {
-        node->role = PARENT;
+        nodePtr->role = PARENT;
     }
     else if (parent == mac.addr)
     {
-        node->role = CHILD;
+        nodePtr->role = CHILD;
         child = true;
     }
     else
     {
-        node->role = NODE;
+        nodePtr->role = NODE;
     }
     if (parent != ADDR_BROADCAST)
     {
-        node->parent = parent;
-        node->parentRSSI = parentRSSI;
+        nodePtr->parent = parent;
+        nodePtr->parentRSSI = parentRSSI;
     }
-    node->RSSI = RSSI;
-    node->lastSeen = time(NULL);
+    nodePtr->RSSI = RSSI;
+    nodePtr->lastSeen = time(NULL);
     sem_post(&neighbours.mutex);
     if (child && parentAddr == addr && addr < mac.addr)
     {
@@ -1003,21 +1012,20 @@ static void cleanupInactiveNodes()
     bool parentInactive = false;
     sem_wait(&neighbours.mutex);
     uint8_t numActive = neighbours.numActive;
-    for (int i = neighbours.minAddr, inactive = 0; i < neighbours.maxAddr && inactive < numActive; i++)
+    for (int i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
-        if (node.state == ACTIVE && ((currentTime - node.lastSeen) >= config.nodeTimeoutS))
+        NodeInfo *nodePtr = &neighbours.nodes[i];
+        if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
         {
-            NodeInfo *ptr = &node;
-            ptr->state = INACTIVE;
-            ptr->role = NODE;
+            nodePtr->state = INACTIVE;
+            nodePtr->role = NODE;
             neighbours.numActive--;
             inactive++;
-            if (parentAddr == node.addr)
+            if (parentAddr == nodePtr->addr)
             {
                 parentInactive = true;
             }
-            printf("%s - Node %02d inactive.\n", timestamp(), node.addr);
+            printf("%s - Node %02d inactive.\n", timestamp(), nodePtr->addr);
         }
     }
     numActive = neighbours.numActive;
@@ -1025,7 +1033,7 @@ static void cleanupInactiveNodes()
     sem_post(&neighbours.mutex);
     if (parentInactive)
     {
-        printf("%s - ##  Parent inactive: %02d\n", timestamp(), parentAddr);
+        printf("%s - Parent inactive: %02d\n", timestamp(), parentAddr);
         changeParent();
     }
     else
@@ -1049,7 +1057,7 @@ static void sendBeacon()
     }
     if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
     {
-        printf("%s - ## Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
+        printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
 }
 
@@ -1061,7 +1069,6 @@ static void *sendBeaconPeriodic(void *args)
         time_t current = time(NULL);
         if ((current - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
-            printf("#### %s - Cleaning up inactive nodes\n", timestamp());
             cleanupInactiveNodes();
         }
         sleep(config.beaconIntervalS);
@@ -1081,7 +1088,7 @@ static DataPacket buildRoutingTablePkt()
     msg.data = (uint8_t *)malloc(msg.len);
     if (msg.data == NULL)
     {
-        printf("## - Error: malloc\n");
+        printf("### - Error: malloc\n");
     }
     sem_wait(&neighbours.mutex);
     int offset = 0;
@@ -1168,14 +1175,14 @@ static void parseRoutingTablePkt(DataPacket tab)
         const char *stateStr = getNodeStateStr(state);
         if (config.loglevel >= DEBUG)
         {
-            printf("# %02d,\t%02d,\t%d,\t%s,\t%d,\t%02d,\t%d\n", tab.src, addr, stateStr, roleStr, rssi, parent, parentRSSI);
+            printf("# %02d,\t%02d,\t%s,\t%s,\t%d,\t%02d,\t%d\n", tab.src, addr, stateStr, roleStr, rssi, parent, parentRSSI);
         }
     }
     fflush(stdout);
     tableQ_enqueue(table);
 }
 
-char *getNodeRoleStr(NodeRole role)
+char *getNodeRoleStr(const NodeRole role)
 {
     char *roleStr;
     switch (role)
@@ -1196,7 +1203,26 @@ char *getNodeRoleStr(NodeRole role)
     return roleStr;
 }
 
-char *getNodeStateStr(NodeState state)
+NodeRoutingTable getSinkRoutingTable()
+{
+    NodeRoutingTable table;
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t min = neighbours.minAddr;
+    uint8_t max = neighbours.maxAddr;
+    table.src = config.self;
+    table.timestamp = timestamp();
+    table.numNodes = activeNodes.numNodes;
+    for (uint8_t addr = min, i = 0; addr <= max && i < activeNodes.numNodes; addr++)
+    {
+        if (activeNodes.nodes[addr].state != UNKNOWN)
+        {
+            table.nodes[i++] = activeNodes.nodes[addr];
+        }
+    }
+    return table;
+}
+
+char *getNodeStateStr(const NodeState state)
 {
     char *stateStr;
     switch (state)
@@ -1264,4 +1290,17 @@ static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
     sem_post(&tableQ.mutex);
     sem_post(&tableQ.free);
     return 1;
+}
+
+static NodeRoutingTable ActiveNodesToNRT(const ActiveNodes activeNodes, uint8_t src)
+{
+    NodeRoutingTable table;
+    table.src = src;
+    table.numNodes = activeNodes.numNodes;
+    for (uint8_t i = 0; i < activeNodes.numNodes; i++)
+    {
+        table.nodes[i] = activeNodes.nodes[i];
+    }
+    table.timestamp = timestamp();
+    return table;
 }
