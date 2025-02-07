@@ -199,6 +199,7 @@ static void *recvRoutingTable_func(void *args)
         int result = STRP_timedRecvRoutingTable(&header, &table, 1);
         if (result)
         {
+            // printf("#### Node %02d totalTx:%d failedTx:%d\n", table.src, table.totalTx, table.failedTx);
             writeToCSVFile(table);
         }
         time_t current = time(NULL);

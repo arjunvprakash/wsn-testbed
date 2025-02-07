@@ -40,16 +40,16 @@ int main(int argc, char *argv[])
 	srand(self * time(NULL));
 	fflush(stdout);
 
-	sleepDuration = 20000;
+	sleepDuration = 2000;
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 	fflush(stdout);
 	STRP_Config strp;
-	strp.beaconIntervalS = 10;
+	strp.beaconIntervalS = 5;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 30;
+	strp.nodeTimeoutS = 10;
 	strp.recvTimeoutMs = 3000;
 	strp.self = self;
-	strp.senseDurationS = 30;
+	strp.senseDurationS = 15;
 	strp.strategy = CLOSEST_LOWER;
 	STRP_init(strp);
 

@@ -63,6 +63,8 @@ typedef struct NodeRoutingTable
     uint8_t src;
     uint8_t numNodes;
     NodeInfo nodes[MAX_ACTIVE_NODES];
+    uint16_t totalTx;
+    uint16_t failedTx;
 } NodeRoutingTable;
 
 typedef struct STRP_Header

@@ -71,6 +71,9 @@ static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
 static TableQueue tableQ;
+static uint16_t totalTx, failedTx;
+static uint16_t totalRx[MAX_ACTIVE_NODES] = {0};
+static uint16_t loss[MAX_ACTIVE_NODES] = {0};
 
 static void sendQ_init();
 static void recvQ_init();
@@ -269,6 +272,7 @@ int STRP_timedRecvMsg(STRP_Header *header, uint8_t *data, unsigned int timeout)
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
+        // totalRx[msg.src]++;
     }
     else
     {
@@ -368,7 +372,7 @@ static void *recvPackets_func(void *args)
         uint8_t *pkt = (uint8_t *)malloc(240);
         if (pkt == NULL)
         {
-            free(pkt);
+            // free(pkt);
             continue;
         }
         // int pktSize = MAC_recv(macTemp, pkt);
@@ -383,8 +387,10 @@ static void *recvPackets_func(void *args)
         {
             DataPacket msg = deserializePacket(pkt);
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
-            if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
+            // if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
+            if (msg.dest == macTemp->addr)
             {
+                ++totalRx[msg.src];
                 if (ctrl == CTRL_TAB)
                 {
                     parseRoutingTablePkt(msg);
@@ -418,10 +424,12 @@ static void *recvPackets_func(void *args)
 
                 if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
+                    totalTx++;
                     printf("%s - FWD: %02d (%02d) -> %02d total: %02d\n", timestamp(), msg.src, msg.numHops, parentAddr, ++total[msg.src]);
                 }
                 else
                 {
+                    failedTx++;
                     printf("# %s - Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
                 }
 
@@ -509,14 +517,19 @@ static void *sendPackets_func(void *args)
         DataPacket msg = sendQ_dequeue();
         uint8_t *pkt;
         unsigned int pktSize = serializePacket(msg, &pkt);
-        if (pkt == NULL)
+        if (pktSize < 0)
         {
-            free(pkt);
+            // free(pkt);
             continue;
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
+            failedTx++;
             printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
+        }
+        else
+        {
+            totalTx++;
         }
         free(pkt);
         usleep(1000);
@@ -528,6 +541,10 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt)
 {
     uint16_t routePktSize = msg.len + headerSize;
     *routePkt = (uint8_t *)malloc(routePktSize);
+    if (*routePkt == NULL)
+    {
+        return -1;
+    }
 
     uint8_t *p = *routePkt;
     *p = msg.ctrl;
@@ -1083,23 +1100,23 @@ static DataPacket buildRoutingTablePkt()
     msg.ctrl = CTRL_TAB;
     msg.src = mac.addr;
     msg.dest = ADDR_SINK;
-    int numNodes = neighbours.numNodes;
-    msg.len = 1 + (numNodes * 20);
+    const ActiveNodes table = neighbours;
+    int numNodes = table.numNodes;
+    msg.len = 1 + (numNodes * 24);
     msg.data = (uint8_t *)malloc(msg.len);
     if (msg.data == NULL)
     {
         printf("### - Error: malloc\n");
     }
-    sem_wait(&neighbours.mutex);
     int offset = 0;
     msg.data[offset++] = numNodes;
     if (config.loglevel >= DEBUG)
     {
         printf("# Address,\tState,\tRole,\tRSSI,\tParent,\tParentRSSI\n");
     }
-    for (int i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
+    for (int i = table.minAddr; i <= table.maxAddr; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = table.nodes[i];
         if (node.state != UNKNOWN)
         {
             msg.data[offset++] = node.addr;
@@ -1121,7 +1138,10 @@ static DataPacket buildRoutingTablePkt()
             }
         }
     }
-    sem_post(&neighbours.mutex);
+    memcpy(&msg.data[offset], &totalTx, sizeof(totalTx));
+    offset += sizeof(totalTx);
+    memcpy(&msg.data[offset], &failedTx, sizeof(failedTx));
+    offset += sizeof(failedTx);
     fflush(stdout);
     return msg;
 }
@@ -1178,6 +1198,22 @@ static void parseRoutingTablePkt(DataPacket tab)
             printf("# %02d,\t%02d,\t%s,\t%s,\t%d,\t%02d,\t%d\n", tab.src, addr, stateStr, roleStr, rssi, parent, parentRSSI);
         }
     }
+    uint16_t tTx;
+    memcpy(&tTx, &data[offset], sizeof(tTx));
+    offset += sizeof(tTx);
+    table.totalTx = tTx;
+    uint16_t fTx;
+    memcpy(&fTx, &data[offset], sizeof(fTx));
+    offset += sizeof(fTx);
+    table.failedTx = fTx;
+    // ####
+    // if (config.loglevel >= DEBUG)
+    {
+        uint16_t tRx = totalRx[tab.src];
+        uint16_t loss = (tTx - fTx - tRx);
+        float lossPercentage = (tTx > 0) ? ((float)loss / tTx) * 100 : 0;
+        printf("#### Node %02d totalTx: %d failedTx: %d totalRx:%d loss:%d \n", table.src, tTx, fTx, tRx, lossPercentage);
+    }
     fflush(stdout);
     tableQ_enqueue(table);
 }
@@ -1207,8 +1243,8 @@ NodeRoutingTable getSinkRoutingTable()
 {
     NodeRoutingTable table;
     const ActiveNodes activeNodes = neighbours;
-    uint8_t min = neighbours.minAddr;
     uint8_t max = neighbours.maxAddr;
+    uint8_t min = neighbours.minAddr;
     table.src = config.self;
     table.timestamp = timestamp();
     table.numNodes = activeNodes.numNodes;
