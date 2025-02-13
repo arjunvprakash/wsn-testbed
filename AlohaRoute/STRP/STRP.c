@@ -71,9 +71,6 @@ static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
 static TableQueue tableQ;
-static uint16_t totalTx, failedTx;
-static uint16_t totalRx[MAX_ACTIVE_NODES] = {0};
-static uint16_t loss[MAX_ACTIVE_NODES] = {0};
 
 static void sendQ_init();
 static void recvQ_init();
@@ -85,7 +82,7 @@ static void *recvPackets_func(void *args);
 static DataPacket deserializePacket(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int serializePacket(DataPacket msg, uint8_t **routePkt);
-static int recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
+static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
 static void selectParent();
@@ -105,7 +102,7 @@ static void parseRoutingTablePkt(DataPacket tab);
 static void tableQ_init();
 static void tableQ_enqueue(NodeRoutingTable table);
 static NodeRoutingTable tableQ_dequeue();
-static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
+static uint8_t tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
 char *getNodeStateStr(const NodeState state);
 char *getNodeRoleStr(const NodeRole role);
 static char *getRoutingStrategyStr();
@@ -272,7 +269,6 @@ int STRP_timedRecvMsg(STRP_Header *header, uint8_t *data, unsigned int timeout)
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
-        // totalRx[msg.src]++;
     }
     else
     {
@@ -282,7 +278,7 @@ int STRP_timedRecvMsg(STRP_Header *header, uint8_t *data, unsigned int timeout)
     return msg.len;
 }
 
-static int recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts)
+static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts)
 {
     if (sem_timedwait(&recvQ.full, ts) == -1)
     {
@@ -390,7 +386,6 @@ static void *recvPackets_func(void *args)
             // if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
             if (msg.dest == macTemp->addr)
             {
-                ++totalRx[msg.src];
                 if (ctrl == CTRL_TAB)
                 {
                     parseRoutingTablePkt(msg);
@@ -424,12 +419,10 @@ static void *recvPackets_func(void *args)
 
                 if (MAC_send(macTemp, msg.next, pkt, pktSize))
                 {
-                    totalTx++;
                     printf("%s - FWD: %02d (%02d) -> %02d total: %02d\n", timestamp(), msg.src, msg.numHops, parentAddr, ++total[msg.src]);
                 }
                 else
                 {
-                    failedTx++;
                     printf("# %s - Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
                 }
 
@@ -489,7 +482,7 @@ static DataPacket deserializePacket(uint8_t *pkt)
     msg.prev = mac.recvH.src_addr;
 
     uint16_t numHops;
-    memcpy(&numHops, pkt, sizeof(msg.numHops));
+    memcpy(&numHops, pkt, sizeof(msg.numHops)); 
     msg.numHops = ++numHops;
     memcpy(pkt, &numHops, sizeof(msg.numHops));
     pkt += sizeof(msg.numHops);
@@ -524,12 +517,10 @@ static void *sendPackets_func(void *args)
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
-            failedTx++;
             printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
         else
         {
-            totalTx++;
         }
         free(pkt);
         usleep(1000);
@@ -789,7 +780,7 @@ static void selectClosestNeighbour()
     int newParentRSSI = MIN_RSSI;
 
     sem_wait(&neighbours.mutex);
-    for (int i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
     {
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
@@ -817,7 +808,7 @@ void selectClosestLowerNeighbour()
     int newParentRSSI = MIN_RSSI;
 
     sem_wait(&neighbours.mutex);
-    for (int i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
     {
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
@@ -872,7 +863,7 @@ static void selectNextLowerNeighbour()
     int newParentRSSI = MIN_RSSI;
 
     sem_wait(&neighbours.mutex);
-    for (int i = 0; i < mac.addr; i++)
+    for (uint8_t i = 0; i < mac.addr; i++)
     {
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
@@ -899,10 +890,10 @@ static void selectRandomNeighbour()
     uint8_t numActive = neighbours.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
-    int p = 0;
+    uint8_t p = 0;
 
     sem_wait(&neighbours.mutex);
-    for (int i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
     {
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
@@ -941,10 +932,10 @@ static void selectRandomLowerNeighbour()
     uint8_t numActive = neighbours.numActive;
     NodeInfo pool[numActive];
     int newParentRSSI = MIN_RSSI;
-    int p = 0;
+    uint8_t p = 0;
 
     sem_wait(&neighbours.mutex);
-    for (int i = 0; i < mac.addr; i++)
+    for (uint8_t i = 0; i < mac.addr; i++)
     {
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
@@ -1014,7 +1005,7 @@ void initActiveNodes()
     neighbours.numActive = 0;
     neighbours.numNodes = 0;
     memset(neighbours.nodes, 0, sizeof(neighbours.nodes));
-    for (int i = 0; i < MAX_ACTIVE_NODES; i++)
+    for (uint8_t i = 0; i < MAX_ACTIVE_NODES; i++)
     {
         neighbours.nodes[i].state = UNKNOWN;
     }
@@ -1029,7 +1020,7 @@ static void cleanupInactiveNodes()
     bool parentInactive = false;
     sem_wait(&neighbours.mutex);
     uint8_t numActive = neighbours.numActive;
-    for (int i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
+    for (uint8_t i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
     {
         NodeInfo *nodePtr = &neighbours.nodes[i];
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
@@ -1101,8 +1092,8 @@ static DataPacket buildRoutingTablePkt()
     msg.src = mac.addr;
     msg.dest = ADDR_SINK;
     const ActiveNodes table = neighbours;
-    int numNodes = table.numNodes;
-    msg.len = 1 + (numNodes * 24);
+    uint8_t numNodes = table.numNodes;
+    msg.len = 1 + (numNodes * 20);
     msg.data = (uint8_t *)malloc(msg.len);
     if (msg.data == NULL)
     {
@@ -1114,7 +1105,7 @@ static DataPacket buildRoutingTablePkt()
     {
         printf("# Address,\tState,\tRole,\tRSSI,\tParent,\tParentRSSI\n");
     }
-    for (int i = table.minAddr; i <= table.maxAddr; i++)
+    for (uint8_t i = table.minAddr; i <= table.maxAddr; i++)
     {
         NodeInfo node = table.nodes[i];
         if (node.state != UNKNOWN)
@@ -1138,10 +1129,6 @@ static DataPacket buildRoutingTablePkt()
             }
         }
     }
-    memcpy(&msg.data[offset], &totalTx, sizeof(totalTx));
-    offset += sizeof(totalTx);
-    memcpy(&msg.data[offset], &failedTx, sizeof(failedTx));
-    offset += sizeof(failedTx);
     fflush(stdout);
     return msg;
 }
@@ -1158,7 +1145,7 @@ static void parseRoutingTablePkt(DataPacket tab)
     }
 
     int offset = 0;
-    int numNodes = data[offset++];
+    uint8_t numNodes = data[offset++];
     table.numNodes = numNodes;
     table.timestamp = timestamp();
     table.src = tab.src;
@@ -1168,7 +1155,7 @@ static void parseRoutingTablePkt(DataPacket tab)
         printf("# Source,\tAddress,\tActive,\tRole,\tRSSI,\tParent,\tParentRSSI\n");
     }
 
-    for (int i = 0; i < numNodes && offset < dataLen; i++)
+    for (uint8_t i = 0; i < numNodes && offset < dataLen; i++)
     {
         uint8_t addr = data[offset++];
         table.nodes[i].addr = addr;
@@ -1197,22 +1184,6 @@ static void parseRoutingTablePkt(DataPacket tab)
         {
             printf("# %02d,\t%02d,\t%s,\t%s,\t%d,\t%02d,\t%d\n", tab.src, addr, stateStr, roleStr, rssi, parent, parentRSSI);
         }
-    }
-    uint16_t tTx;
-    memcpy(&tTx, &data[offset], sizeof(tTx));
-    offset += sizeof(tTx);
-    table.totalTx = tTx;
-    uint16_t fTx;
-    memcpy(&fTx, &data[offset], sizeof(fTx));
-    offset += sizeof(fTx);
-    table.failedTx = fTx;
-    // ####
-    // if (config.loglevel >= DEBUG)
-    {
-        uint16_t tRx = totalRx[tab.src];
-        uint16_t loss = (tTx - fTx - tRx);
-        float lossPercentage = (tTx > 0) ? ((float)loss / tTx) * 100 : 0;
-        printf("#### Node %02d totalTx: %d failedTx: %d totalRx:%d loss:%d \n", table.src, tTx, fTx, tRx, lossPercentage);
     }
     fflush(stdout);
     tableQ_enqueue(table);
@@ -1309,7 +1280,7 @@ static NodeRoutingTable tableQ_dequeue()
     return table;
 }
 
-static int tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
+static uint8_t tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts)
 {
     if (sem_timedwait(&tableQ.full, ts) == -1)
     {

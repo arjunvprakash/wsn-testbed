@@ -13,7 +13,8 @@
 
 #define HTTP_PORT 8000
 
-static const char *outputCSV = "/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv";
+static const char *outputDir = "results";
+static const char *outputFile = "network.csv";
 static TopoMap_Config config;
 
 static void writeToCSVFile(NodeRoutingTable table);
@@ -27,7 +28,7 @@ static void *sendRoutingTable_func(void *args);
 
 static void writeToCSVFile(NodeRoutingTable table)
 {
-    FILE *file = fopen(outputCSV, "a");
+    FILE *file = fopen(outputFile, "a");
     if (file == NULL)
     {
         printf("## - Error opening csv file!\n");
@@ -53,13 +54,16 @@ static void writeToCSVFile(NodeRoutingTable table)
 
 static void createCSVFile()
 {
-    const char *cmd = "[ -d '/home/pi/sw_workspace/AlohaRoute/Debug/results' ] || mkdir -p '/home/pi/sw_workspace/AlohaRoute/Debug/results' && cp '/home/pi/sw_workspace/AlohaRoute/logs/index.html' '/home/pi/sw_workspace/AlohaRoute/Debug/results/index.html'";
+    char cmd[150];
+    sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../logs/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
     if (system(cmd) != 0)
     {
         printf("## - Error creating results dir!\n");
         exit(EXIT_FAILURE);
     }
-    FILE *file = fopen(outputCSV, "w");
+    char filePath[100];
+    sprintf(filePath, "%s/%s", outputDir, outputFile);
+    FILE *file = fopen(filePath, "w");
     if (file == NULL)
     {
         printf("## - Error creating csv file!\n");
@@ -70,7 +74,7 @@ static void createCSVFile()
     fclose(file);
     if (config.loglevel >= DEBUG)
     {
-        printf("# %s - CSV file: %s created\n", timestamp(), outputCSV);
+        printf("# %s - CSV file: %s created\n", timestamp(), outputFile);
     }
 }
 
@@ -78,7 +82,7 @@ static void generateGraph()
 {
     printf("%s - Generating graph. Open http://localhost:8000 \n", timestamp());
     char cmd[100];
-    sprintf(cmd, "python /home/pi/sw_workspace/AlohaRoute/logs/script.py %d", ADDR_SINK);
+    sprintf(cmd, "python ../../logs/script.py %d", ADDR_SINK);
     if (system(cmd) != 0)
     {
         printf("# Error generating graph...\n");
@@ -93,8 +97,8 @@ static void installDependencies()
         printf("# %s - Installing dependencies...\n", timestamp());
         fflush(stdout);
     }
-    chdir("/home/pi/sw_workspace/AlohaRoute/Debug");
-    char *setenv_cmd = "pip install -r /home/pi/sw_workspace/AlohaRoute/logs/requirements.txt > /dev/null &";
+    // chdir("/home/pi/sw_workspace/AlohaRoute/Debug");
+    char *setenv_cmd = "pip install -r ../logs/requirements.txt > /dev/null &";
     if (config.loglevel == TRACE)
     {
         printf("## %s - Executing command : %s\n", timestamp(), setenv_cmd);
@@ -126,7 +130,7 @@ int killProcessOnPort(int port)
 static void createHttpServer(int port)
 {
 
-    chdir("/home/pi/sw_workspace/AlohaRoute/Debug/results");
+    chdir(outputDir);
     killProcessOnPort(port);
     char cmd[100];
     sprintf(cmd, "python3 -m http.server %d --bind 0.0.0.0 > httplogs.txt 2>&1 &", port);
@@ -199,7 +203,6 @@ static void *recvRoutingTable_func(void *args)
         int result = STRP_timedRecvRoutingTable(&header, &table, 1);
         if (result)
         {
-            // printf("#### Node %02d totalTx:%d failedTx:%d\n", table.src, table.totalTx, table.failedTx);
             writeToCSVFile(table);
         }
         time_t current = time(NULL);

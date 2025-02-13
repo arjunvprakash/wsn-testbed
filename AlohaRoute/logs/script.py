@@ -76,7 +76,7 @@ def get_edge_style(row, directed=False):
 args = parseArgs()
 root_node = int(args.sink)
 
-df = pd.read_csv('/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv')
+df = pd.read_csv('network.csv')
 
 ### ------------ Data Preparation ------------ ###
 df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s')
@@ -87,8 +87,8 @@ node_state.sort_values(by='Timestamp', ascending=False, inplace=True)
 node_state.drop_duplicates(subset=['Address',], keep='first', inplace=True, ignore_index=True)
 node_state_dict = dict(zip(node_state['Address'], node_state['State']))
 inactive_nodes = {node for node, state in node_state_dict.items() if state != 'ACTIVE'}
-print("node_state:", node_state_dict)
-print("inactive_nodes:", inactive_nodes)
+# print("node_state:", node_state_dict)
+# print("inactive_nodes:", inactive_nodes)
 
 ### Data extraction for Network Tree
 ###     Direct parent info
@@ -147,6 +147,6 @@ else:
 dt = datetime.now()
 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 fig.suptitle(f'Topology Map\n{timestamp}')
-plt.savefig(f'/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph_{timestamp}.png')
-plt.savefig('/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph.png')
+plt.savefig(f'network_graph_{timestamp}.png')
+plt.savefig('network_graph.png')
 plt.close()
