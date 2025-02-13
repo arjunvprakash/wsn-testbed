@@ -10,17 +10,11 @@ def parseArgs():
     parser.add_argument('sink', metavar='sink', type=int, help='address of sink')
     return parser.parse_args()
 
-def set_positions_v1(node, x, y):
-    pos1[node] = (x, y)
-    children = list(G1.predecessors(node))
-    print(node, children)
-    for i, child in enumerate(children):
-        set_positions_v1(child, x + (1 if i % 2 == 0 else -1), y - child)
-
 def set_positions_v3(node, x, y):
     pos1[node] = (x, y)
-    print(node, x, y)
+    # print(node, x, y)
     children = list(G1.predecessors(node))
+    children.sort()
     num_children = len(children)    
     if num_children > 0:
         spacing = 1
@@ -36,6 +30,7 @@ def set_positions_v2(node, x, y):
     # print(f"Node {node}: Position {x}, {y}")
     pos1[node] = (x, y)
     children = list(G1.predecessors(node))
+    children.sort()
     num_children = len(children)    
     if num_children > 0:
         spacing = 5
@@ -44,117 +39,114 @@ def set_positions_v2(node, x, y):
             child_x = x + x_factor * spacing            
             set_positions_v2(child, child_x, y - 1)   
 
-def set_positions_v4(node, x, y):
-    if node not in pos1:
-        pos1[node] = (x, y)  # Assign position if not already assigned
-    print(f"Node {node}: Position {x}, {y}")
-    children = list(G1.predecessors(node))
-    num_children = len(children)
-    if num_children > 0:
-        spacing = 5  # Adjust spacing as needed
-        for i, child in enumerate(children):
-            x_factor = (i - (num_children - 1) / 2)  # Center children
-            child_x = x + x_factor * spacing
-            set_positions_v2(child, child_x, y - 1)
 
+def draw_edges_from_dataframe(df, G, pos, ax, directed=False):
+    for _, row in df.iterrows():
+        source, address = row['Source'], row['Address']
+        edge_style = row['edge_style']
+        edge_label = row['edge_label']
+        alpha = row['edge_alpha']
+
+        nx.draw_networkx_nodes(G, pos, ax=ax, node_size=1500)
+        nx.draw_networkx_labels(G1, pos, ax=ax)
+    
+        nx.draw_networkx_edges(
+            G, pos=pos, edgelist=[(source, address)], style=edge_style,
+            ax=ax, alpha=alpha, arrows=directed
+        )
+    
+        if edge_label is not None:
+            nx.draw_networkx_edge_labels(
+                G, pos=pos, edge_labels={(source, address): edge_label},
+                ax=ax, label_pos=0.4
+            )
+
+def get_edge_style(row, directed=False):
+    source, address = row['Source'], row['Address']    
+    is_inactive = source in inactive_nodes or address in inactive_nodes
+    row['edge_label'] = '' if is_inactive else str(row['RSSI'])
+    row['edge_alpha'] = 0.2 if is_inactive else 1.0     
+    if directed:
+        row['edge_style'] = 'dotted' if is_inactive else 'solid'           
+    else:
+        row['edge_style'] = 'dotted'
+    return row
+ 
       
 args = parseArgs()
 root_node = int(args.sink)
 
-df = pd.read_csv('/home/pi/sw_workspace/AlohaRoute/Debug/results/network.csv')
-#df = pd.read_csv('/kaggle/input/network/network.csv')
-#df = pd.read_csv('/kaggle/input/network-1/network_1.csv')
+df = pd.read_csv('network.csv')
 
-df['Timestamp'] = pd.to_datetime(df['Timestamp'])
-df_sorted = df.sort_values(by='Timestamp', ascending=False)
+### ------------ Data Preparation ------------ ###
+df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s')
+df.sort_values(by='Timestamp', ascending=False, inplace=True)
 
-# parents = df_sorted[df_sorted['Role'] == 'PARENT']
-df_parent = df_sorted.drop_duplicates(subset='Address')
-df_parent = df_parent[df_parent.Address > 1]
-df_parent.sort_values(by='Address')
-df_parent_filtered = df_parent[df_parent['Parent'] > 0]
-#print(df_parent)
+node_state = df[['Timestamp', 'Address', 'State']].copy()
+node_state.sort_values(by='Timestamp', ascending=False, inplace=True)
+node_state.drop_duplicates(subset=['Address',], keep='first', inplace=True, ignore_index=True)
+node_state_dict = dict(zip(node_state['Address'], node_state['State']))
+inactive_nodes = {node for node, state in node_state_dict.items() if state != 'ACTIVE'}
+# print("node_state:", node_state_dict)
+# print("inactive_nodes:", inactive_nodes)
 
-df_neighbour = df_sorted.drop_duplicates(subset=['Source', 'Address']).sort_values(by='Source')
-#print(df_neighbour)
-df_neighbour = df_neighbour.sort_values('Timestamp', ascending=False)
-df_neighbour['key'] = df_neighbour[['Source', 'Address']].apply(lambda x: tuple(sorted(x)), axis=1)
-df_neighbour = df_neighbour.drop_duplicates('key', keep='first')
-df_neighbour = df_neighbour.drop('key', axis=1)
-df_neighbour.sort_values('Source')
-#print(df_neighbour)
+### Data extraction for Network Tree
+###     Direct parent info
+df_p1 = df[(df['State'] != "UNKNOWN") & (df['Role'] == 'PARENT')][['Timestamp','Source', 'Address', 'RSSI']]
+###     Direct child info
+df_p2 = df[(df['State'] != "UNKNOWN") & (df['Role'] == 'CHILD')][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
+###     Indirect parent info
+df_p3 = df[df['State'] != "UNKNOWN"][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+###     Combine
+df_parent = pd.concat([df_p1, df_p2, df_p3], ignore_index=True)
+df_parent = df_parent[df_parent['Address'] > 0]
+df_parent = df_parent.sort_values('Timestamp', ascending=False).drop_duplicates('Source', keep='first')
+df_parent['key'] = df_parent.apply(lambda row: tuple(sorted([row['Source'], row['Address']])), axis=1)
+df_parent = df_parent.sort_values(by='Timestamp', ascending=False)
+df_parent = df_parent.drop_duplicates(subset='key', keep='first')
+df_parent.sort_values(by='key', ascending=True, inplace=True)
+df_parent = df_parent.apply(get_edge_style, axis=1, directed=True)
 
-df_parent_role = df[df['Role'] == 'PARENT'][['Timestamp','Source', 'Address', 'RSSI']].rename(
-    columns={'Source': 'Address', 'Address': 'Parent'}
+
+### Data preparation for adjacency graph
+###     Direct adjacency
+df1 = df[df['State'] != "UNKNOWN"][['Timestamp','Source', 'Address', 'RSSI']]
+df1['key'] = df1.apply(lambda row: tuple(sorted([row['Source'], row['Address']])), axis=1)
+df1 = df1.apply(get_edge_style, axis=1, directed=False)
+###     Combine with parent info
+df_neighbour = pd.concat([df_parent, df1], ignore_index=False).drop_duplicates(subset='key', keep='first').sort_values(by='key')
+
+parent_rssi_map = df_parent.set_index('key')['RSSI'].to_dict()
+df_neighbour['RSSI'] = df_neighbour.apply(
+    lambda row: parent_rssi_map.get(row['key'], row['RSSI']), axis=1
 )
-df_parent_role = df_parent_role.sort_values(by='Timestamp', ascending=False)
 
-df_other_roles = df[df['Role'] != 'PARENT'][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(
-    columns={'ParentRSSI': 'RSSI'}
-)
-df_other_roles = df_other_roles.sort_values(by='Timestamp', ascending=False)
-
-df_parent_role = df_parent_role.drop_duplicates(subset=['Address']).sort_values(by='Address')
-# print("df_parent_role")
-# print(df_parent_role)
-
+### Draw Network Tree
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8))
+if not df_parent.empty:
+    G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
+    G1.add_node(root_node)     
+    pos1 = {}
+    set_positions_v2(root_node, 0, 0)   
+    draw_edges_from_dataframe(df_parent, G1, pos1, ax1, directed=True)
+    ax1.set_title('Network Tree')
+else:
+    nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=1500, ax=ax1)
+    ax1.set_title('Network Tree')
 
-G1 = nx.from_pandas_edgelist(df_parent_role, 'Address', 'Parent', create_using=nx.DiGraph(), edge_attr='RSSI')
-#print(G1.nodes())
-pos1 = {}
-# root_node = int(args.sink)
-set_positions_v2(root_node, 0, 0)
-
-if 0 in G1:
-    G1.remove_node(0)
-    
-nx.draw(G1, pos1, with_labels=True, node_size=1500, alpha=0.75, arrows=True, ax=ax1)
-
-for _, row in df_parent.iterrows():
-    child = int(row['Address'])  # Address is the child node
-    parent = int(row['Parent'])  # Parent is the parent node
-    rssi = row['RSSI']
-    
-    # Add nodes explicitly
-    G1.add_node(child)
-    if parent > 0 or parent == root_node:  # Only add valid parent-child relationships
-        G1.add_edge(parent, child, RSSI=rssi)
-
-edge_labels = nx.get_edge_attributes(G1, 'RSSI')
-nx.draw_networkx_edge_labels(G1, pos1, edge_labels=edge_labels, ax=ax1)
-ax1.set_title('Network Tree')
-
-
-df_parent_edges = df_parent_role[['Timestamp','Address', 'Parent', 'RSSI']].sort_values('Address')
-# df_combined = pd.concat([df_neighbour[['Timestamp', 'Source', 'Address', 'RSSI']], 
-#                          df_parent_edges[['Timestamp', 'Source', 'Address', 'RSSI']]])
-# df_combined.sort_values(by='Timestamp', ascending=False)
-# df_combined = df_combined.drop_duplicates(subset=['Source', 'Address'], keep='first')
-G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='ParentRSSI')
-
-G2.add_nodes_from(df_parent_role[['Address', 'Parent']].values.flatten())
-
-if 0 in G2:
-    G2.remove_node(0)
-    
-for _, row in df_parent_edges.iterrows():
-    source = row['Address']
-    address = row['Parent']
-    rssi = row['RSSI']
-    G2.add_edge(source, address, RSSI=rssi)
-
-
-pos2 = nx.circular_layout(G2)
-nx.draw(G2, pos2, with_labels=True, node_size=1500, alpha=0.75, arrows=False, ax=ax2, edge_color='grey', style=':')
-edge_labels2 = nx.get_edge_attributes(G2, 'RSSI')
-nx.draw_networkx_edge_labels(G2, pos2, edge_labels=edge_labels2, ax=ax2, label_pos=0.4)
-ax2.set_title('Adjacency Graph')
+### Draw Adjacency Graph
+if not df_neighbour.empty:
+    G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
+    pos2 = nx.circular_layout(G2)
+    draw_edges_from_dataframe(df_neighbour, G2, pos2, ax2, directed=False)
+    ax2.set_title('Adjacency Graph')
+else:
+    nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=1500, ax=ax2)
+    ax2.set_title('Adjacency Graph')
 
 dt = datetime.now()
 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 fig.suptitle(f'Topology Map\n{timestamp}')
-plt.savefig(f'/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph_{timestamp}.png')
-plt.savefig('/home/pi/sw_workspace/AlohaRoute/Debug/results/network_graph.png')
-#plt.show()
+plt.savefig(f'network_graph_{timestamp}.png')
+plt.savefig('network_graph.png')
 plt.close()
