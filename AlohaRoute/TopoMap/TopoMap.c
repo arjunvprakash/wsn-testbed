@@ -121,6 +121,8 @@ int killProcessOnPort(int port)
 {
     char cmd[100];
     sprintf(cmd, "fuser -k %d/tcp > /dev/null 2>&1", port);
+    // exit code check fails if no process was running
+    int v = system(cmd);
     if (config.loglevel >= DEBUG)
     {
         printf("# %s - Port %d freed\n", timestamp(), port);
