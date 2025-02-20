@@ -941,3 +941,8 @@ int ALOHA_Isend(MAC *mac, unsigned char addr, unsigned char *data, unsigned int 
 
 	return 1;
 }
+
+uint8_t MAC_getHeaderSize()
+{
+	return MAC_Header_len;
+}

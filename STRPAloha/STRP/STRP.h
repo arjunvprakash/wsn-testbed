@@ -84,7 +84,6 @@ typedef struct Routing_Header
     uint8_t dst;
     uint8_t prev;
     int RSSI;
-    unsigned int numHops;
 } Routing_Header;
 
 int STRP_init(STRP_Config config);
@@ -104,5 +103,6 @@ uint8_t STRP_getNextHop(uint8_t dest);
 extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
 extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
-uint8_t STRP_getHeaderSize();
+uint8_t Routing_getHeaderSize();
+uint8_t Routing_isDataPkt(uint8_t ctrl);
 #endif // STRP_H

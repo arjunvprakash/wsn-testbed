@@ -46,11 +46,11 @@ int main(int argc, char *argv[])
 	STRP_Config strp;
 	strp.beaconIntervalS = 5;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 10;
+	strp.nodeTimeoutS = 60;
 	strp.recvTimeoutMs = 3000;
 	strp.self = self;
 	strp.senseDurationS = 15;
-	strp.strategy = CLOSEST_LOWER;
+	strp.strategy = NEXT_LOWER;
 	STRP_init(strp);
 
 	ProtoMon_setOrigRSendMsg(STRP_sendMsg);
@@ -60,10 +60,11 @@ int main(int argc, char *argv[])
 	ProtoMon_setOrigMACRecvMsg(ALOHA_recv);
 	ProtoMon_setOrigMACTimedRecvMsg(ALOHA_timedrecv);
 	ProtoMon_Config config;
-	config.graphUpdateIntervalS = 30;
+	config.graphUpdateIntervalS = 60;
 	config.loglevel = INFO;
-	config.routingTableIntervalS = 15;
+	config.routingTableIntervalS = 30;
 	config.self = self;
+	config.monitoredLayers = PROTOMON_LAYER_ROUTING;
 	ProtoMon_init(config);
 
 	Routing_Header header;
@@ -92,7 +93,7 @@ int main(int argc, char *argv[])
 
 static void *recvMsg_func(void *args)
 {
-	unsigned int total[25] = {0};
+	unsigned int total[32] = {0};
 	Routing_Header *header = (Routing_Header *)args;
 	while (1)
 	{
@@ -103,7 +104,8 @@ static void *recvMsg_func(void *args)
 		int msgLen = Routing_timedRecvMsg(header, buffer, 1);
 		if (msgLen > 0)
 		{
-			printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
+			printf("%s - RX: %02d (%02d) src: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, buffer, ++total[header->src]);
+			// printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
 			fflush(stdout);
 		}
 		usleep(rand() % 1000);

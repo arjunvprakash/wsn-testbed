@@ -49,4 +49,6 @@ extern int (*MAC_send)(MAC *h, unsigned char dest, unsigned char *data, unsigned
 extern int (*MAC_recv)(MAC *h, unsigned char *data);
 extern int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout);
 
+uint8_t MAC_getHeaderSize();
+
 #endif /* ALOHA_H */

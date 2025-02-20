@@ -34,14 +34,8 @@ typedef struct DataPacket
     uint8_t ctrl;
     uint8_t dest;
     uint8_t src;
-    uint8_t parent; // Parent of the source node
-    uint16_t numHops;
     uint16_t len;
     uint8_t *data;
-
-    uint8_t prev;
-    uint8_t next;
-
 } DataPacket;
 
 typedef struct PacketQueue
@@ -62,7 +56,7 @@ static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
-static const unsigned short headerSize = 8; // [ ctrl | dest | src | parent | numHops[2] | len[2] | [data[len] ]
+static const unsigned short headerSize = 5; // [ ctrl | dest | src | len[2] ]
 static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
@@ -162,19 +156,16 @@ int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     msg.dest = dest;
     msg.src = mac.addr;
     msg.len = len;
-    msg.next = parentAddr;
-    msg.parent = parentAddr;
-    msg.numHops = 0;
     msg.data = (uint8_t *)malloc(len);
-    if (msg.data != NULL)
+    if (msg.data)
     {
         memcpy(msg.data, data, len);
     }
     else
     {
         printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        return 0;
     }
-    memcpy(msg.data, data, len);
     sendQ_enqueue(msg);
     return 1;
 }
@@ -186,15 +177,16 @@ int STRP_recvMsg(Routing_Header *header, uint8_t *data)
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
-    header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
-    if (msg.data != NULL)
+    if (msg.data)
     {
         memcpy(data, msg.data, msg.len);
+        free(msg.data);
     }
     else
     {
         printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        return 0;
     }
 
     return msg.len;
@@ -208,7 +200,7 @@ int STRP_sendRoutingTable()
     if (neighbours.numActive > 0)
     {
         DataPacket msg = buildRoutingTablePkt();
-        if (msg.data != NULL)
+        if (msg.data)
         {
             printf("%s - Sending routing table\n", timestamp());
             sendQ_enqueue(msg);
@@ -264,16 +256,17 @@ int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
     header->dst = msg.dest;
     header->RSSI = mac.RSSI;
     header->src = msg.src;
-    header->numHops = msg.numHops;
     header->prev = mac.recvH.src_addr;
 
     if (msg.data != NULL)
     {
         memcpy(data, msg.data, msg.len);
+        free(msg.data);
     }
     else
     {
         printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        return 0;
     }
 
     return msg.len;
@@ -367,9 +360,8 @@ static void *recvPackets_func(void *args)
     while (1)
     {
         uint8_t *pkt = (uint8_t *)malloc(240);
-        if (pkt == NULL)
+        if (!pkt)
         {
-            // free(pkt);
             continue;
         }
         // int pktSize = ALOHA_recv(macTemp, pkt);
@@ -382,28 +374,30 @@ static void *recvPackets_func(void *args)
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT || ctrl == CTRL_TAB)
         {
-            DataPacket msg = deserializePacket(pkt);
+            uint8_t dest = *(pkt + sizeof(ctrl));
+            uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
-            // if (msg.dest == ADDR_BROADCAST || msg.dest == macTemp->addr)
-            if (msg.dest == macTemp->addr)
+            if (dest == macTemp->addr)
             {
                 if (ctrl == CTRL_TAB)
                 {
-                    parseRoutingTablePkt(msg);
-                    free(msg.data);
+                    // ####
+                    // parseRoutingTablePkt(msg);
+                    free(pkt);
                 }
                 else
                 {
+                    DataPacket msg = deserializePacket(pkt);
                     // Keep
                     recvQ_enqueue(msg);
                 }
             }
             else // Forward
             {
-                if (msg.src == mac.addr && mac.recvH.src_addr != loopyParent)
+                if (src == mac.addr && mac.recvH.src_addr != loopyParent)
                 {
                     loopyParent = mac.recvH.src_addr; // To skip duplicate loop detection
-                    printf("%s - Loop detected %02d (%02d) msg: %s\n", timestamp(), loopyParent, msg.numHops, msg.data);
+                    printf("%s - Loop detected %02d\n", timestamp(), loopyParent);
                     if (mac.addr > mac.recvH.src_addr) // To avoid both nodes changing parents
                     {
                         changeParent();
@@ -416,20 +410,14 @@ static void *recvPackets_func(void *args)
                         }
                     }
                 }
-                msg.next = parentAddr;
 
-                if (MAC_send(macTemp, msg.next, pkt, pktSize))
+                if (MAC_send(macTemp, parentAddr, pkt, pktSize))
                 {
-                    printf("%s - FWD: %02d (%02d) -> %02d total: %02d\n", timestamp(), msg.src, msg.numHops, parentAddr, ++total[msg.src]);
+                    printf("%s - FWD: %02d -> %02d total: %02d\n", timestamp(), src, parentAddr, ++total[src]);
                 }
                 else
                 {
-                    printf("# %s - Error FWD: %02d (%02d) -> %02d\n", timestamp(), msg.src, msg.numHops, parentAddr);
-                }
-
-                if (msg.data != NULL)
-                {
-                    free(msg.data);
+                    printf("# %s - Error FWD: %02d -> %02d\n", timestamp(), src, parentAddr);
                 }
             }
         }
@@ -477,16 +465,16 @@ static DataPacket deserializePacket(uint8_t *pkt)
     msg.src = *pkt;
     pkt += sizeof(msg.src);
 
-    msg.parent = *pkt;
-    pkt += sizeof(msg.parent);
+    // msg.parent = *pkt;
+    // pkt += sizeof(msg.parent);
 
-    msg.prev = mac.recvH.src_addr;
+    // msg.prev = mac.recvH.src_addr;
 
-    uint16_t numHops;
-    memcpy(&numHops, pkt, sizeof(msg.numHops));
-    msg.numHops = ++numHops;
-    memcpy(pkt, &numHops, sizeof(msg.numHops));
-    pkt += sizeof(msg.numHops);
+    // uint16_t numHops;
+    // memcpy(&numHops, pkt, sizeof(msg.numHops));
+    // msg.numHops = ++numHops;
+    // memcpy(pkt, &numHops, sizeof(msg.numHops));
+    // pkt += sizeof(msg.numHops);
 
     memcpy(&msg.len, pkt, sizeof(msg.len));
     pkt += sizeof(msg.len);
@@ -513,7 +501,6 @@ static void *sendPackets_func(void *args)
         unsigned int pktSize = serializePacket(msg, &pkt);
         if (pktSize < 0)
         {
-            // free(pkt);
             continue;
         }
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
@@ -550,13 +537,13 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt)
     *p = mac.addr;
     p += sizeof(mac.addr);
 
-    // Set parent
-    *p = parentAddr;
-    p += sizeof(parentAddr);
+    // // Set parent
+    // *p = parentAddr;
+    // p += sizeof(parentAddr);
 
-    // Set numHops
-    *p = msg.numHops;
-    p += sizeof(msg.numHops);
+    // // Set numHops
+    // *p = msg.numHops;
+    // p += sizeof(msg.numHops);
 
     // Set actual msg length
     *p = msg.len;
@@ -1319,7 +1306,12 @@ uint8_t STRP_getNextHop(uint8_t dest)
     return parentAddr;
 }
 
-uint8_t STRP_getHeaderSize()
+uint8_t Routing_getHeaderSize()
 {
     return headerSize;
+}
+
+uint8_t Routing_isDataPkt(uint8_t ctrl)
+{
+    return ctrl == CTRL_PKT;
 }

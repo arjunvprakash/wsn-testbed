@@ -15,7 +15,17 @@ typedef struct ProtoMon_Config
     LogLevel loglevel;
     unsigned int routingTableIntervalS; // Interval to send routing table to sink
     unsigned int graphUpdateIntervalS;  // Interval to generate graph
+    bool enableMonitoring;              // Enable monitoring
+    uint8_t monitoredLayers;            // Bitmask for layers to monitor
 } ProtoMon_Config;
+
+typedef enum
+{
+    PROTOMON_LAYER_NONE = 0x00,    // No monitoring
+    PROTOMON_LAYER_MAC = 0x01,     // Monitor MAC
+    PROTOMON_LAYER_ROUTING = 0x02, // Monitor Routing
+    PROTOMON_LAYER_ALL = 0xFF      // Monitor all layers
+} ProtoMon_Layer;
 
 // Function Declarations
 void ProtoMon_init(ProtoMon_Config config);
@@ -45,5 +55,4 @@ void ProtoMon_setOrigMACSendMsg(int (*routing_func)(MAC *, unsigned char, unsign
 void ProtoMon_setOrigMACRecvMsg(int (*routing_func)(MAC *, unsigned char *));
 void ProtoMon_setOrigMACTimedRecvMsg(int (*routing_func)(MAC *, unsigned char *, unsigned int));
 
-uint8_t ProtoMon_getHeaderSize();
 #endif // STRP_H
