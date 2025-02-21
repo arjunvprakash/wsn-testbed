@@ -15,8 +15,8 @@
 
 #define MV_TAB '\xF0'
 #define MV_PKT '\xF1'
-#define ROUTING_OVERHEAD_SIZE 9 // 1(numHops) + 8(timestamp)
-#define MAC_OVERHEAD_SIZE 8     // 8(timestamp)
+#define ROUTING_OVERHEAD_SIZE (sizeof(uint8_t) + sizeof(time_t)) // 1(numHops) + 8(timestamp)
+#define MAC_OVERHEAD_SIZE (sizeof(time_t))                       // 8(timestamp)
 
 static int (*Original_Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = NULL;
 static int (*Original_Routing_recvMsg)(Routing_Header *h, uint8_t *data) = NULL;
@@ -182,62 +182,64 @@ static void *sendRoutingTable_func(void *args)
 
 void ProtoMon_init(ProtoMon_Config c)
 {
-    if (c.monitoredLayers != PROTOMON_LAYER_NONE)
+
+    if (c.monitoredLayers & PROTOMON_LAYER_ROUTING)
     {
-        if (c.monitoredLayers & PROTOMON_LAYER_ROUTING)
+        if (!Original_Routing_sendMsg || !Original_Routing_recvMsg || !Original_Routing_timedRecvMsg || !Original_MAC_sendMsg || !Original_MAC_recvMsg || !Original_MAC_timedRecvMsg)
         {
-            if (!Original_Routing_sendMsg || !Original_Routing_recvMsg || !Original_Routing_timedRecvMsg)
-            {
-                printf("### Error: Routing send, recv & timedRecv functions not set.\n");
-                exit(EXIT_FAILURE);
-            }
-            printf("%s - Monitoring enabled for Routing layer\n", timestamp());
-            fflush(stdout);
+            printf("### ProtoMon Error: Functions of routing & MAC layers must be registered.\n");
+            exit(EXIT_FAILURE);
         }
+        printf("%s - Monitoring enabled for Routing layer\n", timestamp());
+        fflush(stdout);
         Routing_sendMsg = &ProtoMon_Routing_sendMsg;
         Routing_recvMsg = &ProtoMon_Routing_recvMsg;
         Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsg;
-
-        if (c.monitoredLayers & PROTOMON_LAYER_MAC)
-        {
-            if (!Original_MAC_sendMsg || !Original_MAC_recvMsg || !Original_MAC_timedRecvMsg)
-            {
-                printf("### Error: MAC send, recv & timedRecv functions not set.\n");
-                exit(EXIT_FAILURE);
-            }
-            printf("%s - Monitoring enabled for MAC layer\n", timestamp());
-            fflush(stdout);
-        }
         MAC_send = &ProtoMon_MAC_send;
         MAC_recv = &ProtoMon_MAC_recv;
         MAC_timedRecv = &ProtoMon_MAC_timedRecv;
     }
+
+    if (c.monitoredLayers & PROTOMON_LAYER_MAC)
+    {
+        if (!Original_MAC_sendMsg || !Original_MAC_recvMsg || !Original_MAC_timedRecvMsg)
+        {
+            printf("### ProtoMon Error: Functions of MAC layer must be registered.\n");
+            exit(EXIT_FAILURE);
+        }
+        printf("%s - Monitoring enabled for MAC layer\n", timestamp());
+        fflush(stdout);
+        MAC_send = &ProtoMon_MAC_send;
+        MAC_recv = &ProtoMon_MAC_recv;
+        MAC_timedRecv = &ProtoMon_MAC_timedRecv;
+    }
+
     config = c;
 
     // Enable visualization only when routing is enabled
-    if (c.monitoredLayers & PROTOMON_LAYER_ROUTING)
+    // if (c.monitoredLayers & PROTOMON_LAYER_ROUTING)
     {
-        // if (config.self != ADDR_SINK)
-        // {
-        //     pthread_t sendRoutingTableT;
-        //     if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable_func, NULL) != 0)
-        //     {
-        //         printf("### Error: Failed to create sendRoutingTable thread");
-        //         exit(EXIT_FAILURE);
-        //     }
-        // }
-        // else
-        // {
-        //     installDependencies();
-        //     createCSVFile();
-        //     createHttpServer(HTTP_PORT);
-        //     pthread_t recvRoutingTableT;
-        //     if (pthread_create(&recvRoutingTableT, NULL, recvRoutingTable_func, NULL) != 0)
-        //     {
-        //         printf("### Error: Failed to create recvRoutingTable thread");
-        //         exit(EXIT_FAILURE);
-        //     }
-        // }
+        if (config.self != ADDR_SINK)
+        {
+            pthread_t sendRoutingTableT;
+            if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable_func, NULL) != 0)
+            {
+                printf("### Error: Failed to create sendRoutingTable thread");
+                exit(EXIT_FAILURE);
+            }
+        }
+        else
+        {
+            installDependencies();
+            createCSVFile();
+            createHttpServer(HTTP_PORT);
+            pthread_t recvRoutingTableT;
+            if (pthread_create(&recvRoutingTableT, NULL, recvRoutingTable_func, NULL) != 0)
+            {
+                printf("### Error: Failed to create recvRoutingTable thread");
+                exit(EXIT_FAILURE);
+            }
+        }
     }
 }
 
@@ -253,16 +255,16 @@ static void *recvRoutingTable_func(void *args)
         if (len)
         {
             writeToCSVFile(table);
-        }
-        time_t current = time(NULL);
-        if (current - start > config.graphUpdateIntervalS)
-        {
-            NodeRoutingTable t = getSinkRoutingTable();
-            if (t.numNodes > 0)
+            time_t current = time(NULL);
+            if (current - start > config.graphUpdateIntervalS)
             {
-                writeToCSVFile(t);
-                generateGraph();
-                start = current;
+                NodeRoutingTable t = getSinkRoutingTable();
+                if (t.numNodes > 0)
+                {
+                    writeToCSVFile(t);
+                    generateGraph();
+                    start = current;
+                }
             }
         }
         sleep(2);
@@ -282,6 +284,7 @@ static uint16_t getMACOverhead()
 
 int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 {
+    time_t start = time(NULL);
     uint16_t overhead = getRoutingOverhead();
     if (overhead == 0)
     {
@@ -297,7 +300,9 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     temp += sizeof(ts);
     memcpy(temp, data, len);
     fflush(stdout);
-    return Original_Routing_sendMsg(dest, extData, overhead + len);
+    int ret = Original_Routing_sendMsg(dest, extData, overhead + len);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
+    return ret;
 }
 
 int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
@@ -323,12 +328,13 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
     temp += sizeof(ts);
 
     memcpy(data, temp, len - overhead);
-    printf("%s - ProtoMon_Routing_recvMsg: %s hops: %d delay: %d s\n", timestamp(), data, numHops, (time(NULL) - ts));
+    printf("ProtoMon : %s hops: %d delay: %d s\n", data, numHops, (time(NULL) - ts));
     return len - overhead;
 }
 
 int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout)
 {
+    time_t start = time(NULL);
     uint16_t overhead = getRoutingOverhead();
     if (overhead == 0)
     {
@@ -350,47 +356,43 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
     temp += sizeof(ts);
 
     memcpy(data, temp, len - overhead);
-    printf("%s - ProtoMon_Routing_timedRecvMsg: %s hops: %d delay: %d s\n", timestamp(), data, numHops, (time(NULL) - ts));
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
+    printf("ProtoMon : %s hops: %d delay: %d s\n", data, numHops, (time(NULL) - ts));
     return len - overhead;
 }
 
 int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned int len)
 {
     uint16_t overhead = getMACOverhead();
+    if (overhead == 0)
+    {
+        return Original_MAC_sendMsg(h, dest, data, len);
+    }
     uint8_t extData[overhead + len];
     uint8_t *temp = extData;
-    time_t ts = time(NULL);
-    if (overhead > 0 && dest != ADDR_BROADCAST) // exclude broadcast messages
+    if (overhead > 0 && dest != ADDR_BROADCAST) // exclude broadcast messages - beacons
     {
-        memcpy(temp, &ts, sizeof(ts));
-        temp += sizeof(ts);
+        uint8_t ctrl = *temp;
+        // printf("mac_send: Routing_isDataPkt(%X): %d\n", ctrl, Routing_isDataPkt(ctrl));
+        // if (Routing_isDataPkt(ctrl)) // Monitor only routing data packets
+        {
+            // Add hop timestamp
+            time_t ts = time(NULL);
+            memcpy(temp, &ts, sizeof(ts));
+            temp += sizeof(ts);
+        }
     }
     memcpy(temp, data, len);
 
-    // extract message from routing packet with headers
-    uint16_t routingOverhead = getRoutingOverhead();
-    uint8_t *p = temp;
-    uint8_t *pkt = temp;
-    uint8_t ctrl = *pkt;
-    if (Routing_isDataPkt(ctrl))
-    {
-        uint8_t numHops;
-        time_t r_ts;
-        // Increment hopCount
-        if (routingOverhead > 0)
-        {
-            p += Routing_getHeaderSize();
-            memcpy(&numHops, p, sizeof(numHops));
-            numHops++;
-            memcpy(p, &numHops, sizeof(numHops));
-            p += sizeof(numHops);
-        }
-    }
-    return Original_MAC_sendMsg(h, dest, extData, overhead + len);
+    time_t start = time(NULL);
+    int ret = Original_MAC_sendMsg(h, dest, extData, overhead + len);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
+    return ret;
 }
 
 int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
 {
+    time_t start = time(NULL);
     uint16_t overhead = getMACOverhead();
     uint8_t extendedData[overhead + 240];
     int len = Original_MAC_recvMsg(h, extendedData);
@@ -399,20 +401,46 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
         return len;
     }
     uint8_t *temp = extendedData;
-    time_t mac_ts = time(NULL);
     uint8_t dest = h->recvH.dst_addr;
-    if (overhead > 0 && dest != ADDR_BROADCAST) // exclude broadcast messages
+    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
     {
-        memcpy(&mac_ts, temp, sizeof(mac_ts));
-        temp += sizeof(mac_ts);
+        if (overhead > 0)
+        {
+            // extract hop timestamp
+            time_t mac_ts;
+            memcpy(&mac_ts, temp, sizeof(mac_ts));
+            temp += sizeof(mac_ts);
+            printf("ProtoMon : hop src:%02d latency:%ds\n", h->recvH.src_addr, time(NULL) - mac_ts);
+        }
+        uint8_t ctrl = *temp;
+        if (Routing_isDataPkt(ctrl)) // Monitor only routing data packets
+        {
+            // modify routing packet with headers
+            uint16_t routingOverhead = getRoutingOverhead();
+            if (routingOverhead > 0)
+            {
+                uint8_t *p = temp;
+                uint8_t numHops;
+
+                // Increment hopCount
+                p += Routing_getHeaderSize();
+                memcpy(&numHops, p, sizeof(numHops));
+                numHops++;
+                memcpy(p, &numHops, sizeof(numHops));
+                p += sizeof(numHops);
+            }
+        }
     }
+
     memcpy(data, temp, len - overhead);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
 
     return len - overhead;
 }
 
 int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
 {
+    time_t start = time(NULL);
     uint16_t overhead = getMACOverhead();
     uint8_t extendedData[overhead + 240];
     int len = Original_MAC_timedRecvMsg(h, extendedData, timeout);
@@ -421,14 +449,39 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
         return len;
     }
     uint8_t *temp = extendedData;
-    time_t mac_ts = time(NULL);
     uint8_t dest = h->recvH.dst_addr;
-    if (overhead > 0 && dest != ADDR_BROADCAST) // exclude broadcast messages
+    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
     {
-        memcpy(&mac_ts, temp, sizeof(mac_ts));
-        temp += sizeof(mac_ts);
+        if (overhead > 0)
+        {
+            // extract hop timestamp
+            time_t mac_ts;
+            memcpy(&mac_ts, temp, sizeof(mac_ts));
+            temp += sizeof(mac_ts);
+            printf("ProtoMon : hop src:%02d latency:%ds\n", h->recvH.src_addr, time(NULL) - mac_ts);
+        }
+        uint8_t ctrl = *temp;
+        if (Routing_isDataPkt(ctrl)) // Monitor only routing data packets
+        {
+            // modify routing packet with headers
+            uint16_t routingOverhead = getRoutingOverhead();
+            if (routingOverhead > 0)
+            {
+                uint8_t *p = temp;
+                uint8_t numHops;
+
+                // Increment hopCount
+                p += Routing_getHeaderSize();
+                memcpy(&numHops, p, sizeof(numHops));
+                numHops++;
+                memcpy(p, &numHops, sizeof(numHops));
+                p += sizeof(numHops);
+            }
+        }
     }
+
     memcpy(data, temp, len - overhead);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
 
     return len - overhead;
 }

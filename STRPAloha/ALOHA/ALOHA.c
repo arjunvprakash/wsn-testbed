@@ -659,7 +659,7 @@ static void *sendMsg_func(void *args)
 		while (1)
 		{
 			// Wenn Noise zu hoch
-			// ###
+			// ### Disable to prevent nodes getting stuck after a while
 			if (ambientNoise(mac) <= mac->noiseThreshold)
 			{
 				if (mac->debug)

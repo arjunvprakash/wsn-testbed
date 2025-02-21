@@ -14,7 +14,7 @@
 #include "../common.h"
 #include "../util.h"
 
-#define PACKETQ_SIZE 32
+#define PACKETQ_SIZE 128
 #define MIN_RSSI -128
 
 // Packet control flags
@@ -311,12 +311,14 @@ static void recvQ_init()
 
 static void sendQ_enqueue(DataPacket msg)
 {
+    time_t start = time(NULL);
     sem_wait(&sendQ.free);
     sem_wait(&sendQ.mutex);
     sendQ.packet[sendQ.end] = msg;
     sendQ.end = (sendQ.end + 1) % PACKETQ_SIZE;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
 }
 
 static DataPacket sendQ_dequeue()
@@ -382,8 +384,9 @@ static void *recvPackets_func(void *args)
                 if (ctrl == CTRL_TAB)
                 {
                     // ####
-                    // parseRoutingTablePkt(msg);
-                    free(pkt);
+                    DataPacket msg = deserializePacket(pkt);
+                    parseRoutingTablePkt(msg);
+                    // free(pkt);
                 }
                 else
                 {
@@ -438,15 +441,6 @@ static void *recvPackets_func(void *args)
             }
         }
         free(pkt);
-        if (0)
-        {
-            current = time(NULL);
-            if (current - start > 33)
-            {
-                sendBeacon();
-                start = current;
-            }
-        }
         usleep(rand() % 1000);
     }
     return NULL;
@@ -464,17 +458,6 @@ static DataPacket deserializePacket(uint8_t *pkt)
 
     msg.src = *pkt;
     pkt += sizeof(msg.src);
-
-    // msg.parent = *pkt;
-    // pkt += sizeof(msg.parent);
-
-    // msg.prev = mac.recvH.src_addr;
-
-    // uint16_t numHops;
-    // memcpy(&numHops, pkt, sizeof(msg.numHops));
-    // msg.numHops = ++numHops;
-    // memcpy(pkt, &numHops, sizeof(msg.numHops));
-    // pkt += sizeof(msg.numHops);
 
     memcpy(&msg.len, pkt, sizeof(msg.len));
     pkt += sizeof(msg.len);
@@ -958,6 +941,7 @@ static void selectRandomLowerNeighbour()
 
 static void changeParent()
 {
+    time_t start = time(NULL);
     uint8_t prevParentAddr = parentAddr;
     switch (config.strategy)
     {
@@ -985,6 +969,7 @@ static void changeParent()
     neighbours.nodes[parentAddr].role = PARENT;
     sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
+    // printf("## %s: %ds\n", __func__, time(NULL) - start);
 }
 
 void initActiveNodes()

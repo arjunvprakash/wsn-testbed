@@ -50,7 +50,7 @@ int main(int argc, char *argv[])
 	strp.recvTimeoutMs = 3000;
 	strp.self = self;
 	strp.senseDurationS = 15;
-	strp.strategy = NEXT_LOWER;
+	strp.strategy = CLOSEST_LOWER;
 	STRP_init(strp);
 
 	ProtoMon_setOrigRSendMsg(STRP_sendMsg);
@@ -64,12 +64,12 @@ int main(int argc, char *argv[])
 	config.loglevel = INFO;
 	config.routingTableIntervalS = 30;
 	config.self = self;
-	config.monitoredLayers = PROTOMON_LAYER_ROUTING;
+	config.monitoredLayers = PROTOMON_LAYER_MAC | PROTOMON_LAYER_ROUTING;
 	ProtoMon_init(config);
 
-	Routing_Header header;
 	if (self != ADDR_SINK)
 	{
+		Routing_Header header;
 		if (pthread_create(&sendT, NULL, sendMsg_func, &header) != 0)
 		{
 			printf("Failed to create send thread");
@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
+		Routing_Header header;
 		if (pthread_create(&recvT, NULL, recvMsg_func, &header) != 0)
 		{
 			printf("Failed to create receive thread");
@@ -105,7 +106,6 @@ static void *recvMsg_func(void *args)
 		if (msgLen > 0)
 		{
 			printf("%s - RX: %02d (%02d) src: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, buffer, ++total[header->src]);
-			// printf("%s - RX: %02d (%02d) src: %02d hops: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, header->numHops, buffer, ++total[header->src]);
 			fflush(stdout);
 		}
 		usleep(rand() % 1000);
