@@ -120,15 +120,17 @@ int STRP_init(STRP_Config c)
         printf("### Error: Failed to create Routing receive thread");
         exit(EXIT_FAILURE);
     }
-    if (config.self != ADDR_SINK)
-    {
-        printf("%s - Routing Strategy:  %s\n", timestamp(), getRoutingStrategyStr());
-        selectParent();
-    }
-    else
+
+    printf("%s - Routing Strategy:  %s\n", timestamp(), getRoutingStrategyStr());
+
+    if (config.self == ADDR_SINK)
     {
         tableQ_init();
         sendBeacon();
+    }
+    else
+    {
+        selectParent();
     }
 
     if (config.self != ADDR_SINK)

@@ -17,7 +17,6 @@
 // Configuration flags
 
 static LogLevel loglevel = INFO;
-static unsigned int recvTimeout = 3000;
 
 static uint8_t self;
 static unsigned int sleepDuration;
@@ -40,7 +39,7 @@ int main(int argc, char *argv[])
 	srand(self * time(NULL));
 	fflush(stdout);
 
-	sleepDuration = 2000;
+	sleepDuration = 7000;
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 	fflush(stdout);
 	STRP_Config strp;
@@ -50,21 +49,21 @@ int main(int argc, char *argv[])
 	strp.recvTimeoutMs = 3000;
 	strp.self = self;
 	strp.senseDurationS = 15;
-	strp.strategy = CLOSEST_LOWER;
+	strp.strategy = NEXT_LOWER;
 	STRP_init(strp);
 
-	ProtoMon_setOrigRSendMsg(STRP_sendMsg);
-	ProtoMon_setOrigRRecvMsg(STRP_recvMsg);
-	ProtoMon_setOrigRTimedRecvMsg(STRP_timedRecvMsg);
-	ProtoMon_setOrigMACSendMsg(ALOHA_send);
-	ProtoMon_setOrigMACRecvMsg(ALOHA_recv);
-	ProtoMon_setOrigMACTimedRecvMsg(ALOHA_timedrecv);
+	ProtoMon_setOrigRSend(STRP_sendMsg);
+	ProtoMon_setOrigRRecv(STRP_recvMsg);
+	ProtoMon_setOrigRTimedRecv(STRP_timedRecvMsg);
+	ProtoMon_setOrigMACSend(ALOHA_send);
+	ProtoMon_setOrigMACRecv(ALOHA_recv);
+	ProtoMon_setOrigMACTimedRecv(ALOHA_timedrecv);
 	ProtoMon_Config config;
 	config.graphUpdateIntervalS = 60;
 	config.loglevel = INFO;
-	config.routingTableIntervalS = 30;
+	config.routingTableIntervalS = 15;
 	config.self = self;
-	config.monitoredLayers = PROTOMON_LAYER_MAC | PROTOMON_LAYER_ROUTING;
+	config.monitoredLayers = PROTOMON_LAYER_ALL;
 	ProtoMon_init(config);
 
 	if (self != ADDR_SINK)
