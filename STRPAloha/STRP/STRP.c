@@ -14,8 +14,9 @@
 #include "../common.h"
 #include "../util.h"
 
-#define PACKETQ_SIZE 128
+#define PACKETQ_SIZE 16
 #define MIN_RSSI -128
+#define INITIAL_PARENT 0
 
 // Packet control flags
 #define CTRL_PKT '\x45' // STRP packet
@@ -51,6 +52,22 @@ typedef struct TableQueue
     sem_t mutex, full, free;
     unsigned int begin, end;
 } TableQueue;
+
+typedef struct STRP_Params
+{
+    uint16_t parentChanges;
+    uint16_t beaconsSent;
+    uint16_t beaconsReceived;
+} STRP_Params;
+
+typedef struct Metrics
+{
+    // mutex and data for each node
+    sem_t mutex;
+    STRP_Params data[MAX_ACTIVE_NODES];
+} Metrics;
+
+static Metrics metrics;
 
 static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
@@ -102,6 +119,8 @@ char *getNodeStateStr(const NodeState state);
 char *getNodeRoleStr(const NodeRole role);
 static char *getRoutingStrategyStr();
 static NodeRoutingTable ActiveNodesToNRT(const ActiveNodes activeNodes, uint8_t src);
+static void initMetrics();
+static void resetMetrics();
 
 // Initialize the STRP
 int STRP_init(STRP_Config c)
@@ -109,12 +128,15 @@ int STRP_init(STRP_Config c)
     pthread_t sendBeaconT;
     config = c;
     srand(config.self * time(NULL));
-    ALOHA_init(&mac, config.self);
     mac.debug = 0;
     mac.recvTimeout = config.recvTimeoutMs;
+    mac.maxtrials = 2;
+    ALOHA_init(&mac, config.self);
     sendQ_init();
     recvQ_init();
     initActiveNodes();
+    initMetrics();
+
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
         printf("### Error: Failed to create Routing receive thread");
@@ -320,7 +342,7 @@ static void sendQ_enqueue(DataPacket msg)
     sendQ.end = (sendQ.end + 1) % PACKETQ_SIZE;
     sem_post(&sendQ.mutex);
     sem_post(&sendQ.full);
-    // printf("## %s: %ds\n", __func__, time(NULL) - start);
+    printf("## %s: %ds\n", __func__, time(NULL) - start);
 }
 
 static DataPacket sendQ_dequeue()
@@ -522,14 +544,6 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt)
     *p = mac.addr;
     p += sizeof(mac.addr);
 
-    // // Set parent
-    // *p = parentAddr;
-    // p += sizeof(parentAddr);
-
-    // // Set numHops
-    // *p = msg.numHops;
-    // p += sizeof(msg.numHops);
-
     // Set actual msg length
     *p = msg.len;
     p += sizeof(msg.len);
@@ -544,7 +558,7 @@ static void *sendBeaconHandler(void *args)
 {
 
     MAC *m = (MAC *)args;
-    int trials = 0;
+    int count = 0;
     if (config.loglevel >= DEBUG)
     {
         printf("# %s - Sending beacons...\n", timestamp());
@@ -552,18 +566,16 @@ static void *sendBeaconHandler(void *args)
     }
 
     time_t start = time(NULL);
-    time_t current;
     do
     {
         sendBeacon();
-        trials++;
+        count++;
         usleep(randInRange(500000, 1200000));
-        current = time(NULL);
-    } while (current - start < config.senseDurationS);
+    } while (time(NULL) - start < config.senseDurationS);
 
     if (config.loglevel >= DEBUG)
     {
-        printf("# %s - Sent %d beacons...\n", timestamp(), trials);
+        printf("# %s - Sent %d beacons...\n", timestamp(), count);
         fflush(stdout);
     }
     return NULL;
@@ -606,25 +618,47 @@ static void *receiveBeaconHandler(void *args)
 
 static void selectParent()
 {
-    pthread_t send, recv;
-    parentAddr = ADDR_SINK;
+    // pthread_t send, recv;
+    parentAddr = INITIAL_PARENT;
     neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
 
-    if (pthread_create(&send, NULL, sendBeaconHandler, &mac) != 0)
+    do
     {
-        printf("Failed to create beacon send thread");
-        exit(EXIT_FAILURE);
-    }
+        uint16_t count = 0;
+        if (config.loglevel >= DEBUG)
+        {
+            printf("# %s - Sending beacons...\n", timestamp());
+            fflush(stdout);
+        }
 
-    // if (pthread_create(&recv, NULL, receiveBeaconHandler, &mac) != 0)
+        time_t start = time(NULL);
+        do
+        {
+            sendBeacon();
+            count++;
+            usleep(randInRange(800000, 1200000));
+        } while (time(NULL) - start < config.senseDurationS);
+
+        if (config.loglevel >= DEBUG)
+        {
+            printf("# %s - Sent %d beacons...\n", timestamp(), count);
+            fflush(stdout);
+        }
+
+        if (parentAddr == INITIAL_PARENT)
+        {
+            printf("%s - No neighbors detected.Trying again...\n", timestamp());
+        }
+
+    } while (parentAddr == INITIAL_PARENT);
+
+    // if (pthread_create(&send, NULL, sendBeaconHandler, &mac) != 0)
     // {
-    //     printf("Failed to create beacon receive thread");
-    //     exit(1);
+    //     printf("Failed to create beacon send thread");
+    //     exit(EXIT_FAILURE);
     // }
-    // sleep(config.senseDurationS + 1);
-    // pthread_join(recv, NULL);
-    pthread_join(send, NULL);
-    sleep(5);
+    // pthread_join(send, NULL);
+    // sleep(5);
     printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
 }
 
@@ -665,16 +699,16 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     }
     if (addr == parentAddr)
     {
-        nodePtr->role = PARENT;
+        nodePtr->role = ROLE_PARENT;
     }
     else if (parent == mac.addr)
     {
-        nodePtr->role = CHILD;
+        nodePtr->role = ROLE_CHILD;
         child = true;
     }
     else
     {
-        nodePtr->role = NODE;
+        nodePtr->role = ROLE_NODE;
     }
     if (parent != ADDR_BROADCAST)
     {
@@ -698,50 +732,54 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
             printf("# %s - New %s: %02d (%02d)\n", timestamp(), child ? "child" : "neighbour", addr, RSSI);
             printf("# %s - Active neighbour count: %0d\n", timestamp(), numActive);
         }
-    }
-    // change parent if new neighbour fits
-    if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
-    {
-        if (config.loglevel == TRACE)
+
+        // change parent if new neighbour fits
+        if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
         {
-            printf("## %s - Inside change block parent:%02d (%d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
-        }
-        bool changed = false;
-        uint8_t prevParentAddr = parentAddr;
-        if (config.strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
-        {
-            parentAddr = addr;
-            changed = true;
-        }
-        if (config.strategy == RANDOM && (rand() % 101) < 50)
-        {
-            parentAddr = addr;
-            changed = true;
-        }
-        if (config.strategy == RANDOM_LOWER && addr < mac.addr && (rand() % 101) < 50)
-        {
-            parentAddr = addr;
-            changed = true;
-        }
-        if (config.strategy == CLOSEST && RSSI > neighbours.nodes[parentAddr].RSSI)
-        {
-            parentAddr = addr;
-            changed = true;
-        }
-        if (config.strategy == CLOSEST_LOWER && RSSI > neighbours.nodes[parentAddr].RSSI && addr < mac.addr)
-        {
-            printf("# %s - Changing parent. Prev: %02d (%d) New: %02d (%d)\n", timestamp(), prevParentAddr, neighbours.nodes[prevParentAddr].RSSI, addr, RSSI);
-            parentAddr = addr;
-            changed = true;
-        }
-        if (changed)
-        {
-            sem_wait(&neighbours.mutex);
-            neighbours.nodes[prevParentAddr].role = NODE;
-            neighbours.nodes[addr].role = PARENT;
-            sem_post(&neighbours.mutex);
-            printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
-            sendBeacon();
+            if (config.loglevel == TRACE)
+            {
+                printf("## %s - Inside change block parent:%02d (%d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
+            }
+            bool changed = false;
+            uint8_t prevParentAddr = parentAddr;
+            if (config.strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
+            {
+                parentAddr = addr;
+                changed = true;
+            }
+            if (config.strategy == RANDOM && (rand() % 101) < 50)
+            {
+                parentAddr = addr;
+                changed = true;
+            }
+            if (config.strategy == RANDOM_LOWER && addr < mac.addr && (rand() % 101) < 50)
+            {
+                parentAddr = addr;
+                changed = true;
+            }
+            if (config.strategy == CLOSEST && RSSI > neighbours.nodes[parentAddr].RSSI)
+            {
+                parentAddr = addr;
+                changed = true;
+            }
+            if (config.strategy == CLOSEST_LOWER && RSSI > neighbours.nodes[parentAddr].RSSI && addr < mac.addr)
+            {
+                parentAddr = addr;
+                changed = true;
+            }
+            if (changed)
+            {
+                sem_wait(&neighbours.mutex);
+                neighbours.nodes[prevParentAddr].role = ROLE_NODE;
+                neighbours.nodes[addr].role = ROLE_PARENT;
+                sem_post(&neighbours.mutex);
+                if (config.loglevel >= DEBUG && prevParentAddr != INITIAL_PARENT)
+                {
+                    printf("# %s - Changing parent. Prev: %02d (%d) New: %02d (%d)\n", timestamp(), prevParentAddr, neighbours.nodes[prevParentAddr].RSSI, addr, RSSI);
+                }
+                printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
+                sendBeacon();
+            }
         }
     }
 }
@@ -749,16 +787,17 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
 static void selectClosestNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    uint8_t numActive = neighbours.numActive;
     int newParentRSSI = MIN_RSSI;
 
-    sem_wait(&neighbours.mutex);
-    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t numActive = activeNodes.numActive;
+
+    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != CHILD && node.RSSI > newParentRSSI)
+            if (node.role != ROLE_CHILD && node.RSSI > newParentRSSI)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -770,6 +809,9 @@ static void selectClosestNeighbour()
             active++;
         }
     }
+    sem_wait(&neighbours.mutex);
+    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
 }
@@ -777,16 +819,17 @@ static void selectClosestNeighbour()
 void selectClosestLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    uint8_t numActive = neighbours.numActive;
     int newParentRSSI = MIN_RSSI;
 
-    sem_wait(&neighbours.mutex);
-    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t numActive = activeNodes.numActive;
+
+    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr)
+            if (node.role != ROLE_CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -798,6 +841,9 @@ void selectClosestLowerNeighbour()
             active++;
         }
     }
+    sem_wait(&neighbours.mutex);
+    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
 }
@@ -835,23 +881,28 @@ static void selectNextLowerNeighbour()
     uint8_t newParent = ADDR_SINK;
     int newParentRSSI = MIN_RSSI;
 
-    sem_wait(&neighbours.mutex);
-    for (uint8_t i = 0; i < mac.addr; i++)
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t numActive = activeNodes.numActive;
+
+    for (uint8_t i = activeNodes.minAddr; i < mac.addr; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
             if (config.loglevel >= DEBUG)
             {
                 printf("# %s - Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
             }
-            if (node.role != CHILD)
+            if (node.role != ROLE_CHILD)
             {
                 newParent = node.addr;
                 newParentRSSI = node.RSSI;
             }
         }
     }
+    sem_wait(&neighbours.mutex);
+    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
@@ -860,18 +911,17 @@ static void selectNextLowerNeighbour()
 static void selectRandomNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    uint8_t numActive = neighbours.numActive;
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t numActive = activeNodes.numActive;
     NodeInfo pool[numActive];
-    int newParentRSSI = MIN_RSSI;
     uint8_t p = 0;
 
-    sem_wait(&neighbours.mutex);
-    for (uint8_t i = neighbours.minAddr, active = 0; i <= neighbours.maxAddr && active < numActive; i++)
+    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != CHILD && node.addr != parentAddr)
+            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -884,17 +934,16 @@ static void selectRandomNeighbour()
             active++;
         }
     }
-    sem_post(&neighbours.mutex);
-    if (p == 0)
-    {
-        newParent = ADDR_SINK;
-    }
-    else
+    if (p > 0)
     {
         uint8_t index = rand() % numActive;
         newParent = pool[index].addr;
-        newParentRSSI = pool[index].addr;
     }
+
+    sem_wait(&neighbours.mutex);
+    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
 }
@@ -902,18 +951,17 @@ static void selectRandomNeighbour()
 static void selectRandomLowerNeighbour()
 {
     uint8_t newParent = ADDR_SINK;
-    uint8_t numActive = neighbours.numActive;
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t numActive = activeNodes.numActive;
     NodeInfo pool[numActive];
-    int newParentRSSI = MIN_RSSI;
     uint8_t p = 0;
 
-    sem_wait(&neighbours.mutex);
-    for (uint8_t i = 0; i < mac.addr; i++)
+    for (uint8_t i = activeNodes.minAddr; i < config.self; i++)
     {
-        NodeInfo node = neighbours.nodes[i];
+        NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != CHILD && node.addr < parentAddr)
+            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr < parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -925,18 +973,17 @@ static void selectRandomLowerNeighbour()
             }
         }
     }
-    sem_post(&neighbours.mutex);
 
-    if (p == 0)
-    {
-        newParent = ADDR_SINK;
-    }
-    else
+    if (p > 0)
     {
         uint8_t index = rand() % numActive;
         newParent = pool[index].addr;
-        newParentRSSI = pool[index].addr;
     }
+
+    sem_wait(&neighbours.mutex);
+    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
 }
@@ -967,8 +1014,8 @@ static void changeParent()
         break;
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[prevParentAddr].role = NODE;
-    neighbours.nodes[parentAddr].role = PARENT;
+    neighbours.nodes[prevParentAddr].role = ROLE_NODE;
+    neighbours.nodes[parentAddr].role = ROLE_PARENT;
     sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
     // printf("## %s: %ds\n", __func__, time(NULL) - start);
@@ -1001,7 +1048,7 @@ static void cleanupInactiveNodes()
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
         {
             nodePtr->state = INACTIVE;
-            nodePtr->role = NODE;
+            nodePtr->role = ROLE_NODE;
             neighbours.numActive--;
             inactive++;
             if (parentAddr == nodePtr->addr)
@@ -1049,8 +1096,7 @@ static void *sendBeaconPeriodic(void *args)
     while (1)
     {
         sendBeacon();
-        time_t current = time(NULL);
-        if ((current - neighbours.lastCleanupTime) > config.nodeTimeoutS)
+        if ((time(NULL) - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
             cleanupInactiveNodes();
         }
@@ -1169,13 +1215,13 @@ char *getNodeRoleStr(const NodeRole role)
     char *roleStr;
     switch (role)
     {
-    case PARENT:
+    case ROLE_PARENT:
         roleStr = "PARENT";
         break;
-    case CHILD:
+    case ROLE_CHILD:
         roleStr = "CHILD";
         break;
-    case NODE:
+    case ROLE_NODE:
         roleStr = "NODE";
         break;
     default:
@@ -1301,4 +1347,47 @@ uint8_t Routing_getHeaderSize()
 uint8_t Routing_isDataPkt(uint8_t ctrl)
 {
     return ctrl == CTRL_PKT;
+}
+
+uint8_t *Routing_getMetricsHeader()
+{
+    return "ParentChanges,BeaconsSent,BeaconsReceived";
+}
+
+uint16_t Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
+{
+    sem_wait(&metrics.mutex);
+    const STRP_Params data = metrics.data[addr];
+    uint16_t rowlen = sprintf(buffer, "%d,%d,%d", data.parentChanges, data.beaconsSent, data.beaconsReceived);
+    metrics.data[addr] = (STRP_Params){0};
+    sem_post(&metrics.mutex);
+    return rowlen;
+}
+
+static void initMetrics()
+{
+    sem_init(&metrics.mutex, 0, 1);
+    sem_wait(&metrics.mutex);
+    memset(&metrics.data, 0, sizeof(metrics.data));
+    sem_post(&metrics.mutex);
+}
+
+uint16_t Routing_getNeighbourData(char *buffer)
+{
+    const ActiveNodes activeNodes = neighbours;
+    uint8_t max = neighbours.maxAddr;
+    uint8_t min = neighbours.minAddr;
+    uint16_t offset = 0;
+    uint8_t src = config.self;
+    time_t timestamp = time(NULL);
+    for (uint8_t addr = min; addr <= max; addr++)
+    {
+        NodeInfo node = activeNodes.nodes[addr];
+        if (node.state != UNKNOWN)
+        {
+            offset += sprintf(buffer + offset, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.role, node.RSSI, node.parent, node.parentRSSI);
+            timestamp = 0L;
+        }
+    }
+    return offset;
 }

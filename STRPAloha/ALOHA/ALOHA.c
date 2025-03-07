@@ -18,9 +18,27 @@
 
 // ####
 
+typedef struct MAC_Data
+{
+	uint16_t frames;
+	uint16_t collisions;
+	uint16_t failures;
+	uint16_t retries;
+} MAC_Data;
+
+typedef struct MAC_Metrics
+{
+	MAC_Data data[MAX_ACTIVE_NODES];
+	sem_t mutex;
+} MAC_Metrics;
+
+static MAC_Metrics metrics;
+
 int (*MAC_send)(MAC *h, unsigned char dest, unsigned char *data, unsigned int len) = ALOHA_send;
 int (*MAC_recv)(MAC *h, unsigned char *data) = ALOHA_recv;
 int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout) = ALOHA_timedrecv;
+
+static void initMetrics();
 
 // ####
 
@@ -33,7 +51,7 @@ typedef struct recvMessage
 } recvMessage;
 
 // Struktur für die Empfangs-Warteschlange
-#define recvMsgQ_size 256
+#define recvMsgQ_size 16
 typedef struct recvMsgQueue
 {
 	recvMessage msg[recvMsgQ_size]; // Nachrichten der Warteschlange
@@ -54,7 +72,7 @@ typedef struct sendMessage
 } sendMessage;
 
 // Struktur für die Sende-Warteschlange
-#define sendMsgQ_size 256
+#define sendMsgQ_size 16
 typedef struct sendMsgQueue
 {
 	sendMessage msg[sendMsgQ_size]; // Nachrichten der Warteschlange
@@ -323,6 +341,8 @@ static bool acknowledged(MAC *mac, uint8_t addr)
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
 	ts.tv_sec += 5 + rand() % 6;
+	// ###
+	// ts.tv_sec += 1;
 
 	while (1)
 	{
@@ -664,6 +684,9 @@ static void *sendMsg_func(void *args)
 			// {
 			// 	if (mac->debug)
 			// 		printf("Noise is too high.\n");
+			// sem_wait(&metrics.mutex);
+			// 	metrics.data[msg.addr].collisions++;
+			// sem_post(&metrics.mutex);
 
 			// 	// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
 			// 	if (numtrials >= mac->maxtrials)
@@ -681,6 +704,14 @@ static void *sendMsg_func(void *args)
 			// Nachricht versenden
 			SX1262_send(buffer, MAC_Header_len + msg.len);
 
+			// Update metrics
+			if (msg.addr != ADDR_BROADCAST)
+			{
+				sem_wait(&metrics.mutex);
+				metrics.data[msg.addr].frames++;
+				sem_post(&metrics.mutex);
+			}
+
 			if (mac->debug)
 			{
 				// Gesendeten Header und Nachricht ausgeben
@@ -696,6 +727,11 @@ static void *sendMsg_func(void *args)
 			// Auf Acknowledgement warten
 			if (msg.addr != ADDR_BROADCAST && !acknowledged(mac, msg.addr))
 			{
+				// Update metrics
+				sem_wait(&metrics.mutex);
+				metrics.data[msg.addr].failures++;
+				sem_post(&metrics.mutex);
+
 				if (mac->debug)
 					printf("No ACK received. addr:%02d seq:%d\n", msg.addr, sendSeq[msg.addr]);
 
@@ -707,6 +743,10 @@ static void *sendMsg_func(void *args)
 
 				// Anzahl Sendeversuche inkrementieren
 				numtrials++;
+
+				sem_wait(&metrics.mutex);
+				metrics.data[msg.addr].retries++;
+				sem_post(&metrics.mutex);
 
 				continue;
 			}
@@ -744,6 +784,9 @@ static void *sendMsg_func(void *args)
 
 void ALOHA_init(MAC *mac, unsigned char addr)
 {
+	// ###
+	initMetrics();
+
 	// Adresse speichern
 	mac->addr = addr;
 
@@ -945,4 +988,24 @@ int ALOHA_Isend(MAC *mac, unsigned char addr, unsigned char *data, unsigned int 
 uint8_t MAC_getHeaderSize()
 {
 	return MAC_Header_len;
+}
+
+uint8_t *MAC_getMetricsHeader()
+{
+	return "Collission,TotalFrames,Retries,PDR";
+}
+
+uint16_t MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
+{
+	sem_wait(&metrics.mutex);
+	const MAC_Data data = metrics.data[addr];
+	uint16_t rowlen = sprintf(buffer, "%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.frames > 0 ? (data.frames - data.retries - data.failures) / data.frames : 0);
+	metrics.data[addr] = (MAC_Data){0};
+	sem_post(&metrics.mutex);
+	return rowlen;
+}
+
+static void initMetrics()
+{
+	sem_init(&metrics.mutex, 0, 1);
 }

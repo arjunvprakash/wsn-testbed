@@ -692,16 +692,16 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     }
     if (addr == parentAddr)
     {
-        nodePtr->role = PARENT;
+        nodePtr->role = ROLE_PARENT;
     }
     else if (parent == mac.addr)
     {
-        nodePtr->role = CHILD;
+        nodePtr->role = ROLE_CHILD;
         child = true;
     }
     else
     {
-        nodePtr->role = NODE;
+        nodePtr->role = ROLE_NODE;
     }
     if (parent != ADDR_BROADCAST)
     {
@@ -764,8 +764,8 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
         if (changed)
         {
             sem_wait(&neighbours.mutex);
-            neighbours.nodes[prevParentAddr].role = NODE;
-            neighbours.nodes[addr].role = PARENT;
+            neighbours.nodes[prevParentAddr].role = ROLE_NODE;
+            neighbours.nodes[addr].role = ROLE_PARENT;
             sem_post(&neighbours.mutex);
             printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
             sendBeacon();
@@ -785,7 +785,7 @@ static void selectClosestNeighbour()
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != CHILD && node.RSSI > newParentRSSI)
+            if (node.role != ROLE_CHILD && node.RSSI > newParentRSSI)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -813,7 +813,7 @@ void selectClosestLowerNeighbour()
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr)
+            if (node.role != ROLE_CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -872,7 +872,7 @@ static void selectNextLowerNeighbour()
             {
                 printf("# %s - Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
             }
-            if (node.role != CHILD)
+            if (node.role != ROLE_CHILD)
             {
                 newParent = node.addr;
                 newParentRSSI = node.RSSI;
@@ -898,7 +898,7 @@ static void selectRandomNeighbour()
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != CHILD && node.addr != parentAddr)
+            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -940,7 +940,7 @@ static void selectRandomLowerNeighbour()
         NodeInfo node = neighbours.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != CHILD && node.addr < parentAddr)
+            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr < parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -993,8 +993,8 @@ static void changeParent()
         break;
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[prevParentAddr].role = NODE;
-    neighbours.nodes[parentAddr].role = PARENT;
+    neighbours.nodes[prevParentAddr].role = ROLE_NODE;
+    neighbours.nodes[parentAddr].role = ROLE_PARENT;
     sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
 }
@@ -1026,7 +1026,7 @@ static void cleanupInactiveNodes()
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
         {
             nodePtr->state = INACTIVE;
-            nodePtr->role = NODE;
+            nodePtr->role = ROLE_NODE;
             neighbours.numActive--;
             inactive++;
             if (parentAddr == nodePtr->addr)
@@ -1194,13 +1194,13 @@ char *getNodeRoleStr(const NodeRole role)
     char *roleStr;
     switch (role)
     {
-    case PARENT:
+    case ROLE_PARENT:
         roleStr = "PARENT";
         break;
-    case CHILD:
+    case ROLE_CHILD:
         roleStr = "CHILD";
         break;
-    case NODE:
+    case ROLE_NODE:
         roleStr = "NODE";
         break;
     default:

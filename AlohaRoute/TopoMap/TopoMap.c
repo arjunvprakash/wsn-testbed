@@ -20,7 +20,7 @@ static TopoMap_Config config;
 static void writeToCSVFile(NodeRoutingTable table);
 static int killProcessOnPort(int port);
 static void installDependencies();
-static void initResults();
+static void initOutputFiles();
 static void generateGraph();
 static void createHttpServer(int port);
 static void *recvRoutingTable_func(void *args);
@@ -52,7 +52,7 @@ static void writeToCSVFile(NodeRoutingTable table)
     fflush(stdout);
 }
 
-static void initResults()
+static void initOutputFiles()
 {
     char cmd[150];
     sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../logs/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
@@ -183,7 +183,7 @@ void TopoMap_init(TopoMap_Config c)
     else
     {
         installDependencies();
-        initResults();
+        initOutputFiles();
         createHttpServer(HTTP_PORT);
         pthread_t recvRoutingTableT;
         if (pthread_create(&recvRoutingTableT, NULL, recvRoutingTable_func, NULL) != 0)

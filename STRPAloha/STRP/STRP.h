@@ -22,16 +22,18 @@ typedef enum ParentSelectionStrategy
 
 typedef enum NodeRole
 {
-    PARENT,
-    CHILD,
-    NODE
+    // Graph generation script has dependency on the enum  values
+    ROLE_NODE = 0,
+    ROLE_CHILD = 1,
+    ROLE_PARENT = 2,
 } NodeRole;
 
 typedef enum NodeState
 {
-    UNKNOWN,
-    ACTIVE,
-    INACTIVE
+    // Graph generation script has dependency on the enum  values
+    UNKNOWN = -1,
+    INACTIVE = 0,
+    ACTIVE = 1
 } NodeState;
 
 // Structs
@@ -105,4 +107,8 @@ extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 uint8_t Routing_getHeaderSize();
 uint8_t Routing_isDataPkt(uint8_t ctrl);
+uint8_t *Routing_getMetricsHeader();
+uint16_t Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
+uint16_t Routing_getNeighbourData(char *buffer);
+
 #endif // STRP_H

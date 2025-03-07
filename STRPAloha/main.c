@@ -39,32 +39,33 @@ int main(int argc, char *argv[])
 	srand(self * time(NULL));
 	fflush(stdout);
 
-	sleepDuration = 7000;
+	sleepDuration = 15000;
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 	fflush(stdout);
-	STRP_Config strp;
-	strp.beaconIntervalS = 5;
-	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 60;
-	strp.recvTimeoutMs = 3000;
-	strp.self = self;
-	strp.senseDurationS = 15;
-	strp.strategy = NEXT_LOWER;
-	STRP_init(strp);
 
-	ProtoMon_setOrigRSend(STRP_sendMsg);
-	ProtoMon_setOrigRRecv(STRP_recvMsg);
-	ProtoMon_setOrigRTimedRecv(STRP_timedRecvMsg);
-	ProtoMon_setOrigMACSend(ALOHA_send);
-	ProtoMon_setOrigMACRecv(ALOHA_recv);
-	ProtoMon_setOrigMACTimedRecv(ALOHA_timedrecv);
+	ProtoMon_setOrigRSend(Routing_sendMsg);
+	ProtoMon_setOrigRRecv(Routing_recvMsg);
+	ProtoMon_setOrigRTimedRecv(Routing_timedRecvMsg);
+	ProtoMon_setOrigMACSend(MAC_send);
+	ProtoMon_setOrigMACRecv(MAC_recv);
+	ProtoMon_setOrigMACTimedRecv(MAC_timedRecv);
 	ProtoMon_Config config;
 	config.graphUpdateIntervalS = 60;
 	config.loglevel = INFO;
-	config.routingTableIntervalS = 15;
+	config.routingTableIntervalS = 10;
 	config.self = self;
 	config.monitoredLayers = PROTOMON_LAYER_ALL;
 	ProtoMon_init(config);
+
+	STRP_Config strp;
+	strp.beaconIntervalS = 30;
+	strp.loglevel = INFO;
+	strp.nodeTimeoutS = 60;
+	strp.recvTimeoutMs = 1000;
+	strp.self = self;
+	strp.senseDurationS = 15;
+	strp.strategy = CLOSEST_LOWER;
+	STRP_init(strp);
 
 	if (self != ADDR_SINK)
 	{

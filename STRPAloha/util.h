@@ -5,6 +5,9 @@
 
 char *timestamp();
 int randCode(int n);
-int randInRange(int min, int max);
+unsigned long randInRange(unsigned long min, unsigned long max);
+
+#define _PRINT_TRACE_ printf("### Trace: - %s:%d\n", __FILE__, __LINE__);
+
 
 #endif
