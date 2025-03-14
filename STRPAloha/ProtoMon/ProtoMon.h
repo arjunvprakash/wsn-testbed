@@ -11,12 +11,28 @@
 
 typedef struct ProtoMon_Config
 {
+    // Node's own address
     uint8_t self;
+
+    // Log level
+    // Default INFO
     LogLevel loglevel;
-    unsigned int routingTableIntervalS; // Interval to send routing table to sink
-    unsigned int graphUpdateIntervalS;  // Interval to generate graph
-    bool enableMonitoring;              // Enable monitoring
-    uint8_t monitoredLayers;            // Bitmask for layers to monitor
+
+    // Interval to send monitoring metrics to sink
+    // Default 30s
+    unsigned int sendIntervalS;
+
+    // Interval to generate visualization
+    // Default 60s
+    unsigned int vizIntervalS;
+
+    // Bitmask for layers to monitor
+    uint8_t monitoredLayers;
+
+    // Initial wait time before sending first monitoring data packet.
+    // Could be used to wait for lower layers to initialize.
+    // Default 30s
+    uint16_t initialSendWaitS;
 } ProtoMon_Config;
 
 typedef enum
@@ -30,29 +46,12 @@ typedef enum
 // Function Declarations
 void ProtoMon_init(ProtoMon_Config config);
 
-// ####
-int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
-int ProtoMon_Routing_recvMsg(Routing_Header *h, uint8_t *data);
-int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
-
 extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
 extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
-void ProtoMon_setOrigRSend(int (*routing_func)(uint8_t, uint8_t *, unsigned int));
-void ProtoMon_setOrigRRecv(int (*routing_func)(Routing_Header *, uint8_t *));
-void ProtoMon_setOrigRTimedRecv(int (*routing_func)(Routing_Header *, uint8_t *, unsigned int));
-
-int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned int len);
-int ProtoMon_MAC_recv(MAC *h, unsigned char *data);
-int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout);
-
 extern int (*MAC_send)(MAC *h, unsigned char dest, unsigned char *data, unsigned int len);
 extern int (*MAC_recv)(MAC *h, unsigned char *data);
 extern int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout);
-
-void ProtoMon_setOrigMACSend(int (*routing_func)(MAC *, unsigned char, unsigned char *, unsigned int));
-void ProtoMon_setOrigMACRecv(int (*routing_func)(MAC *, unsigned char *));
-void ProtoMon_setOrigMACTimedRecv(int (*routing_func)(MAC *, unsigned char *, unsigned int));
 
 #endif // STRP_H

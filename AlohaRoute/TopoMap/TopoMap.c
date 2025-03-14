@@ -24,7 +24,7 @@ static void initOutputFiles();
 static void generateGraph();
 static void createHttpServer(int port);
 static void *recvRoutingTable_func(void *args);
-static void *sendRoutingTable_func(void *args);
+static void *sendMetrics_func(void *args);
 
 static void writeToCSVFile(NodeRoutingTable table)
 {
@@ -150,7 +150,7 @@ static void createHttpServer(int port)
     }
 }
 
-static void *sendRoutingTable_func(void *args)
+static void *sendMetrics_func(void *args)
 {
     sleep(config.routingTableIntervalS);
     while (1)
@@ -174,7 +174,7 @@ void TopoMap_init(TopoMap_Config c)
     if (config.self != ADDR_SINK)
     {
         pthread_t sendRoutingTableT;
-        if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable_func, NULL) != 0)
+        if (pthread_create(&sendRoutingTableT, NULL, sendMetrics_func, NULL) != 0)
         {
             printf("### Error: Failed to create sendRoutingTable thread");
             exit(EXIT_FAILURE);

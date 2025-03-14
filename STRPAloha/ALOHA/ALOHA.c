@@ -24,6 +24,7 @@ typedef struct MAC_Data
 	uint16_t collisions;
 	uint16_t failures;
 	uint16_t retries;
+	uint16_t retryExceed;
 } MAC_Data;
 
 typedef struct MAC_Metrics
@@ -680,26 +681,42 @@ static void *sendMsg_func(void *args)
 		{
 			// Wenn Noise zu hoch
 			// ### Disable to prevent nodes getting stuck after a while
-			// if (ambientNoise(mac) <= mac->noiseThreshold)
-			// {
-			// 	if (mac->debug)
-			// 		printf("Noise is too high.\n");
-			// sem_wait(&metrics.mutex);
-			// 	metrics.data[msg.addr].collisions++;
-			// sem_post(&metrics.mutex);
+			/*
+			if (ambientNoise(mac) <= mac->noiseThreshold)
+			{
+				if (mac->debug)
+					printf("Noise is too high.\n");
 
-			// 	// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
-			// 	if (numtrials >= mac->maxtrials)
-			// 		break;
+				if (msg.addr != ADDR_BROADCAST)
+				{
+					sem_wait(&metrics.mutex);
+					metrics.data[msg.addr].collisions++;
+					sem_post(&metrics.mutex);
+				}
 
-			// 	// 5 bis 10 Sekunden warten
-			// 	msleep(5000 + rand() % 5001);
+				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
+				if (numtrials >= mac->maxtrials)
+				{
+					if (msg.addr != ADDR_BROADCAST)
+					{
+						sem_wait(&metrics.mutex);
+						metrics.data[msg.addr].retryExceed++;
+						sem_post(&metrics.mutex);
+					}
+					break;
+				}
 
-			// 	// Anzahl Sendeversuche inkrementieren
-			// 	numtrials++;
+				msleep(100 + rand() % 101);
 
-			// 	continue;
-			// }
+				// 5 bis 10 Sekunden warten
+				// msleep(5000 + rand() % 5001);
+
+				// Anzahl Sendeversuche inkrementieren
+				numtrials++;
+
+				continue;
+			}
+			*/
 
 			// Nachricht versenden
 			SX1262_send(buffer, MAC_Header_len + msg.len);
@@ -738,6 +755,10 @@ static void *sendMsg_func(void *args)
 				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
 				if (numtrials >= mac->maxtrials)
 				{
+					sem_wait(&metrics.mutex);
+					metrics.data[msg.addr].retryExceed++;
+					sem_post(&metrics.mutex);
+
 					break;
 				}
 
@@ -992,14 +1013,14 @@ uint8_t MAC_getHeaderSize()
 
 uint8_t *MAC_getMetricsHeader()
 {
-	return "Collission,TotalFrames,Retries,PDR";
+	return "Collission,TotalFrames,TotalRetries,TotalFailures,PDR,RetryExceed";
 }
 
-uint16_t MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
+int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
-	sem_wait(&metrics.mutex);
 	const MAC_Data data = metrics.data[addr];
-	uint16_t rowlen = sprintf(buffer, "%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.frames > 0 ? (data.frames - data.retries - data.failures) / data.frames : 0);
+	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.failures, data.frames > 0 ? ((data.frames - data.failures - data.retryExceed) / data.frames) : 0, data.retryExceed);
+	sem_wait(&metrics.mutex);
 	metrics.data[addr] = (MAC_Data){0};
 	sem_post(&metrics.mutex);
 	return rowlen;
@@ -1008,4 +1029,7 @@ uint16_t MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 static void initMetrics()
 {
 	sem_init(&metrics.mutex, 0, 1);
+	sem_wait(&metrics.mutex);
+	memset(metrics.data, 0, sizeof(metrics.data));
+	sem_post(&metrics.mutex);
 }

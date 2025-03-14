@@ -43,18 +43,13 @@ int main(int argc, char *argv[])
 	printf("%s - Sleep duration: %d ms\n", timestamp(), sleepDuration);
 	fflush(stdout);
 
-	ProtoMon_setOrigRSend(Routing_sendMsg);
-	ProtoMon_setOrigRRecv(Routing_recvMsg);
-	ProtoMon_setOrigRTimedRecv(Routing_timedRecvMsg);
-	ProtoMon_setOrigMACSend(MAC_send);
-	ProtoMon_setOrigMACRecv(MAC_recv);
-	ProtoMon_setOrigMACTimedRecv(MAC_timedRecv);
 	ProtoMon_Config config;
-	config.graphUpdateIntervalS = 60;
+	config.vizIntervalS = 60;
 	config.loglevel = INFO;
-	config.routingTableIntervalS = 10;
+	config.sendIntervalS = 20;
 	config.self = self;
 	config.monitoredLayers = PROTOMON_LAYER_ALL;
+	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 
 	STRP_Config strp;
@@ -64,7 +59,7 @@ int main(int argc, char *argv[])
 	strp.recvTimeoutMs = 1000;
 	strp.self = self;
 	strp.senseDurationS = 15;
-	strp.strategy = CLOSEST_LOWER;
+	strp.strategy = CLOSEST;
 	STRP_init(strp);
 
 	if (self != ADDR_SINK)
@@ -75,6 +70,7 @@ int main(int argc, char *argv[])
 			printf("Failed to create send thread");
 			exit(EXIT_FAILURE);
 		}
+		pthread_join(sendT, NULL);
 	}
 	else
 	{
@@ -84,17 +80,15 @@ int main(int argc, char *argv[])
 			printf("Failed to create receive thread");
 			exit(EXIT_FAILURE);
 		}
+		pthread_join(recvT, NULL);
 	}
-
-	pthread_join(sendT, NULL);
-	pthread_join(recvT, NULL);
 
 	return 0;
 }
 
 static void *recvMsg_func(void *args)
 {
-	unsigned int total[32] = {0};
+	unsigned int total[MAX_ACTIVE_NODES] = {0};
 	Routing_Header *header = (Routing_Header *)args;
 	while (1)
 	{
@@ -108,7 +102,7 @@ static void *recvMsg_func(void *args)
 			printf("%s - RX: %02d (%02d) src: %02d msg: %s total: %02d\n", timestamp(), header->prev, header->RSSI, header->src, buffer, ++total[header->src]);
 			fflush(stdout);
 		}
-		usleep(rand() % 1000);
+		usleep((rand() % 100000) + 1000000); // Sleep 1-1.2s to prevent busy waiting
 	}
 	return NULL;
 }
@@ -132,7 +126,7 @@ static void *sendMsg_func(void *args)
 			fflush(stdout);
 		}
 
-		usleep(sleepDuration * 1000);
+		usleep((rand() % 100000) + (sleepDuration * 1000)); // Sleep sleepDuration + 100ms to avoid busy waiting
 	}
 	return NULL;
 }

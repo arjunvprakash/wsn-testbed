@@ -6,6 +6,12 @@ from datetime import datetime
 import argparse
 import os
 import math
+from bokeh.plotting import figure, output_file, save
+from bokeh.layouts import gridplot
+from bokeh.models import HoverTool, ColumnDataSource, WheelZoomTool
+from bokeh.palettes import Category20, Category20b, Category20c, Dark2, Set3
+from bokeh.layouts import column
+from bokeh.models import Div
 
 def parseArgs():
     parser = argparse.ArgumentParser(description='Generate topology map for WSN from a CSV.')
@@ -137,7 +143,230 @@ def plot_metricsV3(data, metrics, layer, saveDir='plots'):
     filePath = os.path.join(saveDir, f"{layer}_{timestamp}.png")
     plt.savefig(filePath)   
     plt.close(fig) 
+
+def plot_metricsV7(df, cols, layer, saveDir='plots'):
+    os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists
+
+    data = df.copy()
+    metrics = cols
+
+    valid_metrics = [metric for metric in metrics if data[metric].max() > 0]
+
+    # Compute Lost Packets = TotalSent - TotalRecv
+    sent_df = data[['RelativeTime', 'Source', 'Address', 'TotalSent']].copy()
+    recv_df = data[['RelativeTime', 'Source', 'Address', 'TotalRecv']].copy()
+    recv_df = recv_df.rename(columns={'Source': 'Address', 'Address': 'Source'})  # Swap Source & Address
+    lost_packets_df = pd.concat([sent_df.assign(TotalRecv=-1), recv_df.assign(TotalSent=0)], ignore_index=True).sort_values(by="RelativeTime")
+
+    valid_metrics.append("TotalLost")  # Add LostPackets
+    num_metrics = len(valid_metrics)
+    num_cols = min(4, num_metrics)  # Limit to 3 columns per row
+    num_rows = math.ceil(num_metrics / num_cols)
+
+    plots = []  
+    valid_plots = 0  
+    for metric in valid_metrics:
+        p = figure(title=f"{metric}", x_axis_label="Time (s)", y_axis_label=metric, width=400, height=300, tools="pan,wheel_zoom,box_zoom,reset,save")    
+
+        color_index = 0
+
+        combined_palette = Category20[20] + Category20b[20] + Category20c[20] + Dark2[8] + Set3[12]
+        unique_pairs = list(lost_packets_df.groupby(['Source', 'Address']).groups.keys())  
+        num_pairs = len(unique_pairs)
+        palette = combined_palette[:num_pairs] if num_pairs <= len(combined_palette) else combined_palette * (num_pairs // len(combined_palette) + 1)
+
+        color_map = {pair: palette[i % len(palette)] for i, pair in enumerate(unique_pairs)}
+        
+        if metric == "TotalLost":
+            for (src, addr), src_addr_df in lost_packets_df.groupby(['Source', 'Address']):
+                src_addr_df = src_addr_df[['RelativeTime', 'Source','Address', 'TotalSent', 'TotalRecv']].copy()
+                
+                if src_addr_df["TotalSent"].max() > 0:
+                    src_addr_df['TotalSent'] = src_addr_df['TotalSent'].ffill().cumsum()
+                    src_addr_df = src_addr_df[src_addr_df['TotalRecv'] > -1]
+                    src_addr_df['TotalRecv'] = src_addr_df['TotalRecv'].cumsum()
+                    src_addr_df[metric] = src_addr_df['TotalSent'] - src_addr_df['TotalRecv']
+                    src_addr_df = src_addr_df[(src_addr_df['TotalSent'] > 0) & (src_addr_df[metric] > -1)]   
+
+                    if src_addr_df.shape[0] > 0:
+                        # Create Bokeh ColumnDataSource
+                        source = ColumnDataSource(src_addr_df)
+
+                        key = (src, addr)                       
+                        p.line('RelativeTime' 
+                               ,metric
+                               ,source=source
+                               ,legend_label=f'Node {src} → {addr}'
+                               ,line_width=2
+                               ,color=color_map[key]
+                               )
+                        p.scatter('RelativeTime'
+                                ,metric
+                               ,source=source
+                               ,legend_label=f'Node {src} → {addr}'
+                               ,color=color_map[key]
+                               ,size=2
+                               )                               
+                        valid_plots += 1
+
+        else:
+            for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
+                if src_addr_df[metric].max() > 0:
+                    src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
+                    if metric.lower().startswith("total"):
+                        src_addr_df[metric] = src_addr_df[metric].cumsum()
+
+                    if src_addr_df.shape[0] > 0:
+                        # Create Bokeh ColumnDataSource
+                        source = ColumnDataSource(src_addr_df)
+
+                        key = (src, addr)                        
+                    
+                        labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                        p.line('RelativeTime', 
+                               metric
+                               ,source=source
+                               ,legend_label=labelStr
+                               ,line_width=2
+                               ,color=color_map[key]
+                               )
+                        p.scatter('RelativeTime'
+                                ,metric
+                               ,source=source
+                               ,legend_label=labelStr
+                               ,color=color_map[key]
+                               ,size=2
+                               )
+                        valid_plots += 1
+        
+        if valid_plots > 0:
+            p.legend.background_fill_alpha = 0.2 
+            # p.add_layout(p.legend[0], place="right")  # Move to right if space available
+            # p.legend.label_text_font_size = "8pt"
+            # p.legend.location = "top_left" if src % 2 == 0 else "top_right"
+            p.legend.click_policy = "hide" 
+
+            if metric.lower().endswith('recv') or metric.lower().endswith('latency'):
+                hover = HoverTool(tooltips=[
+                    ("Time", "@RelativeTime s"),
+                    (metric, f"@{metric}"),
+                    ("Source", "@Address"),
+                    ("Address", "@Source")
+                ])                            
+            else :
+                hover = HoverTool(tooltips=[
+                    ("Time", "@RelativeTime s"),
+                    (metric, f"@{metric}"),
+                    ("Source", f"@Source"),
+                    ("Address", "@Address")
+                ])                            
+            p.add_tools(hover) 
+            # p.add_tools(WheelZoomTool())
+            # p.toolbar.active_inspect = hover
+            plots.append(p)
+
+    grid = gridplot([plots[i:i+num_cols] for i in range(0, len(plots), num_cols)])
+
+    # Create a global title
+    global_title = Div(
+        text=f"<h2 style='text-align:center;'>{layer.capitalize()} Parameters : {timestamp}</h2>",
+        width=800, 
+        height=40
+    )
+
+    # Combine title and grid into a single layout
+    grid_layout = column(global_title, grid)
+
+    # Save HTML
+    output_file_path = os.path.join(saveDir, f"{layer}.html")
+    output_file(output_file_path)
+    save(grid_layout)
+
+def plot_metricsV4(df, cols, layer, saveDir='plots'):
+
+    data = df.copy()
+    metrics = cols
+
+    # print(data.tail())
     
+    os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists
+
+    valid_metrics = [metric for metric in metrics if data[metric].max() > 0]
+    
+    # Compute Lost Packets = TotalSent - TotalRecv
+    sent_df = data[['RelativeTime', 'Source', 'Address', 'TotalSent']].copy()
+    recv_df = data[['RelativeTime', 'Source', 'Address', 'TotalRecv']].copy()
+
+    # Prepare the received data by swapping Source & Address
+    recv_df = recv_df.rename(columns={'Source': 'Address', 'Address': 'Source'})
+
+    # Merge sent & received data
+    lost_packets_df = pd.concat([sent_df.assign(TotalRecv=-1), recv_df.assign(TotalSent=0)], ignore_index=True)
+    lost_packets_df = lost_packets_df.sort_values(by="RelativeTime")
+
+    valid_metrics.append("TotalLost")  # Add LostPackets as a new plot
+    num_metrics = len(valid_metrics)
+    num_cols = min(3, num_metrics)  # Limit to 3 columns per row
+    num_rows = math.ceil(num_metrics / num_cols)
+
+    fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
+    axes = axes.flatten() if num_metrics > 1 else [axes]
+    fig.suptitle(f'{layer.capitalize()} Parameters : {timestamp}', fontweight='bold')
+
+    valid_plots = 0
+    
+    for i, metric in enumerate(valid_metrics):
+        ax = axes[i]
+              
+        if metric == "TotalLost":
+            for (src, addr), src_addr_df in lost_packets_df.groupby(['Source', 'Address']):
+                src_addr_df = src_addr_df.copy()   
+                
+                if src_addr_df["TotalSent"].max() > 0:                   
+                    src_addr_df['TotalSent'] = src_addr_df['TotalSent'].ffill().cumsum()
+                    src_addr_df = src_addr_df[src_addr_df['TotalRecv'] > -1]
+                    src_addr_df['TotalRecv'] = src_addr_df['TotalRecv'].cumsum()
+                    src_addr_df = src_addr_df[src_addr_df['TotalSent'] > 0]
+                    src_addr_df['TotalLost'] = src_addr_df['TotalSent'] - src_addr_df['TotalRecv']
+                    src_addr_df = src_addr_df[(src_addr_df['TotalSent'] > 0) & (src_addr_df['TotalLost'] > -1)]                 
+                    
+                    if src_addr_df.shape[0] > 0:
+                        # print(f'{addr} -> {src} {src_addr_df.head()}')
+                        ax.plot(src_addr_df['RelativeTime'], src_addr_df[metric], label=f'Node {src} → {addr}', marker=".")
+                        valid_plots+=1
+
+        else:                
+            for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
+                if src_addr_df[metric].max() > 0:
+                    src_addr_df = src_addr_df.copy()                   
+                    
+                    if metric.lower().startswith("total"):
+                        src_addr_df[metric] = src_addr_df[metric].cumsum()
+
+                    if src_addr_df.shape[0] > 0:
+                        labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'                   
+                        ax.plot(src_addr_df['RelativeTime'], src_addr_df[metric], label=labelStr, marker=".")
+                        valid_plots+=1
+        
+        if valid_plots > 0:
+            ax.set_title(metric)
+            ax.set_xlabel('Time (s)')
+            ax.set_ylabel(metric)
+            ax.legend()
+            ax.grid()
+
+    # Hide empty subplots
+    for j in range(i + 1, len(axes)):
+        fig.delaxes(axes[j])
+    
+    plt.tight_layout()  
+
+    # Save the figure as a PNG
+    filePath = os.path.join(saveDir, f"{layer}.png")
+    plt.savefig(filePath)   
+    # filePath = os.path.join(saveDir, f"{layer}_{timestamp}.png")
+    # plt.savefig(filePath)   
+    plt.close(fig) 
 
 # Main Script
 
@@ -255,7 +484,7 @@ if os.path.exists('routing.csv'):
     routing_df = calculateRelativeTime(routing_df)
 
     routing_dataCols = [col for col in routing_df.columns if col not in routing_metaColumns]
-    plot_metricsV3(routing_df,routing_dataCols,'routing')
+    plot_metricsV7(routing_df,routing_dataCols,'routing')
 
 ## MAC metrics plot
 if os.path.exists('mac.csv'):
@@ -264,4 +493,4 @@ if os.path.exists('mac.csv'):
     mac_df = calculateRelativeTime(mac_df)
 
     mac_dataCols = [col for col in mac_df.columns if col not in mac_metaColumns]
-    plot_metricsV3(mac_df, mac_dataCols, 'mac')
+    plot_metricsV7(mac_df, mac_dataCols, 'mac')

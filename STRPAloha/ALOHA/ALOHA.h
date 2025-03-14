@@ -51,6 +51,6 @@ extern int (*MAC_timedRecv)(MAC *, unsigned char *, unsigned int);
 
 uint8_t MAC_getHeaderSize();
 uint8_t *MAC_getMetricsHeader();
-uint16_t MAC_getMetricsData(uint8_t *buffer, uint8_t addr);
+int MAC_getMetricsData(uint8_t *buffer, uint8_t addr);
 
 #endif /* ALOHA_H */

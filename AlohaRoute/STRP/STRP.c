@@ -85,7 +85,7 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
-static void selectParent();
+static void senseNeighbours();
 static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parentRSSI);
 static void changeParent();
 static void initActiveNodes();
@@ -128,7 +128,7 @@ int STRP_init(STRP_Config c)
     if (config.self != ADDR_SINK)
     {
         printf("%s - Routing Strategy:  %s\n", timestamp(), getRoutingStrategyStr());
-        selectParent();
+        senseNeighbours();
     }
     else
     {
@@ -631,7 +631,7 @@ static void *receiveBeaconHandler(void *args)
     return NULL;
 }
 
-static void selectParent()
+static void senseNeighbours()
 {
     pthread_t send, recv;
     parentAddr = ADDR_SINK;

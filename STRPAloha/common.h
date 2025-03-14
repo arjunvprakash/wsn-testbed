@@ -14,11 +14,14 @@ Constants for subnet group
 #define MIN_SLEEP_TIME 1000 // ms
 #define MAX_SLEEP_TIME 3000 // ms
 
+// Logs levels
+// Dependency: util.c - logMessage(), STRP, ProtoMon
 typedef enum LogLevel
 {
-    INFO,
+    INFO, // Default log level
     DEBUG,
-    TRACE
+    TRACE,    
+    ERROR 
 } LogLevel;
 
 #endif
