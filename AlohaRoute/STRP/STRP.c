@@ -88,7 +88,7 @@ static void *receiveBeaconHandler(void *args);
 static void senseNeighbours();
 static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parentRSSI);
 static void changeParent();
-static void initActiveNodes();
+static void initNeighbours();
 static void cleanupInactiveNodes();
 static void selectRandomLowerNeighbour();
 static void selectRandomNeighbour();
@@ -119,7 +119,7 @@ int STRP_init(STRP_Config c)
     mac.recvTimeout = config.recvTimeoutMs;
     sendQ_init();
     recvQ_init();
-    initActiveNodes();
+    initNeighbours();
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
         printf("### Error: Failed to create Routing receive thread");
@@ -999,7 +999,7 @@ static void changeParent()
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
 }
 
-void initActiveNodes()
+void initNeighbours()
 {
     sem_init(&neighbours.mutex, 0, 1);
     neighbours.numActive = 0;

@@ -1,16 +1,19 @@
 #include "ProtoMon.h"
 
-#include <stdio.h>   // printf
-#include <stdlib.h>  // rand, malloc, free, exit
-#include <unistd.h>  // sleep, exec, chdir
-#include <string.h>  // memcpy, strerror, strrok
-#include <pthread.h> // pthread_create
-#include <time.h>    // time
-#include <errno.h>   // errno
-#include <signal.h>  // signal
+#include <stdio.h>     // printf
+#include <stdlib.h>    // rand, malloc, free, exit
+#include <unistd.h>    // sleep, exec, chdir
+#include <string.h>    // memcpy, strerror, strrok
+#include <pthread.h>   // pthread_create
+#include <time.h>      // time
+#include <errno.h>     // errno
+#include <signal.h>    // signal
+#include <stdbool.h>   // bool, true, false
+#include <semaphore.h> // sem_init, sem_wait, sem_trywait, sem_timedwait
 
 #include "../common.h"
 #include "../util.h"
+// #include "../SMRP/SMRP.h"
 
 #define HTTP_PORT 8000
 #define MAX_PAYLOAD_SIZE 240
@@ -144,7 +147,7 @@ static void initOutputFiles()
             exit(EXIT_FAILURE);
         }
         const char *nwheader = "Timestamp,Source,Address,State,Role,RSSI";
-        fprintf(file, "%s", nwheader);   
+        fprintf(file, "%s", nwheader);
 
         fprintf(file, "%s", Routing_getNeighbourHeader()); // Requires additional handling in viz/script.py
         fprintf(file, "\n");
@@ -483,12 +486,12 @@ This function must be called BEFORE initializing the routing and MAC layers.
 
 */
 void ProtoMon_init(ProtoMon_Config c)
-{   
+{
     // Make init idempotent
     if (config.self != 0 || c.monitoredLayers == PROTOMON_LAYER_NONE)
     {
         return;
-    } 
+    }
 
     if (c.monitoredLayers != PROTOMON_LAYER_NONE)
     {
