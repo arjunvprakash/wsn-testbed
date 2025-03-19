@@ -477,12 +477,34 @@ if os.path.exists('network.csv'):
     # print("inactive_nodes:", inactive_nodes)
 
     ### Data extraction for Network Tree
+
+    # Check if exactly one nexthop per Source
+    single_nexthop = df[df['Role'] == NodeRole.ROLE_NEXTHOP].groupby('Source').size().eq(1).all()
+
+    # Check if ROLE column contains any CHILD entries
+    child_exist = df[df['Role'] == NodeRole.ROLE_CHILD].shape[0] > 0
+
+    # Check if the columns 'Parent' and 'ParentRSSI' exist in df
+    parentcols_exist = all(col in df.columns for col in ['Parent', 'ParentRSSI']) 
+
     ###     Direct parent info
     df_p1 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == NodeRole.ROLE_NEXTHOP)][['Timestamp','Source', 'Address', 'RSSI']]
+    df_p2 = pd.DataFrame()
+    df_p3 = pd.DataFrame()
+    numMaps = 0
+
+    is_tree = not single_nexthop or child_exist or parentcols_exist  
+    # if is_tree:
+    #     numMaps += 1
+
     ###     Direct child info
-    df_p2 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == NodeRole.ROLE_CHILD)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
+    if child_exist:
+        df_p2 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == NodeRole.ROLE_CHILD)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
+
     ###     Indirect parent info
-    df_p3 = df[df['State'] != NodeState.UNKNOWN][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+    if parentcols_exist:
+        df_p3 = df[df['State'] != NodeState.UNKNOWN][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+
     ###     Combine
     df_parent = pd.concat([df_p1, df_p2, df_p3], ignore_index=True)
     df_parent = df_parent[df_parent['Address'] > 0]
@@ -492,7 +514,6 @@ if os.path.exists('network.csv'):
     df_parent = df_parent.drop_duplicates(subset='key', keep='first')
     df_parent.sort_values(by='key', ascending=True, inplace=True)
     df_parent = df_parent.apply(get_edge_style, axis=1, directed=True)
-
 
     ### Data preparation for adjacency graph
     ###     Direct adjacency
@@ -507,46 +528,68 @@ if os.path.exists('network.csv'):
         lambda row: parent_rssi_map.get(row['key'], row['RSSI']), axis=1
     )
 
+    if not df_neighbour.empty:
+        numMaps += 1
+        if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
+            numMaps += 1
+
+    i = 0
+
     ### Draw Network Tree
-    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(16, 8))
+    fig, ax = plt.subplots(1, numMaps, figsize=(16, 8))
     if not df_parent.empty:
         G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
         G1.add_node(root_node)     
         pos1 = {}
-        set_positions_v2(root_node, 0, 0)   
-        draw_edges_from_dataframe(df_parent, G1, pos1, ax1, directed=True,config=None)
-        ax1.set_title('Network Tree')
+        if is_tree:
+            # Plot as tree
+            set_positions_v2(root_node, 0, 0)   
+        else:
+           # Plot as nodes graph   
+           pos1 = nx.spring_layout(G1) 
+
+        draw_edges_from_dataframe(df_parent, G1, pos1, ax[i], directed=True,config=None)
+        ax[i].set_title('Network Tree')
     else:
-        nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax1)
-        ax1.set_title('Network Tree')
+        nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
+        ax[i].set_title('Network Tree')
+
+    i += 1
 
     ### Draw Adjacency Graph
     if not df_neighbour.empty:
         G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
         pos2 = nx.circular_layout(G2)
-        draw_edges_from_dataframe(df_neighbour, G2, pos2, ax2, directed=False,config=None)
-        ax2.set_title('Adjacency Graph')
+        draw_edges_from_dataframe(df_neighbour, G2, pos2, ax[i], directed=False,config=None)
+        ax[i].set_title('Adjacency Graph')
+        i += 1
 
         ### Draw Geographical Map   
-        if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
+        # if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
+        if True:
             # print("Drawing geographical map...")  
-            node_pos = pd.read_csv(node_pos_csv)
+            node_pos = pd.read_csv(io.StringIO(node_pos_csv))
             filtered_node_loc = node_pos[node_pos['Node'].isin(G1.nodes)]
-            missing_nodes = set(G2.nodes) - set(filtered_node_loc['Node'])
+            missing_nodes = set(G1.nodes) - set(filtered_node_loc['Node'])
             img = mpimg.imread(map_png)
             # print(f"Missing nodes: {missing_nodes}")
             if len(missing_nodes) == 0 and img is not None:           
-                ax3.imshow(img)
+                ax[i].imshow(img)
                 G3 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')                
                 # Create positions dictionary from filtered_node_loc
                 pos3 = filtered_node_loc.set_index('Node')[['Lat', 'Long']].apply(tuple, axis=1).to_dict()
-                draw_edges_from_dataframe(df_parent, G3, pos3, ax3, directed=False,config=map_config)
-                ax3.set_title('Node Positions')
+                draw_edges_from_dataframe(df_parent, G3, pos3, ax[i], directed=False,config=map_config)
+                ax[i].set_title('Node Positions')
+                i += 1
     else:
         nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax2)
-        ax2.set_title('Adjacency Graph')
+        ax[i].set_title('Adjacency Graph')
+        i += 1
+
+    for j in range(i,numMaps): 
+        fig.delaxes(fig.axes[j])
     
-  
+    plt.tight_layout()
     fig.suptitle(f'Topology Map\n{timestamp}')
 
     # Save plot to file
