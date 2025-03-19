@@ -692,7 +692,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     }
     if (addr == parentAddr)
     {
-        nodePtr->role = ROLE_PARENT;
+        nodePtr->role = ROLE_NEXTHOP;
     }
     else if (parent == mac.addr)
     {
@@ -765,7 +765,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
         {
             sem_wait(&neighbours.mutex);
             neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-            neighbours.nodes[addr].role = ROLE_PARENT;
+            neighbours.nodes[addr].role = ROLE_NEXTHOP;
             sem_post(&neighbours.mutex);
             printf("%s - Parent: %02d (%02d)\n", timestamp(), addr, RSSI);
             sendBeacon();
@@ -994,7 +994,7 @@ static void changeParent()
     }
     sem_wait(&neighbours.mutex);
     neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-    neighbours.nodes[parentAddr].role = ROLE_PARENT;
+    neighbours.nodes[parentAddr].role = ROLE_NEXTHOP;
     sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
 }
@@ -1194,7 +1194,7 @@ char *getNodeRoleStr(const NodeRole role)
     char *roleStr;
     switch (role)
     {
-    case ROLE_PARENT:
+    case ROLE_NEXTHOP:
         roleStr = "PARENT";
         break;
     case ROLE_CHILD:

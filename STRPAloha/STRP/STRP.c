@@ -764,7 +764,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     }
     if (addr == parentAddr)
     {
-        nodePtr->role = ROLE_PARENT;
+        nodePtr->role = ROLE_NEXTHOP;
     }
     else if (parent == mac.addr)
     {
@@ -832,7 +832,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
             {
                 sem_wait(&neighbours.mutex);
                 neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-                neighbours.nodes[addr].role = ROLE_PARENT;
+                neighbours.nodes[addr].role = ROLE_NEXTHOP;
                 sem_post(&neighbours.mutex);
                 if (config.loglevel >= DEBUG && prevParentAddr != INITIAL_PARENT)
                 {
@@ -872,7 +872,7 @@ static void selectClosestNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
     neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
@@ -904,7 +904,7 @@ void selectClosestLowerNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
     neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
@@ -963,7 +963,7 @@ static void selectNextLowerNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
     neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
 
@@ -1003,7 +1003,7 @@ static void selectRandomNeighbour()
     }
 
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
     neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
 
@@ -1043,7 +1043,7 @@ static void selectRandomLowerNeighbour()
     }
 
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_PARENT;
+    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
     neighbours.nodes[parentAddr].role = ROLE_NODE;
     sem_post(&neighbours.mutex);
 
@@ -1077,7 +1077,7 @@ static void changeParent()
     }
     // sem_wait(&neighbours.mutex);
     // neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-    // neighbours.nodes[parentAddr].role = ROLE_PARENT;
+    // neighbours.nodes[parentAddr].role = ROLE_NEXTHOP;
     // sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
     metrics.data[0].parentChanges++;
@@ -1177,7 +1177,7 @@ char *getNodeRoleStr(const NodeRole role)
     char *roleStr;
     switch (role)
     {
-    case ROLE_PARENT:
+    case ROLE_NEXTHOP:
         roleStr = "PARENT";
         break;
     case ROLE_CHILD:

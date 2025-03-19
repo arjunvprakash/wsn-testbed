@@ -103,7 +103,7 @@ static void initOutputFiles()
 {
     // Create results dir
     char cmd[150];
-    sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../logs/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
+    sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../ProtoMon/viz/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
     if (system(cmd) != 0)
     {
         printf("## - Error creating results dir!\n");
@@ -174,14 +174,14 @@ static void initOutputFiles()
 static void generateGraph()
 {
     char cmd[100];
-    sprintf(cmd, "python ../../logs/script.py %d", ADDR_SINK);
+    sprintf(cmd, "python ../../ProtoMon/viz/script.py %d&", ADDR_SINK);
     if (system(cmd) != 0)
     {
         printf("# Error generating graph...\n");
     }
     else
     {
-        printf("%s - Generated visualisation. Go to http://localhost:8000 \n", timestamp());
+        printf("%s - Visualising metrics. Open http://localhost:8000 \n", timestamp());
     }
 }
 
@@ -193,7 +193,7 @@ static void installDependencies()
         printf("# %s - Installing dependencies...\n", timestamp());
         fflush(stdout);
     }
-    char *setenv_cmd = "pip install -r ../logs/requirements.txt > /dev/null &";
+    char *setenv_cmd = "pip install -r ../ProtoMon/viz/requirements.txt > /dev/null &";
     if (config.loglevel == TRACE)
     {
         printf("## %s - Executing command : %s\n", timestamp(), setenv_cmd);
@@ -481,7 +481,7 @@ This function must be called BEFORE initializing the routing and MAC layers.
 void ProtoMon_init(ProtoMon_Config c)
 {   
     // Make init idempotent
-    if (config.self != 0)
+    if (config.self != 0 || c.monitoredLayers == PROTOMON_LAYER_NONE)
     {
         return;
     } 
@@ -540,8 +540,8 @@ void ProtoMon_init(ProtoMon_Config c)
     {
         if (config.self != ADDR_SINK)
         {
-            pthread_t sendRoutingTableT;
-            if (pthread_create(&sendRoutingTableT, NULL, sendMetrics_func, NULL) != 0)
+            pthread_t sendMetricsT;
+            if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
             {
                 printf("### Error: Failed to create sendRoutingTable thread");
                 exit(EXIT_FAILURE);
@@ -720,7 +720,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
             }
             else
             {
-                printf("%s - %s data of Node %02d\n", timestamp(), (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "neigbour" : "routing"), header->src);
+                printf("%s - %s data of Node %02d\n", timestamp(), (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"), header->src);
             }
 
             // Write corresponding sink metrics to file
@@ -731,7 +731,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
                 uint8_t buffer[bufferSize];
                 if (buffer == NULL)
                 {
-                    printf("## - Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "neigbour" : "routing"));
+                    printf("## - Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"));
                     exit(EXIT_FAILURE);
                 }
                 uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);

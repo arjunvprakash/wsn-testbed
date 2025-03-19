@@ -21,7 +21,7 @@ typedef enum ParentSelectionStrategy
 
 typedef enum NodeRole
 {
-    ROLE_PARENT,
+    ROLE_NEXTHOP,
     ROLE_CHILD,
     ROLE_NODE
 } NodeRole;

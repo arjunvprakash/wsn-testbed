@@ -25,7 +25,7 @@ typedef enum NodeRole
     // Dependency : Graph generation script ../logs/script.py
     ROLE_NODE = 0,
     ROLE_CHILD = 1,
-    ROLE_PARENT = 2,
+    ROLE_NEXTHOP = 2,
 } NodeRole;
 
 typedef enum NodeState
