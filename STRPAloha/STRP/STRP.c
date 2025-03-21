@@ -9,9 +9,6 @@
 #include <unistd.h>    // sleep, exec, chdir
 
 #include "STRP.h"
-#include "../ALOHA/ALOHA.h"
-#include "../GPIO/GPIO.h"
-#include "../common.h"
 #include "../util.h"
 
 #define PACKETQ_SIZE 16
@@ -21,7 +18,6 @@
 // Packet control flags
 #define CTRL_PKT '\x45' // STRP packet
 #define CTRL_BCN '\x47' // STRP beacon
-#define CTRL_TAB '\x48' // STRP routing table packet
 
 typedef struct Beacon
 {
@@ -146,7 +142,6 @@ static char *getRoutingStrategyStr();
 static void initMetrics();
 static void setConfigDefaults(STRP_Config *config);
 
-// Initialize the STRP
 int STRP_init(STRP_Config c)
 {
     // Make init idempotent
@@ -199,7 +194,6 @@ int STRP_init(STRP_Config c)
     return 1;
 }
 
-// Send a message via STRP
 int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 {
     DataPacket msg;
@@ -221,7 +215,6 @@ int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     return 1;
 }
 
-// Receive a message via STRP
 int STRP_recvMsg(Routing_Header *header, uint8_t *data)
 {
     DataPacket msg = recvMsgQ_dequeue();
@@ -243,8 +236,6 @@ int STRP_recvMsg(Routing_Header *header, uint8_t *data)
     return msg.len;
 }
 
-// Receive a message via STRP. Blocks the thread till the timeout.
-// Returns 0 for timeout, -1 for error
 int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout)
 {
 
@@ -428,7 +419,6 @@ static void *recvPackets_func(void *args)
         {
             continue;
         }
-        // int pktSize = ALOHA_recv(macTemp, pkt);
         int pktSize = MAC_timedRecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
@@ -687,7 +677,6 @@ static void *receiveBeaconHandler(void *args)
 
 static void senseNeighbours()
 {
-    // pthread_t send, recv;
     parentAddr = INITIAL_PARENT;
     neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
 
@@ -934,7 +923,6 @@ char *getRoutingStrategyStr()
         strategyStr = "UNKNOWN";
         break;
     }
-    // printf("%s - Routing strategy: %s\n", timestamp(), strategyStr);
     return strategyStr;
 }
 
@@ -1075,10 +1063,6 @@ static void changeParent()
         selectNextLowerNeighbour();
         break;
     }
-    // sem_wait(&neighbours.mutex);
-    // neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-    // neighbours.nodes[parentAddr].role = ROLE_NEXTHOP;
-    // sem_post(&neighbours.mutex);
     printf("%s - New parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
     metrics.data[0].parentChanges++;
 }
@@ -1262,10 +1246,10 @@ int Routing_getNeighbourData(char *buffer, uint16_t size)
         if (node.state != UNKNOWN)
         {
             uint8_t row[100];
-            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)node.lastSeen, src, addr, node.state, node.role, node.RSSI, node.parent, node.parentRSSI);
+            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.role, node.RSSI, node.parent, node.parentRSSI);
 
             // Clear timestamp to avoid duplicate
-            // timestamp = 0L;
+            timestamp = 0L;
 
             // if (offset + rowlen < size)
             if (1)

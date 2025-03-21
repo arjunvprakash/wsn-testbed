@@ -3,15 +3,14 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <math.h>
-#include <stdio.h> // printf
+#include <stdio.h>  // printf
 #include <stdarg.h> // va_list, va_start, va_end
 
 #include "common.h"
-#include "ALOHA/ALOHA.h"
-#include "GPIO/GPIO.h"
 
-// Returns the current timestamp. Sample: 2024-06-16T11:56:23
-// Dependency: STRP, ProtoMon, main
+/**
+ * @returns Current local timestamp in the yyyy-mm-dd'T'hh:mm:ss format. Eg: 2024-06-16T11:56:23
+ */
 char *timestamp()
 {
     time_t current_time;
@@ -26,24 +25,32 @@ char *timestamp()
     return time_buffer;
 }
 
-// Returns a random value within the range
+/**
+ * @returns A random value within the range
+ * @param min
+ * @param max
+ */
 unsigned long randInRange(unsigned long min, unsigned long max)
 {
     return min + (rand() % (max - min + 1));
 }
 
-// Returns a random code with n digits
+/**
+ * @returns A random value with the specified number of digits
+ * @param n number of digits
+ */
 int randCode(int n)
 {
     int maxValue = (int)pow(10, n);
     return rand() % maxValue;
 }
 
-// Log a message to the console
-// Parameters:
-//  logLevel - The log level of the message.
-//  format - The format string of the message.
-//  ... - The arguments of the format string.
+/**
+ * @brief Log a message to the console
+ * @param logLevel - log level of the message.
+ * @param format - format string of the message.
+ * @param ... - args of the format string.
+ */
 void logMessage(LogLevel logLevel, const char *format, ...)
 {
     va_list args;
@@ -68,6 +75,6 @@ void logMessage(LogLevel logLevel, const char *format, ...)
     }
 
     vprintf(format, args);
-    fflush(stdout);
+    // fflush(stdout);
     va_end(args);
 }

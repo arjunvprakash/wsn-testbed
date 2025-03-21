@@ -117,7 +117,7 @@ def calculateRelativeTime(df, timestamp_col='Timestamp', relative_time_col='Rela
 
         df[timestamp_col] = df[timestamp_col].ffill()
         df[relative_time_col] = (df[timestamp_col] - df[timestamp_col].min()).dt.total_seconds()
-        return df
+        return df.sort_values(by=relative_time_col)
 
 def plot_metricsV3(data, metrics, layer, saveDir='plots'):
     
@@ -177,6 +177,7 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
     os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists
 
     data = df.copy()
+    # data.sort_values(by='RelativeTime', inplace=True)
     metrics = cols
 
     valid_metrics = [metric for metric in metrics if data[metric].max() > 0]
@@ -242,6 +243,7 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
             for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
                 if src_addr_df[metric].max() > 0:
                     src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
+                    # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
                     if metric.lower().startswith("total"):
                         src_addr_df[metric] = src_addr_df[metric].cumsum()
 
@@ -473,16 +475,10 @@ if os.path.exists('network.csv'):
     node_state.drop_duplicates(subset=['Address',], keep='first', inplace=True, ignore_index=True)
     node_state_dict = dict(zip(node_state['Address'], node_state['State']))
     inactive_nodes = {node for node, state in node_state_dict.items() if state == 0}
-    # print("node_state:", node_state_dict)
-    # print("inactive_nodes:", inactive_nodes)
 
     ### Data extraction for Network Tree
-
-    # Check if exactly one nexthop per Source
-    single_nexthop = df[df['Role'] == 2].groupby('Source').size().eq(1).all()
-
     # Check if ROLE column contains any CHILD entries
-    child_exist = df[df['Role'] == 1].shape[0] > 0
+    child_exist = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 1)].shape[0] > 0
 
     # Check if the columns 'Parent' and 'ParentRSSI' exist in df
     parentcols_exist = all(col in df.columns for col in ['Parent', 'ParentRSSI']) 
@@ -491,11 +487,7 @@ if os.path.exists('network.csv'):
     df_p1 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 2)][['Timestamp','Source', 'Address', 'RSSI']]
     df_p2 = pd.DataFrame()
     df_p3 = pd.DataFrame()
-    numMaps = 0
-
-    is_tree = not single_nexthop or child_exist or parentcols_exist  
-    # if is_tree:
-    #     numMaps += 1
+    numMaps = 2
 
     ###     Direct child info
     if child_exist:
@@ -508,12 +500,21 @@ if os.path.exists('network.csv'):
     ###     Combine
     df_parent = pd.concat([df_p1, df_p2, df_p3], ignore_index=True)
     df_parent = df_parent[df_parent['Address'] > 0]
-    df_parent = df_parent.sort_values('Timestamp', ascending=False).drop_duplicates('Source', keep='first')
+    df_parent = df_parent.sort_values('Timestamp', ascending=False)
+
+    max_timestamp_per_source = df_parent.groupby('Source')['Timestamp'].max().reset_index()
+    df_parent = df_parent.merge(max_timestamp_per_source, on=['Source', 'Timestamp'], how='inner')
+
     df_parent['key'] = df_parent.apply(lambda row: tuple(sorted([row['Source'], row['Address']])), axis=1)
     df_parent = df_parent.sort_values(by='Timestamp', ascending=False)
-    df_parent = df_parent.drop_duplicates(subset='key', keep='first')
-    df_parent.sort_values(by='key', ascending=True, inplace=True)
+    df_parent = df_parent.drop_duplicates(subset='key', keep='first').sort_values(by='key')
+
+    # df_parent.sort_values(by='key', inplace=True)
     df_parent = df_parent.apply(get_edge_style, axis=1, directed=True)
+
+    # Check if exactly one nexthop per Source
+    nextop_count = df_parent.groupby('Source').size()
+    single_nexthop = nextop_count.max() == 1
 
     ### Data preparation for adjacency graph
     ###     Direct adjacency
@@ -528,10 +529,8 @@ if os.path.exists('network.csv'):
         lambda row: parent_rssi_map.get(row['key'], row['RSSI']), axis=1
     )
 
-    if not df_neighbour.empty:
+    if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
         numMaps += 1
-        if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
-            numMaps += 1
 
     i = 0
 
@@ -541,20 +540,20 @@ if os.path.exists('network.csv'):
         G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
         G1.add_node(root_node)     
         pos1 = {}
-        if single_nexthop:
-            # Plot as tree
-            set_positions_v2(root_node, 0, 0)   
-        else:
+        # if single_nexthop:
+        #     # Plot as tree
+        #     set_positions_v2(root_node, 0, 0)   
+        # else:
            # Plot as nodes graph   
-           pos1 = nx.circular_layout(G1)
+        pos1 = nx.circular_layout(G1)
 
         draw_edges_from_dataframe(df_parent, G1, pos1, ax[i], directed=True,config=None)
         ax[i].set_title('Network Tree')
-    else:
-        nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
-        ax[i].set_title('Network Tree')
+        i += 1
+    # else:
+    #     nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
+    #     ax[i].set_title('Network Tree')
 
-    i += 1
 
     ### Draw Adjacency Graph
     if not df_neighbour.empty:
@@ -564,35 +563,31 @@ if os.path.exists('network.csv'):
         ax[i].set_title('Adjacency Graph')
         i += 1
 
-        ### Draw Geographical Map   
-        # if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
-        if True:
-            # print("Drawing geographical map...")  
+        ### Plot Node positions
+        if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
             node_pos = pd.read_csv(node_pos_csv)
             Gx = G1 if not df_parent.empty else G2 
             df_geo = df_parent if not df_parent.empty else df_neighbour
             filtered_node_loc = node_pos[node_pos['Node'].isin(Gx.nodes)]
             missing_nodes = set(Gx.nodes) - set(filtered_node_loc['Node'])
             img = mpimg.imread(map_png)
-            # print(f"Missing nodes: {missing_nodes}")
             if len(missing_nodes) == 0 and img is not None:           
                 ax[i].imshow(img)
                 G3 = nx.from_pandas_edgelist(df_geo, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')                
-                # Create positions dictionary from filtered_node_loc
                 pos3 = filtered_node_loc.set_index('Node')[['Lat', 'Long']].apply(tuple, axis=1).to_dict()
                 draw_edges_from_dataframe(df_geo, G3, pos3, ax[i], directed=False,config=map_config)
                 ax[i].set_title('Node Positions')
                 i += 1
     else:
-        nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax2)
+        nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
         ax[i].set_title('Adjacency Graph')
         i += 1
 
     for j in range(i,numMaps): 
         fig.delaxes(fig.axes[j])
     
-    plt.tight_layout()
-    fig.suptitle(f'Topology Map\n{timestamp}')
+    fig.suptitle(f'Network Topology : {timestamp}', fontweight='bold')
+    plt.tight_layout() 
 
     # Save plot to file
     os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists

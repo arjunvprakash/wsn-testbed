@@ -9,9 +9,6 @@
 #include <unistd.h>    // sleep, exec, chdir
 
 #include "SMRP.h"
-#include "../ALOHA/ALOHA.h"
-#include "../GPIO/GPIO.h"
-#include "../common.h"
 #include "../util.h"
 
 #define PACKETQ_SIZE 16
@@ -63,8 +60,8 @@ typedef struct
 
 typedef struct SMRP_Params
 {
-    uint16_t beaconsSent;
-    uint16_t beaconsRecv;
+    uint16_t beaconsTx;
+    uint16_t beaconsRx;
 } SMRP_Params;
 
 typedef struct Metrics
@@ -98,7 +95,6 @@ static void *recvPackets_func(void *args);
 static DataPacket deserializePacket(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
-static void *sendBeaconHandler(void *args);
 static void *receiveBeaconHandler(void *args);
 static void senseNeighbours();
 static void updateActiveNodes(uint8_t addr, int RSSI);
@@ -113,20 +109,20 @@ char *getNodeRoleStr(const NodeRole role);
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
 
-uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t maxTries)
+uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries)
 {
     ActiveNodes activenodes = neighbours;
     int i = 0;
     do
     {
-        NodeInfo node = activenodes.nodes[(uint8_t)randInRange(activenodes.minAddr, activenodes.maxAddr - 1)];
-        if (node.state == ACTIVE && node.addr != config.self && node.addr != prev && node.addr != src)
+        NodeInfo node = activenodes.nodes[(uint8_t)randInRange(activenodes.minAddr, activenodes.maxAddr)];
+        if (node.state == ACTIVE && node.addr != src && node.addr != prev)
         {
             return node.addr;
         }
     } while (i < maxTries);
 
-    return ADDR_SINK;
+    return dest == 0 ? ADDR_SINK : dest;
 }
 
 // Initialize the SMRP
@@ -157,7 +153,8 @@ int SMRP_init(SMRP_Config c)
 
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
-        printf("### Error: Failed to create Routing receive thread");
+        logMessage(ERROR, "Failed to create Routing receive thread\n");
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
 
@@ -167,14 +164,16 @@ int SMRP_init(SMRP_Config c)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
-            printf("### Error: Failed to create Routing send thread");
+            logMessage(ERROR, "Failed to create Routing send thread\n");
+            fflush(stdout);
             exit(EXIT_FAILURE);
         }
     }
     // Beacon thread
     if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
     {
-        printf("### Error: Failed to create sendBeaconPeriodic thread");
+        logMessage(ERROR, "Failed to create sendBeaconPeriodic thread");
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
     return 1;
@@ -186,7 +185,7 @@ int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     DataPacket msg;
     msg.ctrl = CTRL_PKT;
     msg.dest = dest;
-    msg.src = mac.addr;
+    msg.src = config.self;
     msg.len = len;
     msg.data = (uint8_t *)malloc(len);
     if (msg.data)
@@ -195,7 +194,8 @@ int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     }
     else
     {
-        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        logMessage(ERROR, "msg.data is NULL %s:%d\n", __FILE__, __LINE__);
+        fflush(stdout);
         return 0;
     }
     sendQ_enqueue(msg);
@@ -217,7 +217,8 @@ int SMRP_recvMsg(Routing_Header *header, uint8_t *data)
     }
     else
     {
-        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        logMessage(ERROR, "msg.data is NULL %s:%d\n", __FILE__, __LINE__);
+        fflush(stdout);
         return 0;
     }
 
@@ -253,7 +254,8 @@ int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
     }
     else
     {
-        printf("# %s - Error: msg.data is NULL %s:%d\n", timestamp(), __FILE__, __LINE__);
+        logMessage(ERROR, "msg.data is NULL %s:%d\n", __FILE__, __LINE__);
+        fflush(stdout);
         return 0;
     }
 
@@ -422,25 +424,29 @@ static void *recvPackets_func(void *args)
             uint8_t dest = *(pkt + sizeof(ctrl));
             uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI);
-            if (dest == macTemp->addr)
+            if (dest == config.self)
             {
                 DataPacket msg = deserializePacket(pkt);
                 // Keep
-                if (msg.len > 0 && msg.data != NULL)
+                if (msg.len > 0)
                 {
                     recvQ_enqueue(msg);
                 }
             }
             else // Forward
             {
-                uint8_t nextHop = Routing_getnextHop(src, mac.recvH.src_addr, config.maxTries);
+                uint8_t nextHop = Routing_getnextHop(src, mac.recvH.src_addr, dest, config.maxTries);
+                if (rand() % 100 < 0)
+                {
+                    nextHop = dest;
+                }
                 if (MAC_send(macTemp, nextHop, pkt, pktSize))
                 {
-                    printf("%s - FWD: %02d -> %02d total: %02d\n", timestamp(), src, nextHop, ++total[src]);
+                    logMessage(INFO, "FWD: %02d -> %02d total: %02d\n", src, nextHop, ++total[src]);
                 }
                 else
                 {
-                    printf("# %s - Error FWD: %02d -> %02d\n", timestamp(), src, nextHop);
+                    logMessage(ERROR, "%s - Error FWD: %02d -> %02d\n", timestamp(), src, nextHop);
                 }
             }
         }
@@ -449,16 +455,16 @@ static void *recvPackets_func(void *args)
             Beacon *beacon = (Beacon *)pkt;
             if (config.loglevel >= DEBUG)
             {
-                printf("# %s - Beacon src: %02d (%d)\n", timestamp(), mac.recvH.src_addr, mac.RSSI);
+                logMessage(DEBUG, "%s -Beacon src: %02d (%d)\n", timestamp(), mac.recvH.src_addr, mac.RSSI);
             }
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI);
-            metrics.data[mac.recvH.src_addr].beaconsRecv++;
+            metrics.data[mac.recvH.src_addr].beaconsRx++;
         }
         else
         {
             if (config.loglevel >= DEBUG)
             {
-                printf("# %s - SMRP : Unknown control flag %02d \n", timestamp(), ctrl);
+                logMessage(DEBUG, "%s - SMRP : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
         free(pkt);
@@ -511,9 +517,9 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
     *p = msg.dest;
     p += sizeof(msg.dest);
 
-    // Set source as config.self
-    *p = mac.addr;
-    p += sizeof(mac.addr);
+    // Set source as self
+    *p = config.self;
+    p += sizeof(config.self);
 
     // Set actual msg length
     memcpy(p, &msg.len, sizeof(msg.len));
@@ -543,43 +549,17 @@ static void *sendPackets_func(void *args)
             continue;
         }
         time_t start = time(NULL);
-        uint8_t nextHop = Routing_getnextHop(msg.src, -1, config.maxTries);
+        uint8_t nextHop = Routing_getnextHop(msg.src, -1, msg.dest, config.maxTries);
+        // nextHop = msg.dest;
         if (!MAC_send(macTemp, nextHop, pkt, pktSize))
         {
-            printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
+            logMessage(ERROR, "%s - MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
         else
         {
         }
         free(pkt);
         usleep(1000000); // Sleep 1s
-    }
-    return NULL;
-}
-
-static void *sendBeaconHandler(void *args)
-{
-
-    MAC *m = (MAC *)args;
-    int count = 0;
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Sending beacons...\n", timestamp());
-        fflush(stdout);
-    }
-
-    time_t start = time(NULL);
-    do
-    {
-        sendBeacon();
-        count++;
-        usleep(randInRange(500000, 1200000));
-    } while (time(NULL) - start < config.senseDurationS);
-
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Sent %d beacons...\n", timestamp(), count);
-        fflush(stdout);
     }
     return NULL;
 }
@@ -591,8 +571,7 @@ static void senseNeighbours()
         uint16_t count = 0;
         if (config.loglevel >= DEBUG)
         {
-            printf("# %s - Sending beacons...\n", timestamp());
-            fflush(stdout);
+            logMessage(DEBUG, "Sending beacons...\n");
         }
 
         time_t start = time(NULL);
@@ -605,13 +584,12 @@ static void senseNeighbours()
 
         if (config.loglevel >= DEBUG)
         {
-            printf("# %s - Sent %d beacons...\n", timestamp(), count);
-            fflush(stdout);
+            logMessage(DEBUG, "Sent %d beacons...\n", count);
         }
 
         if (neighbours.numActive == 0)
         {
-            printf("%s - No neighbors detected.Trying again...\n", timestamp());
+            logMessage(INFO, "No neighbors detected. Trying again...\n");
         }
         else
         {
@@ -620,7 +598,8 @@ static void senseNeighbours()
 
     } while (1);
 
-    printf("%s - Active neighbours: %d \n", timestamp(), neighbours.numActive);
+    logMessage(INFO, "Active neighbours: %d \n", neighbours.numActive);
+    fflush(stdout);
 }
 
 static void updateActiveNodes(uint8_t addr, int RSSI)
@@ -654,19 +633,34 @@ static void updateActiveNodes(uint8_t addr, int RSSI)
             neighbours.numActive++;
         }
     }
-    // Only neighbours are tracked
+    // Random assignment of role
+    if (new)
     {
-        nodePtr->role = ROLE_NODE;
+        if (addr == ADDR_SINK)
+        {
+            nodePtr->role = ROLE_NEXTHOP;
+        }
+        else
+        {
+            nodePtr->role = rand() % 100 < 50 ? ROLE_NEXTHOP : ROLE_NODE;
+        }
+    }
+    else
+    {
+        if (addr != ADDR_SINK)
+        {
+            nodePtr->role = rand() % 100 < 80 ? ROLE_NODE : ROLE_NEXTHOP;
+        }
     }
     nodePtr->RSSI = RSSI;
     nodePtr->lastSeen = time(NULL);
     sem_post(&neighbours.mutex);
     if (new)
     {
-        if (config.loglevel >= DEBUG)
+        // if (config.loglevel >= DEBUG)
         {
-            printf("# %s - New %s: %02d (%02d)\n", timestamp(), "neighbour", addr, RSSI);
-            printf("# %s - Active neighbour count: %0d\n", timestamp(), numActive);
+            logMessage(DEBUG, "New %s: %02d (%02d)\n", "neighbour", addr, RSSI);
+            logMessage(DEBUG, "Active neighbours: %d \n", neighbours.numActive);
         }
     }
 }
@@ -701,7 +695,7 @@ static void cleanupInactiveNodes()
             nodePtr->role = ROLE_NODE;
             neighbours.numActive--;
             inactive++;
-            printf("%s - Node %02d inactive.\n", timestamp(), nodePtr->addr);
+            logMessage(INFO, "Node %02d inactive.\n", nodePtr->addr);
         }
     }
     numActive = neighbours.numActive;
@@ -710,7 +704,7 @@ static void cleanupInactiveNodes()
 
     if (config.loglevel >= DEBUG)
     {
-        printf("# %s - Active neighbour count: %d\n", timestamp(), numActive);
+        logMessage(DEBUG, "Active neighbours: %d \n", neighbours.numActive);
     }
 }
 
@@ -720,15 +714,15 @@ static void sendBeacon()
     beacon.ctrl = CTRL_BCN;
     if (config.loglevel >= DEBUG)
     {
-        printf("# %s - Sending beacon\n", timestamp());
+        logMessage(DEBUG, "Sending beacon\n");
     }
     if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
     {
-        printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
+        logMessage(INFO, "MAC_send failed %s:%d\n", __FILE__, __LINE__);
     }
     else
     {
-        metrics.data[0].beaconsSent++;
+        metrics.data[0].beaconsTx++;
     }
 }
 
@@ -804,10 +798,10 @@ uint8_t *Routing_getMetricsHeader()
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
     const SMRP_Params data = metrics.data[addr];
-    int rowlen = sprintf(buffer, "%d,%d", metrics.data[0].beaconsSent, data.beaconsRecv);
+    int rowlen = sprintf(buffer, "%d,%d", metrics.data[0].beaconsTx, data.beaconsRx);
     sem_wait(&metrics.mutex);
     metrics.data[addr] = (SMRP_Params){0};
-    metrics.data[0].beaconsSent = 0;
+    metrics.data[0].beaconsTx = 0;
     sem_post(&metrics.mutex);
     return rowlen;
 }
@@ -834,10 +828,10 @@ int Routing_getNeighbourData(char *buffer, uint16_t size)
         if (node.state != UNKNOWN)
         {
             uint8_t row[100];
-            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d\n", (long)node.lastSeen, src, addr, node.state, node.role, node.RSSI);
+            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.role, node.RSSI);
 
             // Clear timestamp to avoid duplicate
-            // timestamp = 0L;
+            timestamp = 0L;
 
             // if (offset + rowlen < size)
             if (1)

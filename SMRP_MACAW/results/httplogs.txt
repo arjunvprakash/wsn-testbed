@@ -1,0 +1,132 @@
+127.0.0.1 - - [21/Mar/2025 17:45:49] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] "GET /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] "GET /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:45:49] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] "GET /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] "GET /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:46:11] code 404, message File not found
+127.0.0.1 - - [21/Mar/2025 17:46:11] "HEAD /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:13] "HEAD /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:20] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:28] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:41] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:42] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:48] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:47:49] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:49] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:47:49] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:17] "HEAD /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:38] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:44] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "HEAD /network.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "GET /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:53] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:48:54] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "GET / HTTP/1.1" 304 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [21/Mar/2025 17:50:03] "HEAD /plots/routing.html HTTP/1.1" 200 -
