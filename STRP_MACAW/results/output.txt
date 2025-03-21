@@ -1,0 +1,111 @@
+2025-03-21T18:02:47 - Node: 14
+2025-03-21T18:02:47 - Role : SINK
+2025-03-21T18:02:47 - Sleep duration: 15000 ms
+2025-03-21T18:02:47 - Monitoring enabled for Routing layer
+2025-03-21T18:02:47 - Monitoring enabled for MAC layer
+2025-03-21T18:02:48 - Routing Strategy:  CLOSEST
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:03:12 - RX: 27 (00) src: 27 msg: 27001 total: 01
+2025-03-21T18:03:13 - RX: 20 (00) src: 20 msg: 20001 total: 01
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:03:20 - Received Routing data of Node 20
+2025-03-21T18:03:21 - RX: 27 (00) src: 15 msg: 15001 total: 01
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:03:27 - Received Routing data of Node 27
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:03:32 - Received Neigbour data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:03:36 - Received MAC data of Node 20
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:03:42 - RX: 27 (00) src: 07 msg: 7001 total: 01
+2025-03-21T18:03:44 - RX: 20 (00) src: 20 msg: 20002 total: 02
+2025-03-21T18:03:47 - Received Neigbour data of Node 27
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:03:52 - Received Routing data of Node 20
+2025-03-21T18:03:52 - Visualising metrics. Open http://localhost:8000
+2025-03-21T18:03:54 - Received Routing data of Node 15
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:03:59 - Received Neigbour data of Node 20
+2025-03-21T18:04:02 - Received MAC data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:04:06 - Received MAC data of Node 27
+2025-03-21T18:04:08 - RX: 20 (00) src: 20 msg: 20003 total: 03
+2025-03-21T18:04:11 - Received Routing data of Node 07
+2025-03-21T18:04:14 - RX: 20 (00) src: 20 msg: 20004 total: 04
+2025-03-21T18:04:16 - Node 07 inactive.
+2025-03-21T18:04:17 - Received Routing data of Node 20
+2025-03-21T18:04:18 - RX: 27 (00) src: 27 msg: 27002 total: 02
+2025-03-21T18:04:21 - Received Neigbour data of Node 20
+2025-03-21T18:04:23 - Received Neigbour data of Node 15
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:04:28 - Received Routing data of Node 27
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:04:33 - Received MAC data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:04:37 - Received Neigbour data of Node 07
+2025-03-21T18:04:38 - Received Neigbour data of Node 27
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:04:44 - Received MAC data of Node 15
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:04:49 - Received MAC data of Node 27
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:04:51 - Received MAC data of Node 07
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:04:55 - RX: 27 (00) src: 27 msg: 27003 total: 03
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:05:00 - RX: 27 (00) src: 15 msg: 15002 total: 02
+2025-03-21T18:05:05 - Received Routing data of Node 20
+2025-03-21T18:05:05 - Visualising metrics. Open http://localhost:8000
+2025-03-21T18:05:09 - RX: 27 (00) src: 27 msg: 27004 total: 04
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:05:14 - Received Neigbour data of Node 20
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:05:19 - RX: 27 (00) src: 07 msg: 7002 total: 02
+2025-03-21T18:05:21 - Received MAC data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:05:26 - Received Routing data of Node 27
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:05:30 - RX: 20 (00) src: 20 msg: 20006 total: 05
+2025-03-21T18:05:31 - Received Routing data of Node 15
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:05:34 - Received Routing data of Node 20
+2025-03-21T18:05:37 - Received Neigbour data of Node 27
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:05:41 - Received Neigbour data of Node 20
+2025-03-21T18:05:42 - Received Neigbour data of Node 07
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:05:46 - Received MAC data of Node 27
+2025-03-21T18:05:47 - Received MAC data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:05:50 - RX: 20 (00) src: 20 msg: 20007 total: 06
+2025-03-21T18:05:53 - RX: 20 (00) src: 20 msg: 20008 total: 07
+2025-03-21T18:05:55 - Received Neigbour data of Node 15
+2025-03-21T18:05:57 - Received Routing data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:06:02 - Received Neigbour data of Node 20
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:06:11 - Received MAC data of Node 20
+2025-03-21T18:06:11 - Visualising metrics. Open http://localhost:8000
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:06:18 - RX: 20 (00) src: 20 msg: 20009 total: 08
+2025-03-21T18:06:22 - Received Routing data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T18:06:31 - Received MAC data of Node 07
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:06:35 - Received Routing data of Node 27
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T18:06:40 - Received Neigbour data of Node 20
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms

@@ -1,0 +1,176 @@
+2025-03-21T17:45:48 - Node: 14
+2025-03-21T17:45:48 - Role : SINK
+2025-03-21T17:45:48 - Sleep duration: 15000 ms
+2025-03-21T17:45:48 - Monitoring enabled for Routing layer
+2025-03-21T17:45:48 - Monitoring enabled for MAC layer
+# New neighbour: 27 (00)
+# Active neighbours: 1 
+# New neighbour: 15 (-10)
+# Active neighbours: 2 
+# New neighbour: 07 (-41)
+# Active neighbours: 3 
+2025-03-21T17:46:05 - Active neighbours: 3 
+2025-03-21T17:46:05 - TX: 07 msg: 14001 total: 01
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T17:46:30 - FWD: 15 -> 27 total: 01
+2025-03-21T17:46:31 - Received Routing data of Node 07
+2025-03-21T17:46:31 - Visualising metrics. Open http://localhost:8000
+2025-03-21T17:46:32 - Received Neigbour data of Node 07
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T17:46:35 - TX: 07 msg: 14002 total: 02
+MSG: pi7 -> pi27, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:46:44 - Received Neigbour data of Node 15
+2025-03-21T17:46:50 - FWD: 15 -> 07 total: 02
+/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
+You are attempting to set `plot.legend.background_fill_alpha` on a plot that has zero legends added, this will have no effect.
+
+Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
+
+  p.legend.background_fill_alpha = 0.2
+/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
+You are attempting to set `plot.legend.click_policy` on a plot that has zero legends added, this will have no effect.
+
+Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
+
+  p.legend.click_policy = "hide"
+WARNING:bokeh.core.validation.check:W-1000 (MISSING_RENDERERS): Plot has no renderers: figure(id='p1235', ...)
+2025-03-21T17:46:51 - Received MAC data of Node 07
+MSG: pi27 -> pi15, NAV = 200ms
+/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
+You are attempting to set `plot.legend.background_fill_alpha` on a plot that has zero legends added, this will have no effect.
+
+Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
+
+  p.legend.background_fill_alpha = 0.2
+/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
+You are attempting to set `plot.legend.click_policy` on a plot that has zero legends added, this will have no effect.
+
+Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
+
+  p.legend.click_policy = "hide"
+MSG: pi27 -> pi7, NAV = 200ms
+WARNING:bokeh.core.validation.check:W-1000 (MISSING_RENDERERS): Plot has no renderers: figure(id='p1810', ...)
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:46:59 - Received Routing data of Node 15
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi27 -> pi15, NAV = 200ms
+2025-03-21T17:47:04 - Received Routing data of Node 27
+2025-03-21T17:47:05 - TX: 07 msg: 14003 total: 03
+2025-03-21T17:47:07 - Received Neigbour data of Node 15
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:47:10 - Received MAC data of Node 15
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:47:14 - RX: 07 (-41) src: 07 msg: 7003 total: 01
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:47:23 - RX: 27 (00) src: 27 msg: 27002 total: 01
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:47:30 - Received Neigbour data of Node 27
+2025-03-21T17:47:31 - RX: 07 (-40) src: 15 msg: 15002 total: 01
+2025-03-21T17:47:35 - TX: 07 msg: 14004 total: 04
+MSG: pi27 -> pi15, NAV = 200ms
+2025-03-21T17:47:38 - FWD: 15 -> 27 total: 03
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi27 -> pi7, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:47:48 - Received Routing data of Node 07
+2025-03-21T17:47:48 - Visualising metrics. Open http://localhost:8000
+2025-03-21T17:47:49 - Received Neigbour data of Node 15
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:47:54 - Received MAC data of Node 15
+2025-03-21T17:47:56 - Received MAC data of Node 27
+MSG: pi27 -> pi15, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:48:02 - RX: 27 (00) src: 27 msg: 27004 total: 02
+MSG: pi7 -> pi27, NAV = 200ms
+2025-03-21T17:48:05 - TX: 27 msg: 14005 total: 05
+MSG: pi7 -> pi27, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:48:09 - Received Routing data of Node 15
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:48:15 - Received Routing data of Node 15
+2025-03-21T17:48:19 - Received Routing data of Node 07
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi27 -> pi15, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:48:28 - Received MAC data of Node 07
+2025-03-21T17:48:31 - Received Routing data of Node 15
+2025-03-21T17:48:32 - Received Neigbour data of Node 27
+2025-03-21T17:48:34 - Received Routing data of Node 27
+2025-03-21T17:48:35 - TX: 15 msg: 14006 total: 06
+MSG: pi7 -> pi27, NAV = 200ms
+2025-03-21T17:48:40 - Received MAC data of Node 15
+MSG: pi27 -> pi15, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:48:53 - Received MAC data of Node 07
+2025-03-21T17:48:53 - Visualising metrics. Open http://localhost:8000
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi7 -> pi27, NAV = 200ms
+2025-03-21T17:49:05 - TX: 07 msg: 14007 total: 07
+MSG: pi27 -> pi7, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T17:49:17 - FWD: 15 -> 07 total: 04
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:49:24 - FWD: 27 -> 15 total: 01
+2025-03-21T17:49:25 - Received MAC data of Node 27
+2025-03-21T17:49:27 - Received Neigbour data of Node 07
+MSG: pi27 -> pi15, NAV = 200ms
+2025-03-21T17:49:28 - Received MAC data of Node 15
+2025-03-21T17:49:29 - Received Routing data of Node 07
+2025-03-21T17:49:30 - Received MAC data of Node 27
+2025-03-21T17:49:31 - Received Neigbour data of Node 27
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:49:32 - Received Routing data of Node 15
+MSG: pi7 -> pi15, NAV = 200ms
+2025-03-21T17:49:33 - Received Neigbour data of Node 27
+2025-03-21T17:49:35 - Received MAC data of Node 15
+2025-03-21T17:49:35 - TX: 07 msg: 14008 total: 08
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:49:38 - RX: 15 (-10) src: 07 msg: 7005 total: 02
+2025-03-21T17:49:41 - Received Routing data of Node 27
+2025-03-21T17:49:42 - Received Routing data of Node 27
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi27 -> pi15, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T17:49:57 - MAC_send failed SMRP/SMRP.c:708
+MSG: pi7 -> pi27, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi7 -> pi27, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+2025-03-21T17:50:05 - TX: 07 msg: 14009 total: 09
+MSG: pi7 -> pi27, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi27, NAV = 200ms
+MSG: pi27 -> pi15, NAV = 200ms
+### 2025-03-21T17:50:17 - Error FWD: 15 -> 07
+MSG: pi27 -> pi15, NAV = 200ms
+2025-03-21T17:50:18 - Received MAC data of Node 27
+2025-03-21T17:50:18 - Visualising metrics. Open http://localhost:8000
+MSG: pi27 -> pi15, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi15 -> pi7, NAV = 200ms
+2025-03-21T17:50:30 - FWD: 27 -> 07 total: 02
+2025-03-21T17:50:35 - TX: 15 msg: 14010 total: 10
+MSG: pi27 -> pi15, NAV = 200ms
+2025-03-21T17:50:37 - FWD: 15 -> 07 total: 05
+2025-03-21T17:50:39 - Received Neigbour data of Node 15
+2025-03-21T17:50:40 - Received Neigbour data of Node 27
+MSG: pi27 -> pi7, NAV = 200ms
+2025-03-21T17:50:41 - Received Routing data of Node 07
+2025-03-21T17:50:42 - Received Routing data of Node 27
+MSG: pi27 -> pi7, NAV = 200ms
+MSG: pi27 -> pi7, NAV = 200ms
+MSG: pi7 -> pi15, NAV = 200ms
+MSG: pi27 -> pi7, NAV = 200ms

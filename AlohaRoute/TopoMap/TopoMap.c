@@ -14,21 +14,21 @@
 #define HTTP_PORT 8000
 
 static const char *outputDir = "results";
-static const char *outputFile = "network.csv";
+static const char *networkCSV = "network.csv";
 static TopoMap_Config config;
 
 static void writeToCSVFile(NodeRoutingTable table);
 static int killProcessOnPort(int port);
 static void installDependencies();
-static void createCSVFile();
+static void initOutputFiles();
 static void generateGraph();
 static void createHttpServer(int port);
 static void *recvRoutingTable_func(void *args);
-static void *sendRoutingTable_func(void *args);
+static void *sendMetrics_func(void *args);
 
 static void writeToCSVFile(NodeRoutingTable table)
 {
-    FILE *file = fopen(outputFile, "a");
+    FILE *file = fopen(networkCSV, "a");
     if (file == NULL)
     {
         printf("## - Error opening csv file!\n");
@@ -52,7 +52,7 @@ static void writeToCSVFile(NodeRoutingTable table)
     fflush(stdout);
 }
 
-static void createCSVFile()
+static void initOutputFiles()
 {
     char cmd[150];
     sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../logs/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
@@ -62,7 +62,7 @@ static void createCSVFile()
         exit(EXIT_FAILURE);
     }
     char filePath[100];
-    sprintf(filePath, "%s/%s", outputDir, outputFile);
+    sprintf(filePath, "%s/%s", outputDir, networkCSV);
     FILE *file = fopen(filePath, "w");
     if (file == NULL)
     {
@@ -74,7 +74,7 @@ static void createCSVFile()
     fclose(file);
     if (config.loglevel >= DEBUG)
     {
-        printf("# %s - CSV file: %s created\n", timestamp(), outputFile);
+        printf("# %s - CSV file: %s created\n", timestamp(), networkCSV);
     }
 }
 
@@ -150,7 +150,7 @@ static void createHttpServer(int port)
     }
 }
 
-static void *sendRoutingTable_func(void *args)
+static void *sendMetrics_func(void *args)
 {
     sleep(config.routingTableIntervalS);
     while (1)
@@ -174,7 +174,7 @@ void TopoMap_init(TopoMap_Config c)
     if (config.self != ADDR_SINK)
     {
         pthread_t sendRoutingTableT;
-        if (pthread_create(&sendRoutingTableT, NULL, sendRoutingTable_func, NULL) != 0)
+        if (pthread_create(&sendRoutingTableT, NULL, sendMetrics_func, NULL) != 0)
         {
             printf("### Error: Failed to create sendRoutingTable thread");
             exit(EXIT_FAILURE);
@@ -183,7 +183,7 @@ void TopoMap_init(TopoMap_Config c)
     else
     {
         installDependencies();
-        createCSVFile();
+        initOutputFiles();
         createHttpServer(HTTP_PORT);
         pthread_t recvRoutingTableT;
         if (pthread_create(&recvRoutingTableT, NULL, recvRoutingTable_func, NULL) != 0)

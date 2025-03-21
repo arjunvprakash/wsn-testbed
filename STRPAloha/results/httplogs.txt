@@ -1,0 +1,10 @@
+127.0.0.1 - - [14/Mar/2025 17:13:09] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /network.csv HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [14/Mar/2025 17:13:09] "HEAD /plots/routing.html HTTP/1.1" 200 -
