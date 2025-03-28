@@ -9,7 +9,7 @@
 
 #include "common.h"
 #include "util.h"
-#include "SMRP/SMRP.h"
+#include "RMRP/RMRP.h"
 #include "ProtoMon/ProtoMon.h"
 
 // Configuration flags
@@ -49,15 +49,15 @@ int main(int argc, char *argv[])
 	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 
-	SMRP_Config smrp;
-	smrp.beaconIntervalS = 30;
-	smrp.loglevel = INFO;
-	smrp.nodeTimeoutS = 60;
-	smrp.recvTimeoutMs = 1000;
-	smrp.self = self;
-	smrp.senseDurationS = 15;
-	smrp.maxTries = 1;
-	SMRP_init(smrp);
+	RMRP_Config RMRP;
+	RMRP.beaconIntervalS = 30;
+	RMRP.loglevel = INFO;
+	RMRP.nodeTimeoutS = 60;
+	RMRP.recvTimeoutMs = 1000;
+	RMRP.self = self;
+	RMRP.senseDurationS = 15;
+	RMRP.maxTries = 1;
+	RMRP_init(RMRP);
 
 	// if (self != ADDR_SINK)
 	{

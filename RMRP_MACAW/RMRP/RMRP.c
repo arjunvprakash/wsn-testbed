@@ -8,14 +8,15 @@
 #include <time.h>      // time
 #include <unistd.h>    // sleep, exec, chdir
 
-#include "SMRP.h"
+#include "RMRP.h"
+#include "../common.h"
 #include "../util.h"
 
 #define PACKETQ_SIZE 16
 
 // Packet control flags
-#define CTRL_PKT '\x45' // SMRP data packet
-#define CTRL_BCN '\x47' // SMRP beacon
+#define CTRL_PKT '\x45' // RMRP data packet
+#define CTRL_BCN '\x47' // RMRP beacon
 
 typedef struct Beacon
 {
@@ -58,17 +59,17 @@ typedef struct
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
-typedef struct SMRP_Params
+typedef struct RMRP_Params
 {
     uint16_t beaconsTx;
     uint16_t beaconsRx;
-} SMRP_Params;
+} RMRP_Params;
 
 typedef struct Metrics
 {
     // mutex and data for each node
     sem_t mutex;
-    SMRP_Params data[MAX_ACTIVE_NODES];
+    RMRP_Params data[MAX_ACTIVE_NODES];
 } Metrics;
 
 static Metrics metrics;
@@ -79,11 +80,11 @@ static pthread_t sendT;
 static MAC mac;
 static const unsigned short headerSize = 5; // [ ctrl | dest | src | len[2] ]
 static ActiveNodes neighbours;
-static SMRP_Config config;
+static RMRP_Config config;
 
-int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = SMRP_sendMsg;
-int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = SMRP_recvMsg;
-int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = SMRP_timedRecvMsg;
+int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = RMRP_sendMsg;
+int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = RMRP_recvMsg;
+int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = RMRP_timedRecvMsg;
 
 static void sendQ_init();
 static void recvQ_init();
@@ -107,7 +108,7 @@ char *getNodeStateStr(const NodeState state);
 char *getNodeRoleStr(const NodeRole role);
 
 static void initMetrics();
-static void setConfigDefaults(SMRP_Config *config);
+static void setConfigDefaults(RMRP_Config *config);
 
 uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries)
 {
@@ -125,8 +126,8 @@ uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxT
     return dest == 0 ? ADDR_SINK : dest;
 }
 
-// Initialize the SMRP
-int SMRP_init(SMRP_Config c)
+// Initialize the RMRP
+int RMRP_init(RMRP_Config c)
 {
     // Make init idempotent
     if (config.self != 0)
@@ -138,14 +139,10 @@ int SMRP_init(SMRP_Config c)
     setConfigDefaults(&c);
     config = c;
     srand(config.self * time(NULL));
-    mac.debug = 0;
-    if (config.loglevel > INFO)
-    {
-        mac.debug = 1;
-    }
     mac.recvTimeout = config.recvTimeoutMs;
     mac.maxtrials = 2;
-    ALOHA_init(&mac, config.self);
+    MACAW_init(&mac, config.self);
+    mac.debug = config.loglevel > INFO;
     sendQ_init();
     recvQ_init();
     initNeighbours();
@@ -179,8 +176,8 @@ int SMRP_init(SMRP_Config c)
     return 1;
 }
 
-// Send a message via SMRP
-int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
+// Send a message via RMRP
+int RMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 {
     DataPacket msg;
     msg.ctrl = CTRL_PKT;
@@ -202,8 +199,8 @@ int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     return 1;
 }
 
-// Receive a message via SMRP
-int SMRP_recvMsg(Routing_Header *header, uint8_t *data)
+// Receive a message via RMRP
+int RMRP_recvMsg(Routing_Header *header, uint8_t *data)
 {
     DataPacket msg = recvMsgQ_dequeue();
     header->dst = msg.dest;
@@ -225,9 +222,9 @@ int SMRP_recvMsg(Routing_Header *header, uint8_t *data)
     return msg.len;
 }
 
-// Receive a message via SMRP. Blocks the thread till the timeout.
+// Receive a message via RMRP. Blocks the thread till the timeout.
 // Returns 0 for timeout, -1 for error
-int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout)
+int RMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout)
 {
 
     DataPacket msg;
@@ -464,7 +461,7 @@ static void *recvPackets_func(void *args)
         {
             if (config.loglevel >= DEBUG)
             {
-                logMessage(DEBUG, "%s - SMRP : Unknown control flag %02d \n", timestamp(), ctrl);
+                logMessage(DEBUG, "%s - RMRP : Unknown control flag %02d \n", timestamp(), ctrl);
             }
         }
         free(pkt);
@@ -636,21 +633,11 @@ static void updateActiveNodes(uint8_t addr, int RSSI)
     // Random assignment of role
     if (new)
     {
-        if (addr == ADDR_SINK)
-        {
-            nodePtr->role = ROLE_NEXTHOP;
-        }
-        else
-        {
-            nodePtr->role = rand() % 100 < 50 ? ROLE_NEXTHOP : ROLE_NODE;
-        }
+        nodePtr->role = rand() % 100 < 50 ? ROLE_NEXTHOP : ROLE_NODE;
     }
     else
     {
-        if (addr != ADDR_SINK)
-        {
-            nodePtr->role = rand() % 100 < 80 ? ROLE_NODE : ROLE_NEXTHOP;
-        }
+        nodePtr->role = rand() % 100 < 80 ? ROLE_NODE : ROLE_NEXTHOP;
     }
     nodePtr->RSSI = RSSI;
     nodePtr->lastSeen = time(NULL);
@@ -797,10 +784,10 @@ uint8_t *Routing_getMetricsHeader()
 
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
-    const SMRP_Params data = metrics.data[addr];
+    const RMRP_Params data = metrics.data[addr];
     int rowlen = sprintf(buffer, "%d,%d", metrics.data[0].beaconsTx, data.beaconsRx);
     sem_wait(&metrics.mutex);
-    metrics.data[addr] = (SMRP_Params){0};
+    metrics.data[addr] = (RMRP_Params){0};
     metrics.data[0].beaconsTx = 0;
     sem_post(&metrics.mutex);
     return rowlen;
@@ -848,7 +835,7 @@ int Routing_getNeighbourData(char *buffer, uint16_t size)
     return offset;
 }
 
-void setConfigDefaults(SMRP_Config *config)
+void setConfigDefaults(RMRP_Config *config)
 {
     if (config->beaconIntervalS == 0)
     {

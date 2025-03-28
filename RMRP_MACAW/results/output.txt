@@ -26,13 +26,13 @@ MSG: pi15 -> pi27, NAV = 200ms
 MSG: pi7 -> pi15, NAV = 200ms
 2025-03-21T17:46:44 - Received Neigbour data of Node 15
 2025-03-21T17:46:50 - FWD: 15 -> 07 total: 02
-/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
+/home/pi/sw_workspace/RMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
 You are attempting to set `plot.legend.background_fill_alpha` on a plot that has zero legends added, this will have no effect.
 
 Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
 
   p.legend.background_fill_alpha = 0.2
-/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
+/home/pi/sw_workspace/RMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
 You are attempting to set `plot.legend.click_policy` on a plot that has zero legends added, this will have no effect.
 
 Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
@@ -41,13 +41,13 @@ Before legend properties can be set, you must add a Legend explicitly, or call a
 WARNING:bokeh.core.validation.check:W-1000 (MISSING_RENDERERS): Plot has no renderers: figure(id='p1235', ...)
 2025-03-21T17:46:51 - Received MAC data of Node 07
 MSG: pi27 -> pi15, NAV = 200ms
-/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
+/home/pi/sw_workspace/RMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:274: UserWarning: 
 You are attempting to set `plot.legend.background_fill_alpha` on a plot that has zero legends added, this will have no effect.
 
 Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
 
   p.legend.background_fill_alpha = 0.2
-/home/pi/sw_workspace/SMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
+/home/pi/sw_workspace/RMRP_MACAW/Debug/results/../../ProtoMon/viz/script.py:278: UserWarning: 
 You are attempting to set `plot.legend.click_policy` on a plot that has zero legends added, this will have no effect.
 
 Before legend properties can be set, you must add a Legend explicitly, or call a glyph method with a legend parameter set.
@@ -142,7 +142,7 @@ MSG: pi27 -> pi7, NAV = 200ms
 MSG: pi15 -> pi7, NAV = 200ms
 MSG: pi27 -> pi15, NAV = 200ms
 MSG: pi15 -> pi27, NAV = 200ms
-2025-03-21T17:49:57 - MAC_send failed SMRP/SMRP.c:708
+2025-03-21T17:49:57 - MAC_send failed RMRP/RMRP.c:708
 MSG: pi7 -> pi27, NAV = 200ms
 MSG: pi15 -> pi7, NAV = 200ms
 MSG: pi7 -> pi15, NAV = 200ms

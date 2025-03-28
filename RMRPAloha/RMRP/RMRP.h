@@ -1,5 +1,5 @@
-#ifndef SMRP_H
-#define SMRP_H
+#ifndef RMRP_H
+#define RMRP_H
 #pragma once
 
 #include "../ALOHA/ALOHA.h"
@@ -27,9 +27,9 @@ typedef enum NodeState
 } NodeState;
 
 /**
- * @brief Configuration struct for SMRP protocol.
+ * @brief Configuration struct for RMRP protocol.
  */
-typedef struct SMRP_Config
+typedef struct RMRP_Config
 {
     // Node's own address
     uint8_t self;
@@ -58,7 +58,7 @@ typedef struct SMRP_Config
     // Default 2
     uint8_t maxTries;
 
-} SMRP_Config;
+} RMRP_Config;
 
 /**
  * @brief Header information from the received message.
@@ -72,12 +72,12 @@ typedef struct Routing_Header
 } Routing_Header;
 
 /**
- * @brief Initialize the SMRP protocol.
+ * @brief Initialize the RMRP protocol.
  */
-int SMRP_init(SMRP_Config config);
-int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
-int SMRP_recvMsg(Routing_Header *header, uint8_t *data);
-int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
+int RMRP_init(RMRP_Config config);
+int RMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
+int RMRP_recvMsg(Routing_Header *header, uint8_t *data);
+int RMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
 
 // To be able to be compatible with ProtoMon, the Routing protocol must declare the external function pointers
 
@@ -114,21 +114,21 @@ extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
 /**
- * @returns size of the SMRP packet header
+ * @returns size of the RMRP packet header
  * @note Dependency with ProtoMon
  */
 uint8_t Routing_getHeaderSize();
 
 /**
- * @brief Check if a packet is an SMRP data packet.
+ * @brief Check if a packet is an RMRP data packet.
  * @param ctrl control flag of the packet
- * @returns 1 if the control flag is of an SMRP data packet
+ * @returns 1 if the control flag is of an RMRP data packet
  * @note Dependency with ProtoMon
  */
 uint8_t Routing_isDataPkt(uint8_t ctrl);
 
 /**
- * @returns CSV header of metrics collected by SMRP.
+ * @returns CSV header of metrics collected by RMRP.
  * @note Dependency with ProtoMon
  */
 uint8_t *Routing_getMetricsHeader();
@@ -156,4 +156,4 @@ int Routing_getNeighbourData(char *buffer, uint16_t size);
  */
 uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries);
 
-#endif // SMRP_H
+#endif // RMRP_H

@@ -1231,21 +1231,31 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             // Track path
             if (len < (MAX_PAYLOAD_SIZE - 5))
             {
-                uint8_t pathAppend[5];
+                uint8_t pathAppend[10];
                 footerSize = snprintf(pathAppend, sizeof(pathAppend), "%s%02d", pathSeparator, config.self);
                 datalen += footerSize;
                 uint8_t *footer = extendedData;
                 footer += len;
-                // strcpy(footer, pathAppend);
-                memcpy(footer, pathAppend, footerSize);
-                footer += footerSize;
-                printf("### pathAppend: %s\n", pathAppend);
 
-                uint16_t pathLen = getPathLen(numHops);
-                footer -= pathLen;
-                uint8_t curPath[pathLen];
-                memcpy(curPath, footer, pathLen);
-                printf("### len: %d datalen: %d temp: %d footer: %d cur path: %s\n", len, datalen, temp - extendedData, footer - extendedData, curPath);
+                printf("DEBUG: Before appending path - extendedData (hex): ");
+                for (int i = 0; i < len; i++)
+                {
+                    printf("%02X ", extendedData[i]);
+                }
+                printf("\n");
+
+                printf("### %s pathAppend: %s footerSize:%d\n", __func__, pathAppend, footerSize);
+
+                // strcpy(extendedData + len, pathAppend);
+                memcpy(extendedData + len, pathAppend, footerSize);
+                footer += footerSize;
+
+                printf("DEBUG: After appending path - extendedData (hex): ");
+                for (int i = 0; i < datalen; i++)
+                {
+                    printf("%02X ", extendedData[i]);
+                }
+                printf("\n");
             }
             else
             {

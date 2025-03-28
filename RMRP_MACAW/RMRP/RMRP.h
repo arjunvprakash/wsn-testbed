@@ -1,5 +1,5 @@
-#ifndef SMRP_H
-#define SMRP_H
+#ifndef RMRP_H
+#define RMRP_H
 #pragma once
 
 #include <stdint.h>
@@ -30,7 +30,7 @@ typedef enum NodeState
 
 // Structs
 
-typedef struct SMRP_Config
+typedef struct RMRP_Config
 {
     // Node's own address
     uint8_t self;
@@ -59,7 +59,7 @@ typedef struct SMRP_Config
     // Default 2
     uint8_t maxTries;
 
-} SMRP_Config;
+} RMRP_Config;
 
 typedef struct Routing_Header
 {
@@ -69,10 +69,10 @@ typedef struct Routing_Header
     int RSSI;
 } Routing_Header;
 
-int SMRP_init(SMRP_Config config);
-int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
-int SMRP_recvMsg(Routing_Header *header, uint8_t *data);
-int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
+int RMRP_init(RMRP_Config config);
+int RMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
+int RMRP_recvMsg(Routing_Header *header, uint8_t *data);
+int RMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
 
 extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
 extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
@@ -85,4 +85,4 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
 int Routing_getNeighbourData(char *buffer, uint16_t size);
 uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries);
 
-#endif // SMRP_H
+#endif // RMRP_H

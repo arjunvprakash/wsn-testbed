@@ -125,17 +125,17 @@ static void *sendMsg_func(void *args)
 	unsigned int total;
 	while (1)
 	{
-		char buffer[5];
+		char buffer[6];
 		// int msg = randCode(4);
 		int msg = (self * 1000) + (++total % 1000);
-		sprintf(buffer, "%04d", msg);
+		int len = sprintf(buffer, "%d", msg);
 
 		uint8_t dest_addr = dest[randInRange(0, pool_size - 2)];
-		int r = Routing_sendMsg(dest_addr, buffer, sizeof(buffer));
+		int r = Routing_sendMsg(dest_addr, buffer, len);
 		// int r = Dijkstras_send(dest_addr, buffer, sizeof(buffer));
 		if (r)
 		{
-			logMessage(INFO, "TX: %02d msg: %s total: %02d\n", dest_addr, buffer, total);
+			logMessage(INFO, "TX: %02d msg: %s (%d) total: %02d\n", dest_addr, buffer, len, total);
 			fflush(stdout);
 		}
 
