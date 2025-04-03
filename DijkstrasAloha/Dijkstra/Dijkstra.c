@@ -229,16 +229,16 @@ static sendMessage sendMsgQ_dequeue()
 }
 
 int paths[anz_knoten][anz_knoten] = {
-	// 7   8   9   10  11  12  13  14, 15
-	{0, 0, 0, 0, 0, 0, 0, 10, 10}, // Node 7
-	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 8
+  // 7  8  9 10 11 12 13  14  15
+	{0, 10, 0, 0, 0, 0, 0, 0, 10}, // Node 7
+	{10, 0, 0, 0, 0, 0, 0, 0, 10},   // Node 8
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 9
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 10
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 11
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 12
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 13
-	{10, 0, 0, 0, 0, 0, 0, 0, 10}, // Node 14
-	{10, 0, 0, 0, 0, 0, 0, 10, 0}  // Node 15
+	{0, 0, 0, 0, 0, 0, 0, 0, 0}, // Node 14
+	{10, 10, 0, 0, 0, 0, 0, 0, 0}  // Node 15
 };
 
 static int dijkstra(int quelle, int ziel, int *prev)
@@ -395,7 +395,10 @@ static void *recvT_func(void *args)
 			msg.header = recvH;
 
 			// Nachrichtenlänge speichern
-			msg.len = mac_recvH.msg_len - Routing_Header_len;
+			// msg.len = mac_recvH.msg_len - Routing_Header_len;
+			memcpy(&msg.len, p, sizeof(msg.len));
+			p += sizeof(msg.len);
+			msg.header.len = msg.len;
 
 			// Speicher für den Nachrichtenpayload allokieren, bei einem Fehler das Programm beenden
 			msg.data = (uint8_t *)malloc(msg.len);
@@ -480,6 +483,10 @@ static void *sendT_func(void *args)
 		// Zieladresse in den Puffer schreiben
 		*p = msg.addr;
 		p += sizeof(msg.addr);
+
+		// Set length
+		memcpy(p, &msg.len, sizeof(msg.len));
+		p += sizeof(msg.len);
 
 		// Payload in den Puffer kopieren
 		memcpy(p, msg.data, msg.len);

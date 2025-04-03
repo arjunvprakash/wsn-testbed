@@ -17,8 +17,9 @@ typedef struct Routing_Header {
 	uint8_t dst_addr;		// Zieladresse
 	int RSSI;
 	uint8_t prev;
+	uint16_t len;
 } Routing_Header;
-#define Routing_Header_len 3
+#define Routing_Header_len 5 // ctrl, src, dest, len
 
 typedef struct Routing {
 	/* konfigurierbare Parameter */

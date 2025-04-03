@@ -70,6 +70,7 @@ static const char *outputDir = "results";
 static const char *networkCSV = "network.csv";
 static const char *macCSV = "mac.csv";
 static const char *routingCSV = "routing.csv";
+static const char pathSeparator = '-'; // DO NOT use comma
 
 static ProtoMon_Config config;
 static MACMetrics macMetrics;
@@ -592,11 +593,11 @@ void ProtoMon_init(ProtoMon_Config c)
         if (config.self != ADDR_SINK)
         {
             pthread_t sendMetricsT;
-            if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
-            {
-                logMessage(ERROR, "Failed to create sendMetrics thread\n");
-                exit(EXIT_FAILURE);
-            }
+            // if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
+            // {
+            //     logMessage(ERROR, "Failed to create sendMetrics thread\n");
+            //     exit(EXIT_FAILURE);
+            // }
         }
         else
         {
@@ -652,6 +653,11 @@ static void initMetrics()
     resetRoutingMetrics();
 }
 
+uint16_t getPathLen(uint8_t numHops)
+{
+    return ((numHops + 1) * 3);
+}
+
 int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 {
     time_t start = time(NULL);
@@ -661,7 +667,7 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
         return Original_Routing_sendMsg(dest, data, len); // No monitoring needed
     }
     uint8_t extData[MAX_PAYLOAD_SIZE];
-    int extLen = len + overhead + 1;
+    int extLen = len + overhead + 1; // null terminator
     const uint8_t numHops = 0;
     const time_t ts = time(NULL);
     uint8_t *temp = extData;
@@ -679,14 +685,19 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     memcpy(temp, &ts, sizeof(ts));
     temp += sizeof(ts);
 
+    // Set data
     memcpy(temp, data, len);
     temp += len;
+
+    // Terminate the data field
     *temp = '\0';
     temp++;
 
-    uint8_t path[5];
+    uint8_t path[10];
+    // memset(path, 0, sizeof(path));
     uint8_t pathLen = sprintf(path, "%02d", config.self);
-    memcpy(temp, path, pathLen);
+    // memcpy(temp, path, pathLen);
+    strcpy(temp, path);
     temp += pathLen;
     extLen += pathLen;
 
@@ -729,6 +740,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
     if (ctrl == CTRL_MSG)
     {
         uint8_t src = header->src;
+
         // Extract routing monitoring fields
         uint8_t numHops;
         time_t ts;
@@ -737,12 +749,20 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         temp += sizeof(numHops);
         memcpy(&ts, temp, sizeof(ts));
         temp += sizeof(ts);
-        memcpy(data, temp, len - overhead);
+
+        // strcpy(data, temp);
+        // uint16_t dataLen = strlen(data);
+        uint16_t dataLen = header->len - overhead - 2;
+        memcpy(data, temp, dataLen);
+        temp += dataLen;
+
+        printf("### pos:%d data:%s dataLen:%d curPos:%d\n", temp - dataLen - extendedData, data, dataLen, temp - extendedData);
 
         uint16_t latency = (time(NULL) - ts);
-        if (config.loglevel >= DEBUG)
+        // if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
+            logMessage(DEBUG, "Path: %s\n", lastPath);
         }
 
         // Capture metrics
@@ -758,6 +778,8 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         routingMetrics.data[src].recv++;
         routingMetrics.data[src].totalLatency += latency;
         routingMetrics.data[src].numHops = numHops;
+        memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
+        strcpy(routingMetrics.data[src].path, lastPath);
         sem_post(&routingMetrics.mutex);
 
         return len - overhead;
@@ -836,7 +858,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
     if (ctrl == CTRL_MSG)
     {
         uint8_t src = header->src;
-        extendedData[len] = '\0';
+
         // Extract routing monitoring fields
         uint8_t numHops;
         time_t ts;
@@ -845,13 +867,17 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
         temp += sizeof(numHops);
         memcpy(&ts, temp, sizeof(ts));
         temp += sizeof(ts);
-        strcpy(data, temp);
-        uint16_t dataLen = strlen(data);
-        // data[dataLen] = '\0';
-        temp += dataLen + 1;
+
+        // strcpy(data, temp);
+        // uint16_t dataLen = strlen(data);
+        uint16_t dataLen = header->len - overhead - 2;
+        memcpy(data, temp, dataLen);
+        temp += dataLen;
+
+        printf("### pos:%d data:%s dataLen:%d curPos:%d temp:%s\n", temp - dataLen - extendedData, data, dataLen, temp - extendedData, temp);
 
         uint16_t latency = (time(NULL) - ts);
-        if (config.loglevel >= DEBUG)
+        // if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -939,6 +965,7 @@ int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned 
     }
 
     uint8_t extData[MAX_PAYLOAD_SIZE];
+    memset(extData, 0, sizeof(extData));
     uint8_t *temp = extData;
     // if (dest != ADDR_BROADCAST) // exclude broadcast messages - beacons
     {
@@ -996,6 +1023,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
     time_t start = time(NULL);
     uint16_t overhead = getMACOverhead();
     uint8_t extendedData[MAX_PAYLOAD_SIZE];
+    memset(extendedData, 0, sizeof(extendedData));
     int len = Original_MAC_recvMsg(h, extendedData);
     if (len <= 0)
     {
@@ -1003,9 +1031,8 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
     }
     uint8_t *temp = extendedData;
     uint16_t extLen = len - overhead;
-    uint8_t path[10];
     uint8_t dest = h->recvH.dst_addr;
-    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
+    // if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
     {
         // Check if msg packet
         uint8_t ctrl;
@@ -1021,8 +1048,8 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             ctrl = *(temp + overhead);
             isMsg = Routing_isDataPkt(ctrl);
         }
-        if (overhead && isMsg)
-        // if (overhead)
+        // if (overhead && isMsg)
+        if (overhead)
         {
             uint8_t src = h->recvH.src_addr;
             // extract hop timestamp
@@ -1064,23 +1091,40 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             memcpy(p, &numHops, sizeof(numHops));
             p += sizeof(numHops);
 
+            // Check path before append
+            p = extendedData + len;
+            uint8_t totalPathLen1 = (numHops * 3) - 1;
+            p -= totalPathLen1;
+            printf("### Path before append:%s pathBegin:%d\n", p, p - extendedData);
+
             // Append self to path
-            uint8_t pathLen = sprintf(path, "-%02d", config.self);
+            uint8_t path[10];
+            // memset(path, 0, sizeof(path));
+            uint8_t pathLen = sprintf(path, "%c%02d", pathSeparator, config.self);
             strcpy(extendedData + len, path);
+            // memcpy(extendedData + len, path, pathLen);
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            if (config.loglevel >= DEBUG)
+            // if (config.loglevel >= DEBUG)
             {
-                logMessage(config.loglevel, "Path:%s\n", p);
+                printf("### hops:%d append:%s pos:%d totalPathLen:%d\n", numHops, path, len, p - extendedData, totalPathLen);
+                logMessage(DEBUG, "Path:%s\n", p);
             }
+            memset(lastPath, 0, sizeof(lastPath));
             memcpy(lastPath, p, totalPathLen);
             extLen += pathLen;
+
+            printf("### payload: ");
+            p = temp + overhead + Routing_getHeaderSize();
+            for (int i = 0; i < len + pathLen - (p - extendedData); i++)
+                printf("%02X ", p[i]);
+            printf("\n");
+            fflush(stdout);
         }
     }
 
     memcpy(data, temp, extLen);
-
     return extLen;
 }
 
@@ -1096,7 +1140,6 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
     }
     uint8_t *temp = extendedData;
     uint16_t extLen = len - overhead;
-    uint8_t path[10];
     uint8_t dest = h->recvH.dst_addr;
     // if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
     {
@@ -1156,19 +1199,36 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             memcpy(p, &numHops, sizeof(numHops));
             p += sizeof(numHops);
 
+            // Check path before append
+            p = extendedData + len;
+            uint8_t totalPathLen1 = (numHops * 3) - 1;
+            p -= totalPathLen1;
+            printf("### Path before append:%s pathBegin:%d\n", p, p - extendedData);
+
             // Append self to path
-            uint8_t pathLen = sprintf(path, "-%02d", config.self);
+            uint8_t path[10];
+            // memset(path, 0, sizeof(path));
+            uint8_t pathLen = snprintf(path, sizeof(path), "%c%02d", pathSeparator, config.self);
             strcpy(extendedData + len, path);
+            // memcpy(extendedData + len, path, pathLen);
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            if (config.loglevel >= DEBUG)
+            // if (config.loglevel >= DEBUG)
             {
+                printf("### hops:%d append:%s pos:%d pathBegin:%d\n", numHops, path, len, p - extendedData);
                 logMessage(DEBUG, "Path:%s\n", p);
             }
             memset(lastPath, 0, sizeof(lastPath));
             memcpy(lastPath, p, totalPathLen);
             extLen += pathLen;
+
+            printf("### payload: ");
+            p = temp + overhead + Routing_getHeaderSize();
+            for (int i = 0; i < len + pathLen - (p - extendedData); i++)
+                printf("%02X ", p[i]);
+            printf("\n");
+            fflush(stdout);
         }
     }
 

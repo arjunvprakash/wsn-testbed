@@ -70,6 +70,7 @@ static const char *outputDir = "results";
 static const char *networkCSV = "network.csv";
 static const char *macCSV = "mac.csv";
 static const char *routingCSV = "routing.csv";
+static const uint8_t *pathSeparator = "-"; // DO NOT use comma
 
 static ProtoMon_Config config;
 static MACMetrics macMetrics;
@@ -679,8 +680,11 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     memcpy(temp, &ts, sizeof(ts));
     temp += sizeof(ts);
 
+    // Set data
     memcpy(temp, data, len);
     temp += len;
+
+    // Terminate the data field
     *temp = '\0';
     temp++;
 
@@ -729,6 +733,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
     if (ctrl == CTRL_MSG)
     {
         uint8_t src = header->src;
+        
         // Extract routing monitoring fields
         uint8_t numHops;
         time_t ts;
@@ -737,12 +742,16 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         temp += sizeof(numHops);
         memcpy(&ts, temp, sizeof(ts));
         temp += sizeof(ts);
-        memcpy(data, temp, len - overhead);
+        strcpy(data, temp);
+        uint16_t dataLen = strlen(data);
+        // data[dataLen] = '\0';
+        temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
         if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
+            logMessage(DEBUG, "Path: %s\n", lastPath);
         }
 
         // Capture metrics
@@ -758,6 +767,8 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         routingMetrics.data[src].recv++;
         routingMetrics.data[src].totalLatency += latency;
         routingMetrics.data[src].numHops = numHops;
+        memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
+        strcpy(routingMetrics.data[src].path, lastPath);
         sem_post(&routingMetrics.mutex);
 
         return len - overhead;
@@ -837,6 +848,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
     {
         uint8_t src = header->src;
         extendedData[len] = '\0';
+
         // Extract routing monitoring fields
         uint8_t numHops;
         time_t ts;
@@ -851,7 +863,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
         temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
-        if (config.loglevel >= DEBUG)
+        // if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -1005,7 +1017,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
     uint16_t extLen = len - overhead;
     uint8_t path[10];
     uint8_t dest = h->recvH.dst_addr;
-    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
+    // if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
     {
         // Check if msg packet
         uint8_t ctrl;
@@ -1021,8 +1033,8 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             ctrl = *(temp + overhead);
             isMsg = Routing_isDataPkt(ctrl);
         }
-        if (overhead && isMsg)
-        // if (overhead)
+        // if (overhead && isMsg)
+        if (overhead)
         {
             uint8_t src = h->recvH.src_addr;
             // extract hop timestamp
@@ -1070,17 +1082,17 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            if (config.loglevel >= DEBUG)
+            // if (config.loglevel >= DEBUG)
             {
-                logMessage(config.loglevel, "Path:%s\n", p);
+                logMessage(DEBUG, "Path:%s\n", p);
             }
+            memset(lastPath, 0, sizeof(lastPath));
             memcpy(lastPath, p, totalPathLen);
             extLen += pathLen;
         }
     }
 
     memcpy(data, temp, extLen);
-
     return extLen;
 }
 
@@ -1162,7 +1174,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            if (config.loglevel >= DEBUG)
+            // if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "Path:%s\n", p);
             }

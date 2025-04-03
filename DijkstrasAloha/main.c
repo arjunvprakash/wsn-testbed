@@ -25,9 +25,9 @@ static pthread_t sendT;
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
 
-#define pool_size 3
-static uint8_t nodes[pool_size] = {7, 14, 15};
-static uint8_t dest[pool_size - 1];
+static uint8_t nodes[] = {7, 8, 15};
+int pool_size = (sizeof(nodes) / sizeof(nodes[0]));
+static uint8_t dest[5];
 
 void destinations(uint8_t self)
 {
@@ -70,6 +70,7 @@ int main(int argc, char *argv[])
 
 	Routing routing;
 	Dijkstras_init(&routing, self);
+	// routing.debug = 1;
 
 	// if (self != ADDR_SINK)
 	{
@@ -131,7 +132,7 @@ static void *sendMsg_func(void *args)
 		sprintf(buffer, "%04d", msg);
 
 		uint8_t dest_addr = dest[randInRange(0, pool_size - 2)];
-		int r = Routing_sendMsg(dest_addr, buffer, sizeof(buffer));
+		int r = Routing_sendMsg(dest_addr, buffer, strlen(buffer));
 		// int r = Dijkstras_send(dest_addr, buffer, sizeof(buffer));
 		if (r)
 		{

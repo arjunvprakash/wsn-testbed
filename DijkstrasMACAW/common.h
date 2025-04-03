@@ -9,7 +9,7 @@ Constants for subnet group
 #define MAX_ACTIVE_NODES 32
 
 #define ADDR_BROADCAST 0XFF
-#define ADDR_SINK 0XE
+#define ADDR_SINK 0X07
 
 #define MIN_SLEEP_TIME 1000 // ms
 #define MAX_SLEEP_TIME 3000 // ms
