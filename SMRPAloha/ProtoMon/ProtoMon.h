@@ -3,8 +3,8 @@
 #pragma once
 
 #include "../common.h"
-#include "../ALOHA/ALOHA.h"       // include the MAC layer implemetation
-#include "../SMRP/SMRP.h" // include the routing layer implemetation
+#include "../ALOHA/ALOHA.h" // include the MAC layer implemetation
+#include "../SMRP/SMRP.h"   // include the routing layer implemetation
 
 /**
  * @brief Configuration struct for ProtoMon.

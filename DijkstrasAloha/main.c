@@ -65,7 +65,7 @@ int main(int argc, char *argv[])
 	config.sendIntervalS = 20;
 	config.self = self;
 	config.monitoredLayers = PROTOMON_LAYER_ROUTING | PROTOMON_LAYER_MAC;
-	config.initialSendWaitS = 30;
+	// config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 
 	Routing routing;

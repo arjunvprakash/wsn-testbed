@@ -56,7 +56,7 @@ int main(int argc, char *argv[])
 	strp.recvTimeoutMs = 1000;
 	strp.self = self;
 	strp.senseDurationS = 15;
-	strp.strategy = CLOSEST;
+	strp.strategy = NEXT_LOWER;
 	STRP_init(strp);
 
 	if (self != ADDR_SINK)

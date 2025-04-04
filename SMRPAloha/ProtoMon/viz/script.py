@@ -15,6 +15,7 @@ from bokeh.models import HoverTool, ColumnDataSource, WheelZoomTool
 from bokeh.palettes import Category20, Category20b, Category20c, Dark2, Set3
 from bokeh.layouts import column
 from bokeh.models import Div
+import matplotlib.patches as patches
 
 def parseArgs():
     parser = argparse.ArgumentParser(description='Generate topology map for WSN from a CSV.')
@@ -50,6 +51,50 @@ def set_positions_v2(node, x, y):
             child_x = x + x_factor * spacing            
             set_positions_v2(child, child_x, y - 1)   
 
+def draw_edges_from_path(df_path, ax, df_rssi, pos=None, directed=True, config=None):
+    if config is not None:
+        nodeColor = config['node_color']
+        sinkColor = config['sink_color']
+        nodeSize = config['node_size']
+        fontSize = config['font_size']
+        edgeColor = config['active_edge_color']
+    else:
+        nodeColor = default_map_config['node_color']
+        sinkColor = default_map_config['sink_color']
+        nodeSize = default_map_config['node_size']
+        fontSize = default_map_config['font_size']
+        edgeColor = default_map_config['active_edge_color']
+    G1 = nx.DiGraph()
+    for _, row in df_path.iterrows():
+        path = row['Path']
+        nodes = path.split('-')  # Split the path by the '-' separator
+        nodes = [int(node) for node in nodes] 
+        for j in range(len(nodes) - 1):
+            source, address = nodes[j], nodes[j + 1]
+            key = tuple(sorted((source, address)))
+            rssi_value = df_rssi.loc[df_rssi['key'] == key, 'RSSI'] if not df_rssi is None else ""
+            edgeLabel = rssi_value.iloc[0] if not df_rssi is None and not rssi_value.empty else ''
+            if config is not None:
+                edgeLabel = ''
+            edgeAlpha = 1.0  # Set edge transparency (can be modified based on conditions)
+            if not G1.has_edge(int(source), int(address)):
+                G1.add_edge(source, address, label=edgeLabel, edge_color=edgeColor)
+    pos1 = nx.circular_layout(G1) if pos is None else pos
+    nodeColors = [sinkColor if node == root_node else nodeColor for node in G1.nodes()]
+    nx.draw(G1, pos1, with_labels=True, node_size=nodeSize, ax=ax, node_color=nodeColors, font_size=fontSize, edge_color=edgeColor)
+    edge_labels = nx.get_edge_attributes(G1, 'label')
+    nx.draw_networkx_edge_labels(G1, pos1, edge_labels=edge_labels, ax=ax, font_size=fontSize)
+    # Add a border using a rectangle patch
+    border = patches.Rectangle(
+        (0, 0),  # Bottom left corner of the rectangle
+        1, 1,    # Width and height of the rectangle
+        transform=ax.transAxes,  # Use axes coordinates
+        color='black',            # Border color
+        linewidth=3,              # Border width
+        fill=False                # No fill
+    )
+    ax.add_patch(border)
+    return G1
 
 def draw_edges_from_dataframe(df, G, pos, ax, directed=False, config=None):
     if config is not None:
@@ -86,6 +131,16 @@ def draw_edges_from_dataframe(df, G, pos, ax, directed=False, config=None):
                 G, pos=pos, edge_labels={(source, address): edgeLabel},
                 ax=ax, label_pos=0.4, font_size=fontSize
             )
+    # Add a border using a rectangle patch
+    border = patches.Rectangle(
+        (0, 0),  # Bottom left corner of the rectangle
+        1, 1,    # Width and height of the rectangle
+        transform=ax.transAxes,  # Use axes coordinates
+        color='black',            # Border color
+        linewidth=3,              # Border width
+        fill=False                # No fill
+    )
+    ax.add_patch(border)
 
 def get_edge_style(row, directed=False, config=None):
     if config is not None:
@@ -430,6 +485,8 @@ map_png = '../../ProtoMon/viz/map.png'
 # Global variables for graphs
 routing_csv = 'routing.csv'
 mac_csv = 'mac.csv'
+network_csv = 'network.csv'
+numMaps = 3 # max possible network graphs
 
 default_map_config = {
     "active_edge_color": "k",
@@ -448,24 +505,63 @@ map_config = default_map_config.copy()
 
 ## Standard columns for MAC and Routing data
 mac_metaColumns = ['RelativeTime','Timestamp','Source','Address']
-routing_metaColumns = ['RelativeTime','Timestamp','Source','Address']
+routing_metaColumns = ['RelativeTime','Timestamp','Source','Address', 'Path']
+
+if os.path.exists(routing_csv):
+    routing_df = pd.read_csv(routing_csv)
+    routing_df = calculateRelativeTime(routing_df)
+    df_path = routing_df[['RelativeTime', 'Path', 'Source', 'Address']].copy()
+    df_path = df_path.dropna(subset=['Path'])
+    df_path = df_path.sort_values(by='RelativeTime', ascending=False)
+    df_path = df_path.drop_duplicates(subset=['Source', 'Address'], keep='first')
+
+fig, ax = plt.subplots(1, numMaps, figsize=(16, 8))
+i = 0
+
+# Read configuration from file
+config_file_path = config_json
+if os.path.exists(config_file_path):
+    try:
+        with open(config_file_path, 'r') as config_file:
+            file_config = json.load(config_file)
+            # Update config with values from the file, using defaults if not present
+            map_config.update({key: file_config.get(key, default_map_config[key]) for key in default_map_config.keys()})
+    except (json.JSONDecodeError, KeyError) as e:
+        print(f"Error reading config file: {e}. Using default configuration.")
+
+if not df_path.empty:
+    #print(df_path)
+    G1 = draw_edges_from_path(df_path, ax[i], None)
+    
+    # Show the plot
+    ax[i].set_title("Routing Path")
+    i += 1
+
+    ### Plot Node positions
+    if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
+        
+        node_pos = pd.read_csv(node_pos_csv)
+        Gx = G1 #if not df_path.empty else G2 
+        df_geo = df_path #if not df_path.empty else df_neighbour
+        filtered_node_loc = node_pos[node_pos['Node'].isin(Gx.nodes)]
+        missing_nodes = set(Gx.nodes) - set(filtered_node_loc['Node'])
+        img = mpimg.imread(map_png)
+        if len(missing_nodes) == 0 and img is not None:           
+            ax[i].imshow(img)
+            # G3 = nx.from_pandas_edgelist(df_geo, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')                
+            pos3 = filtered_node_loc.set_index('Node')[['Lat', 'Long']].apply(tuple, axis=1).to_dict()
+            # draw_edges_from_dataframe(df_geo, G3, pos3, ax[i], directed=False,config=map_config)
+            G2 = draw_edges_from_path(df_path, ax[i], None, pos=pos3,config=map_config)
+            ax[i].set_title('Node Positions')
+            i += 1
+        else:
+            print(f"Positions of {missing_nodes} missing in " + node_pos_csv)
 
 ## Network graph
-if os.path.exists('network.csv'):    
-
-    # Read configuration from file
-    config_file_path = config_json
-    if os.path.exists(config_file_path):
-        try:
-            with open(config_file_path, 'r') as config_file:
-                file_config = json.load(config_file)
-                # Update config with values from the file, using defaults if not present
-                map_config.update({key: file_config.get(key, default_map_config[key]) for key in default_map_config.keys()})
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"Error reading config file: {e}. Using default configuration.")
+if os.path.exists(network_csv):    
     
     ### ------------ Data Preparation ------------ ###
-    df = pd.read_csv('network.csv')    
+    df = pd.read_csv(network_csv)    
     calculateRelativeTime(df)    
     #df['Timestamp'] = pd.to_datetime(df['Timestamp'], unit='s')
     df.sort_values(by='Timestamp', ascending=False, inplace=True)
@@ -487,7 +583,6 @@ if os.path.exists('network.csv'):
     df_p1 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 2)][['Timestamp','Source', 'Address', 'RSSI']]
     df_p2 = pd.DataFrame()
     df_p3 = pd.DataFrame()
-    numMaps = 2
 
     ###     Direct child info
     if child_exist:
@@ -528,28 +623,24 @@ if os.path.exists('network.csv'):
     df_neighbour['RSSI'] = df_neighbour.apply(
         lambda row: parent_rssi_map.get(row['key'], row['RSSI']), axis=1
     )
-
-    if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
-        numMaps += 1
-
-    i = 0
+    
 
     ### Draw Network Tree
-    fig, ax = plt.subplots(1, numMaps, figsize=(16, 8))
-    if not df_parent.empty:
-        G1 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
-        G1.add_node(root_node)     
-        pos1 = {}
-        # if single_nexthop:
-        #     # Plot as tree
-        #     set_positions_v2(root_node, 0, 0)   
-        # else:
-           # Plot as nodes graph   
-        pos1 = nx.circular_layout(G1)
 
-        draw_edges_from_dataframe(df_parent, G1, pos1, ax[i], directed=True,config=None)
-        ax[i].set_title('Network Tree')
-        i += 1
+    # if not df_parent.empty:
+    #     G3 = nx.from_pandas_edgelist(df_parent, 'Source', 'Address', create_using=nx.DiGraph(), edge_attr='RSSI')
+    #     G3.add_node(root_node)     
+    #     pos1 = {}
+    #     # if single_nexthop:
+    #     #     # Plot as tree
+    #     #     set_positions_v2(root_node, 0, 0)   
+    #     # else:
+    #        # Plot as nodes graph   
+    #     pos1 = nx.circular_layout(G3)
+
+    #     draw_edges_from_dataframe(df_parent, G3, pos1, ax[i], directed=True,config=None)
+    #     ax[i].set_title('Network Tree')
+    #     i += 1
     # else:
     #     nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
     #     ax[i].set_title('Network Tree')
@@ -557,45 +648,30 @@ if os.path.exists('network.csv'):
 
     ### Draw Adjacency Graph
     if not df_neighbour.empty:
-        G2 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
-        pos2 = nx.circular_layout(G2)
-        draw_edges_from_dataframe(df_neighbour, G2, pos2, ax[i], directed=False,config=None)
+        G4 = nx.from_pandas_edgelist(df_neighbour, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')
+        pos2 = nx.circular_layout(G4)
+        draw_edges_from_dataframe(df_neighbour, G4, pos2, ax[i], directed=False,config=None)
         ax[i].set_title('Adjacency Graph')
         i += 1
-
-        ### Plot Node positions
-        if os.path.exists(node_pos_csv) and os.path.exists(map_png):  
-            node_pos = pd.read_csv(node_pos_csv)
-            Gx = G1 if not df_parent.empty else G2 
-            df_geo = df_parent if not df_parent.empty else df_neighbour
-            filtered_node_loc = node_pos[node_pos['Node'].isin(Gx.nodes)]
-            missing_nodes = set(Gx.nodes) - set(filtered_node_loc['Node'])
-            img = mpimg.imread(map_png)
-            if len(missing_nodes) == 0 and img is not None:           
-                ax[i].imshow(img)
-                G3 = nx.from_pandas_edgelist(df_geo, 'Source', 'Address', create_using=nx.Graph(), edge_attr='RSSI')                
-                pos3 = filtered_node_loc.set_index('Node')[['Lat', 'Long']].apply(tuple, axis=1).to_dict()
-                draw_edges_from_dataframe(df_geo, G3, pos3, ax[i], directed=False,config=map_config)
-                ax[i].set_title('Node Positions')
-                i += 1
     else:
         nx.draw(nx.Graph(), {root_node: (0, 0)}, with_labels=True, node_size=default_map_config['node_size'], ax=ax[i])
         ax[i].set_title('Adjacency Graph')
         i += 1
 
-    for j in range(i,numMaps): 
+for j in range(i, len(fig.axes)):
+    if not fig.axes[j].has_data():  # Check if the axis is empty
         fig.delaxes(fig.axes[j])
-    
-    fig.suptitle(f'Network Topology : {timestamp}', fontweight='bold')
-    plt.tight_layout() 
 
-    # Save plot to file
-    os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists
-    filePath = os.path.join(saveDir, f'network_graph_{timestamp}.png')
-    plt.savefig(filePath)    
-    filePath = os.path.join(saveDir, 'network_graph.png')
-    plt.savefig(filePath)
-    plt.close()
+fig.suptitle(f'Network Topology : {timestamp}', fontweight='bold')
+plt.tight_layout() 
+
+# Save plot to file
+os.makedirs(saveDir, exist_ok=True)  # Ensure the directory exists
+filePath = os.path.join(saveDir, f'network_graph_{timestamp}.png')
+plt.savefig(filePath)    
+filePath = os.path.join(saveDir, 'network_graph.png')
+plt.savefig(filePath)
+plt.close()
 
 ## Routing metrics plot
 if os.path.exists(routing_csv):

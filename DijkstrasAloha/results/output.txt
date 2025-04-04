@@ -1,0 +1,185 @@
+2025-04-04T18:47:23 - Node: 07
+2025-04-04T18:47:23 - Role : SINK
+2025-04-04T18:47:23 - Sleep duration: 15000 ms
+2025-04-04T18:47:23 - Monitoring enabled for Routing layer
+2025-04-04T18:47:23 - Monitoring enabled for MAC layer
+Nachricht wird an pi15 gesendet.
+2025-04-04T18:47:24 - TX: 15 msg: 7001 total: 01
+# ProtoMon : hop src:15 latency:9s
+# Path:15-07
+# ProtoMon : hop src:08 latency:15s
+# Path:08-07
+# ProtoMon : 8001 hops: 1 delay: 15 s
+# Path: 08-07
+2025-04-04T18:47:37 - RX: 08 msg: 8001 total: 01
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15002 hops: 1 delay: 0 s
+# Path: 15-07
+2025-04-04T18:47:46 - RX: 15 msg: 15002 total: 01
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : 8002 hops: 1 delay: 0 s
+# Path: 08-07
+2025-04-04T18:47:47 - RX: 08 msg: 8002 total: 02
+# ProtoMon : hop src:15 latency:1s
+2025-04-04T18:47:51 - Received Routing data of Node 15
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:47:52 - Received MAC data of Node 15
+2025-04-04T18:47:53 - Received Routing data of Node 08
+2025-04-04T18:47:54 - Received MAC data of Node 08
+Nachricht wird an pi8 gesendet.
+2025-04-04T18:47:54 - TX: 08 msg: 7002 total: 02
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : hop src:08 latency:5s
+# Path:08-07
+# ProtoMon : 8003 hops: 1 delay: 5 s
+# Path: 08-07
+2025-04-04T18:48:07 - RX: 08 msg: 8003 total: 03
+# ProtoMon : hop src:15 latency:0s
+2025-04-04T18:48:11 - Received Routing data of Node 15
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:48:12 - Received MAC data of Node 15
+2025-04-04T18:48:13 - Received Routing data of Node 08
+2025-04-04T18:48:14 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15004 hops: 1 delay: 1 s
+# Path: 15-07
+2025-04-04T18:48:17 - RX: 15 msg: 15004 total: 02
+# ProtoMon : hop src:08 latency:1s
+# Path:08-07
+Nachricht wird an pi15 gesendet.
+2025-04-04T18:48:24 - TX: 15 msg: 7003 total: 03
+# ProtoMon : hop src:15 latency:0s
+2025-04-04T18:48:31 - Received Routing data of Node 15
+2025-04-04T18:48:31 - Visualising metrics. Open http://localhost:8000
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:48:32 - Received MAC data of Node 15
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : 15005 hops: 1 delay: 2 s
+# Path: 08-07
+2025-04-04T18:48:33 - RX: 15 msg: 15005 total: 03
+2025-04-04T18:48:34 - Received Routing data of Node 08
+2025-04-04T18:48:35 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:1s
+# Path:15-07
+# ProtoMon : 15006 hops: 1 delay: 1 s
+# Path: 15-07
+2025-04-04T18:48:47 - RX: 15 msg: 15006 total: 04
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : 8006 hops: 1 delay: 0 s
+# Path: 08-07
+2025-04-04T18:48:48 - RX: 08 msg: 8006 total: 04
+# ProtoMon : hop src:15 latency:1s
+2025-04-04T18:48:52 - Received Routing data of Node 15
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:48:53 - Received MAC data of Node 15
+2025-04-04T18:48:54 - Received Routing data of Node 08
+Nachricht wird an pi15 gesendet.
+2025-04-04T18:48:55 - TX: 15 msg: 7004 total: 04
+2025-04-04T18:48:55 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15007 hops: 1 delay: 0 s
+# Path: 15-07
+2025-04-04T18:49:02 - RX: 15 msg: 15007 total: 05
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : hop src:15 latency:0s
+2025-04-04T18:49:12 - Received Routing data of Node 15
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:49:13 - Received MAC data of Node 15
+2025-04-04T18:49:14 - Received Routing data of Node 08
+2025-04-04T18:49:15 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+Nachricht wird an pi8 gesendet.
+2025-04-04T18:49:25 - TX: 08 msg: 7005 total: 05
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:15 latency:0s
+2025-04-04T18:49:33 - Received Routing data of Node 15
+2025-04-04T18:49:33 - Visualising metrics. Open http://localhost:8000
+# ProtoMon : hop src:08 latency:1s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:49:34 - Received MAC data of Node 15
+2025-04-04T18:49:35 - Received Routing data of Node 08
+2025-04-04T18:49:36 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15009 hops: 1 delay: 0 s
+# Path: 15-07
+2025-04-04T18:49:41 - RX: 15 msg: 15009 total: 06
+# ProtoMon : hop src:08 latency:1s
+# Path:08-07
+# ProtoMon : hop src:15 latency:1s
+2025-04-04T18:49:53 - Received Routing data of Node 15
+# ProtoMon : hop src:15 latency:0s
+# ProtoMon : hop src:08 latency:0s
+# ProtoMon : hop src:08 latency:0s
+2025-04-04T18:49:54 - Received MAC data of Node 15
+Nachricht wird an pi15 gesendet.
+2025-04-04T18:49:55 - Received Routing data of Node 08
+2025-04-04T18:49:55 - TX: 15 msg: 7006 total: 06
+2025-04-04T18:49:56 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : hop src:08 latency:9s
+# Path:08-07
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15011 hops: 1 delay: 0 s
+# Path: 15-07
+2025-04-04T18:50:11 - RX: 15 msg: 15011 total: 07
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : hop src:15 latency:9s
+# ProtoMon : hop src:15 latency:9s
+# ProtoMon : hop src:08 latency:9s
+# ProtoMon : hop src:08 latency:9s
+2025-04-04T18:50:23 - Received Routing data of Node 15
+2025-04-04T18:50:24 - Received MAC data of Node 15
+2025-04-04T18:50:25 - Received Routing data of Node 08
+Nachricht wird an pi8 gesendet.
+2025-04-04T18:50:25 - TX: 08 msg: 7007 total: 07
+2025-04-04T18:50:26 - Received MAC data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : hop src:08 latency:7s
+# Path:08-07
+# ProtoMon : hop src:15 latency:1s
+# ProtoMon : hop src:15 latency:1s
+# ProtoMon : hop src:08 latency:1s
+2025-04-04T18:50:34 - Received Routing data of Node 15
+2025-04-04T18:50:34 - Visualising metrics. Open http://localhost:8000
+2025-04-04T18:50:35 - Received MAC data of Node 15
+2025-04-04T18:50:36 - Received Routing data of Node 08
+# ProtoMon : hop src:15 latency:0s
+# Path:15-07
+# ProtoMon : 15013 hops: 1 delay: 0 s
+# Path: 15-07
+2025-04-04T18:50:42 - RX: 15 msg: 15013 total: 08
+# ProtoMon : hop src:08 latency:14s
+2025-04-04T18:50:48 - Received MAC data of Node 08
+# ProtoMon : hop src:08 latency:0s
+# Path:08-07
+# ProtoMon : 8013 hops: 1 delay: 7 s
+# Path: 08-07
+2025-04-04T18:50:49 - RX: 08 msg: 8013 total: 05

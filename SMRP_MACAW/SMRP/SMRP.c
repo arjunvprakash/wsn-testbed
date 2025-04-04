@@ -631,13 +631,14 @@ static void updateActiveNodes(uint8_t addr, int RSSI)
         }
     }
     // Random assignment of role
-    if (new)
+    if (addr == ADDR_SINK)
     {
-        nodePtr->role = rand() % 100 < 50 ? ROLE_NEXTHOP : ROLE_NODE;
+        nodePtr->role = ROLE_NEXTHOP;
     }
     else
     {
-        nodePtr->role = rand() % 100 < 80 ? ROLE_NODE : ROLE_NEXTHOP;
+        nodePtr->role = ROLE_NEXTHOP;
+        // nodePtr->role = rand() % 100 < 80 ? ROLE_NODE : ROLE_NEXTHOP;
     }
     nodePtr->RSSI = RSSI;
     nodePtr->lastSeen = time(NULL);

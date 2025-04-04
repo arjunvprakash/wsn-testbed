@@ -19,7 +19,7 @@ typedef struct Routing_Header {
 	uint8_t prev;
 	uint16_t len;
 } Routing_Header;
-#define Routing_Header_len 5 // ctrl, src, dest, len
+#define Routing_Header_len sizeof(uint8_t) + sizeof(uint8_t) +  sizeof(uint8_t) + sizeof(uint16_t)// ctrl, src, dest, len
 
 typedef struct Routing {
 	/* konfigurierbare Parameter */

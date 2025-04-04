@@ -1,0 +1,370 @@
+2025-04-04T18:12:19 - Node: 14
+2025-04-04T18:12:19 - Role : SINK
+2025-04-04T18:12:19 - Sleep duration: 15000 ms
+2025-04-04T18:12:19 - Monitoring enabled for Routing layer
+2025-04-04T18:12:19 - Monitoring enabled for MAC layer
+2025-04-04T18:12:20 - Routing Strategy:  NEXT_LOWER
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:27 latency:1s
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:27 latency:1s
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:27 latency:2s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:27 latency:3s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:27 latency:3s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:27 latency:3s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:20 latency:4s
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:20 latency:4s
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:20 latency:5s
+ProtoMon : hop src:27 latency:5s
+ProtoMon : hop src:20 latency:5s
+ProtoMon : hop src:20 latency:4s
+ProtoMon : hop src:20 latency:4s
+# Path:20-14
+# ProtoMon : 20001 hops: 1 delay: 4 s
+# Path: 20-14
+2025-04-04T18:12:41 - RX: 20 (-7) src: 20 msg: 20001 total: 01
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+# ProtoMon : 27001 hops: 2 delay: 7 s
+# Path: 27-20-14
+2025-04-04T18:12:42 - RX: 20 (-7) src: 27 msg: 27001 total: 01
+ProtoMon : hop src:20 latency:8s
+ProtoMon : hop src:20 latency:7s
+2025-04-04T18:12:58 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:12:59 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:13:00 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:13:01 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+ProtoMon : hop src:20 latency:2s
+# Path:20-14
+2025-04-04T18:13:02 - Received MAC data of Node 27
+2025-04-04T18:13:03 - Received MAC data of Node 20
+# ProtoMon : 27002 hops: 2 delay: 14 s
+# Path: 20-14
+2025-04-04T18:13:04 - RX: 20 (-7) src: 27 msg: 27002 total: 02
+ProtoMon : hop src:27 latency:0s
+# ProtoMon : 20002 hops: 1 delay: 13 s
+# Path: 20-14
+2025-04-04T18:13:05 - RX: 27 (-8) src: 20 msg: 20002 total: 02
+ProtoMon : hop src:20 latency:0s
+# Path:27-20-14
+# ProtoMon : 27003 hops: 2 delay: 1 s
+# Path: 27-20-14
+2025-04-04T18:13:06 - RX: 20 (-7) src: 27 msg: 27003 total: 03
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+# ProtoMon : 20003 hops: 1 delay: 0 s
+# Path: 20-14
+2025-04-04T18:13:07 - RX: 20 (-7) src: 20 msg: 20003 total: 03
+ProtoMon : hop src:20 latency:9s
+ProtoMon : hop src:20 latency:8s
+2025-04-04T18:13:19 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:13:20 - Received Routing data of Node 20
+2025-04-04T18:13:20 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:13:21 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:13:22 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+2025-04-04T18:13:23 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:1s
+# Path:20-14
+2025-04-04T18:13:24 - Received MAC data of Node 20
+# ProtoMon : 27004 hops: 2 delay: 5 s
+# Path: 20-14
+2025-04-04T18:13:25 - RX: 20 (-7) src: 27 msg: 27004 total: 04
+# ProtoMon : 20004 hops: 1 delay: 4 s
+# Path: 20-14
+2025-04-04T18:13:26 - RX: 20 (-7) src: 20 msg: 20004 total: 04
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:9s
+2025-04-04T18:13:38 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:8s
+2025-04-04T18:13:39 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:13:40 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:13:41 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:13:42 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:2s
+# Path:27-20-14
+2025-04-04T18:13:43 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:3s
+# Path:20-14
+# ProtoMon : 27005 hops: 2 delay: 9 s
+# Path: 20-14
+2025-04-04T18:13:44 - RX: 20 (-7) src: 27 msg: 27005 total: 05
+# ProtoMon : 20005 hops: 1 delay: 8 s
+# Path: 20-14
+2025-04-04T18:13:45 - RX: 20 (-7) src: 20 msg: 20005 total: 05
+ProtoMon : hop src:20 latency:7s
+ProtoMon : hop src:20 latency:6s
+2025-04-04T18:13:57 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:13:58 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:13:59 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:14:00 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+2025-04-04T18:14:01 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:2s
+# Path:20-14
+2025-04-04T18:14:02 - Received MAC data of Node 20
+# ProtoMon : 27006 hops: 2 delay: 13 s
+# Path: 20-14
+2025-04-04T18:14:03 - RX: 20 (-6) src: 27 msg: 27006 total: 06
+# ProtoMon : 20006 hops: 1 delay: 12 s
+# Path: 20-14
+2025-04-04T18:14:04 - RX: 20 (-6) src: 20 msg: 20006 total: 06
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+# ProtoMon : 27007 hops: 2 delay: 2 s
+# Path: 27-20-14
+2025-04-04T18:14:07 - RX: 20 (-7) src: 27 msg: 27007 total: 07
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+# ProtoMon : 20007 hops: 1 delay: 1 s
+# Path: 20-14
+2025-04-04T18:14:08 - RX: 20 (-7) src: 20 msg: 20007 total: 07
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:14:11 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:13 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:14:14 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:11s
+2025-04-04T18:14:27 - Received Routing data of Node 27
+2025-04-04T18:14:27 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:20 latency:5s
+# Path:20-14
+ProtoMon : hop src:20 latency:1s
+# ProtoMon : 20008 hops: 1 delay: 6 s
+# Path: 20-14
+2025-04-04T18:14:28 - RX: 20 (-7) src: 20 msg: 20008 total: 08
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:29 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+2025-04-04T18:14:30 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:0s
+# ProtoMon : 27008 hops: 2 delay: 11 s
+# Path: 27-20-14
+2025-04-04T18:14:31 - RX: 20 (-7) src: 27 msg: 27008 total: 08
+2025-04-04T18:14:32 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:6s
+2025-04-04T18:14:38 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:7s
+2025-04-04T18:14:39 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:40 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:41 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:1s
+# Path:20-14
+2025-04-04T18:14:42 - Received MAC data of Node 20
+# ProtoMon : 20009 hops: 1 delay: 6 s
+# Path: 20-14
+2025-04-04T18:14:43 - RX: 20 (-7) src: 20 msg: 20009 total: 09
+ProtoMon : hop src:27 latency:9s
+ProtoMon : hop src:20 latency:8s
+# Path:27-20-14
+ProtoMon : hop src:20 latency:3s
+# ProtoMon : 27009 hops: 2 delay: 19 s
+# Path: 27-20-14
+2025-04-04T18:14:54 - RX: 20 (-7) src: 27 msg: 27009 total: 09
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:55 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:56 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:14:57 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:14:58 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:2s
+# Path:20-14
+ProtoMon : hop src:20 latency:2s
+# Path:27-20-14
+2025-04-04T18:14:59 - Received MAC data of Node 20
+2025-04-04T18:15:00 - Received MAC data of Node 27
+# ProtoMon : 20010 hops: 1 delay: 9 s
+# Path: 27-20-14
+2025-04-04T18:15:01 - RX: 20 (-7) src: 20 msg: 20010 total: 10
+# ProtoMon : 27010 hops: 2 delay: 12 s
+# Path: 27-20-14
+2025-04-04T18:15:02 - RX: 20 (-7) src: 27 msg: 27010 total: 10
+ProtoMon : hop src:20 latency:0s
+# Path:27-20-14
+# ProtoMon : 27011 hops: 2 delay: 1 s
+# Path: 27-20-14
+2025-04-04T18:15:06 - RX: 20 (-7) src: 27 msg: 27011 total: 11
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+# ProtoMon : 20011 hops: 1 delay: 0 s
+# Path: 20-14
+2025-04-04T18:15:07 - RX: 20 (-7) src: 20 msg: 20011 total: 11
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:7s
+2025-04-04T18:15:16 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:6s
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:15:17 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:15:18 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:15:20 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:1s
+# Path:27-20-14
+2025-04-04T18:15:21 - Received MAC data of Node 27
+2025-04-04T18:15:22 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+# ProtoMon : 27012 hops: 2 delay: 3 s
+# Path: 20-14
+2025-04-04T18:15:23 - RX: 20 (-7) src: 27 msg: 27012 total: 12
+# ProtoMon : 20012 hops: 1 delay: 2 s
+# Path: 20-14
+2025-04-04T18:15:24 - RX: 20 (-7) src: 20 msg: 20012 total: 12
+ProtoMon : hop src:20 latency:10s
+2025-04-04T18:15:40 - Received Routing data of Node 27
+2025-04-04T18:15:40 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:20 latency:10s
+2025-04-04T18:15:41 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:15:42 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:15:43 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:3s
+2025-04-04T18:15:44 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:2s
+# Path:27-20-14
+2025-04-04T18:15:45 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:3s
+# Path:20-14
+# ProtoMon : 27013 hops: 2 delay: 11 s
+# Path: 20-14
+2025-04-04T18:15:46 - RX: 20 (-7) src: 27 msg: 27013 total: 13
+ProtoMon : hop src:27 latency:2s
+# ProtoMon : 20013 hops: 1 delay: 10 s
+# Path: 20-14
+2025-04-04T18:15:47 - RX: 27 (-8) src: 20 msg: 20013 total: 13
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:15:49 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:15:52 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:15:53 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:15:54 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+# ProtoMon : 20014 hops: 1 delay: 3 s
+# Path: 20-14
+2025-04-04T18:15:55 - RX: 20 (-7) src: 20 msg: 20014 total: 14
+ProtoMon : hop src:20 latency:7s
+2025-04-04T18:16:06 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:16:07 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:1s
+# Path:20-14
+# ProtoMon : 20015 hops: 1 delay: 1 s
+# Path: 20-14
+2025-04-04T18:16:08 - RX: 20 (-7) src: 20 msg: 20015 total: 15
+ProtoMon : hop src:20 latency:0s
+# Path:27-20-14
+ProtoMon : hop src:20 latency:0s
+# Path:27-20-14
+# ProtoMon : 27014 hops: 2 delay: 18 s
+# Path: 27-20-14
+2025-04-04T18:16:09 - RX: 20 (-7) src: 27 msg: 27014 total: 14
+ProtoMon : hop src:20 latency:0s
+# ProtoMon : 27015 hops: 2 delay: 5 s
+# Path: 27-20-14
+2025-04-04T18:16:11 - RX: 20 (-5) src: 27 msg: 27015 total: 15
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:16:12 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:16:13 - Received Neigbour data of Node 27
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:16:14 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:2s
+ProtoMon : hop src:20 latency:1s
+2025-04-04T18:16:15 - Received MAC data of Node 27
+2025-04-04T18:16:16 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:2s
+2025-04-04T18:16:17 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:7s
+# Path:27-20-14
+# ProtoMon : 27016 hops: 2 delay: 7 s
+# Path: 27-20-14
+2025-04-04T18:16:28 - RX: 20 (-7) src: 27 msg: 27016 total: 16
+ProtoMon : hop src:20 latency:7s
+# Path:20-14
+# ProtoMon : 20016 hops: 1 delay: 7 s
+# Path: 20-14
+2025-04-04T18:16:29 - RX: 20 (-7) src: 20 msg: 20016 total: 16
+ProtoMon : hop src:20 latency:10s
+2025-04-04T18:16:39 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:9s
+2025-04-04T18:16:40 - Received Routing data of Node 20
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:16:41 - Received Neigbour data of Node 27
+2025-04-04T18:16:41 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:16:42 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:16:43 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:2s
+2025-04-04T18:16:44 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:2s
+# Path:27-20-14
+ProtoMon : hop src:20 latency:3s
+# Path:20-14
+# ProtoMon : 27017 hops: 2 delay: 9 s
+# Path: 20-14
+2025-04-04T18:16:45 - RX: 20 (-6) src: 27 msg: 27017 total: 17
+# ProtoMon : 20017 hops: 1 delay: 9 s
+# Path: 20-14
+2025-04-04T18:16:46 - RX: 20 (-6) src: 20 msg: 20017 total: 17
+ProtoMon : hop src:27 latency:0s
+ProtoMon : hop src:20 latency:0s
+2025-04-04T18:16:49 - Received Routing data of Node 27
