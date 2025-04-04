@@ -229,16 +229,16 @@ static sendMessage sendMsgQ_dequeue()
 }
 
 int paths[anz_knoten][anz_knoten] = {
-	// 7   8   9   10  11  12  13  14, 15
-	{0, 0, 0, 0, 0, 0, 0, 10, 10}, // Node 7
-	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 8
+  // 7  8  9 10 11 12 13  14  15
+	{0, 10, 0, 0, 0, 0, 0, 0, 10}, // Node 7
+	{10, 0, 0, 0, 0, 0, 0, 0, 10},   // Node 8
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 9
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 10
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 11
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 12
 	{0, 0, 0, 0, 0, 0, 0, 0, 0},   // Node 13
-	{10, 0, 0, 0, 0, 0, 0, 0, 10}, // Node 14
-	{10, 0, 0, 0, 0, 0, 0, 10, 0}  // Node 15
+	{0, 0, 0, 0, 0, 0, 0, 0, 0}, // Node 14
+	{10, 10, 0, 0, 0, 0, 0, 0, 0}  // Node 15
 };
 
 static int dijkstra(int quelle, int ziel, int *prev)
@@ -343,7 +343,8 @@ static void *recvT_func(void *args)
 		uint8_t *p = buffer;
 
 		// Nachricht empfangen
-		MAC_recv(mac, p);
+		int pktSize = MAC_recv(mac, p);
+		// int pktSize = MAC_timedRecv(mac, p, 1);
 
 		// MAC-Nachrichtenheader der empfangenen Nachricht speichern
 		MAC_Header mac_recvH = mac->recvH;
@@ -395,7 +396,10 @@ static void *recvT_func(void *args)
 			msg.header = recvH;
 
 			// Nachrichtenlänge speichern
-			msg.len = mac_recvH.msg_len - Routing_Header_len;
+			// msg.len = mac_recvH.msg_len - Routing_Header_len;
+			memcpy(&msg.len, p, sizeof(msg.len));
+			p += sizeof(msg.len);
+			msg.header.len = msg.len;
 
 			// Speicher für den Nachrichtenpayload allokieren, bei einem Fehler das Programm beenden
 			msg.data = (uint8_t *)malloc(msg.len);
@@ -436,7 +440,7 @@ static void *recvT_func(void *args)
 			}
 
 			// Nachricht über den kürzesten Weg weiterleiten
-			if (!MAC_send(mac, next, buffer, mac_recvH.msg_len))
+			if (!MAC_send(mac, next, buffer, pktSize))
 			{
 				// Nachricht konnte nicht versendet werden
 				if (r->debug)
@@ -481,6 +485,10 @@ static void *sendT_func(void *args)
 		*p = msg.addr;
 		p += sizeof(msg.addr);
 
+		// Set length
+		memcpy(p, &msg.len, sizeof(msg.len));
+		p += sizeof(msg.len);
+
 		// Payload in den Puffer kopieren
 		memcpy(p, msg.data, msg.len);
 
@@ -507,7 +515,7 @@ static void *sendT_func(void *args)
 			printf("Nachricht wird an pi%d gesendet.\n", next);
 
 			// Nachricht versenden und Erfolg der Übertragung speichern
-			success = MAC_send(mac, next, buffer, sizeof(buffer));
+			success = MAC_send(mac, next, buffer, Routing_Header_len + msg.len);
 
 			if (r->debug)
 			{
@@ -518,7 +526,7 @@ static void *sendT_func(void *args)
 					for (int i = 0; i < Routing_Header_len; i++)
 						printf("%02X ", buffer[i]);
 					printf("|");
-					for (int i = Routing_Header_len; i < sizeof(buffer); i++)
+					for (int i = Routing_Header_len; i < Routing_Header_len + msg.len; i++)
 						printf(" %02X", buffer[i]);
 					printf("\n");
 				}
@@ -720,7 +728,7 @@ int Dj_Isend(Routing *r, unsigned char addr, unsigned char *data, unsigned int l
 
 int Dijkstras_send(uint8_t dest, uint8_t *data, unsigned int len)
 {
-	Dj_send(routing, dest, data, len);
+	return Dj_send(routing, dest, data, len);
 }
 
 int Dijkstras_recv(Routing_Header *h, uint8_t *data)

@@ -1019,7 +1019,7 @@ uint8_t *MAC_getMetricsHeader()
 int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.failures, data.frames > 0 ? ((data.frames - data.failures - data.retryExceed) / data.frames) : 0, data.retryExceed);
+	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.retryExceed) * 100) / data.frames)  : 0, data.retryExceed);
 	sem_wait(&metrics.mutex);
 	metrics.data[addr] = (MAC_Data){0};
 	sem_post(&metrics.mutex);
