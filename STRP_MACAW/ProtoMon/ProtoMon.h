@@ -28,7 +28,7 @@ typedef struct ProtoMon_Config
     unsigned int vizIntervalS;
 
     // Bitmask for layers to monitor
-    uint8_t monitoredLayers;
+    uint8_t monitoredLevels;
 
     // Initial wait time before sending first monitoring data packet.
     // Could be used to wait for lower layers to initialize.
@@ -40,14 +40,14 @@ typedef struct ProtoMon_Config
  * @brief Protocol layer combinations supported for monitoring by ProtoMon.
  *
  */
-typedef enum ProtoMon_Layer
+typedef enum ProtoMon_Level
 {
     PROTOMON_LAYER_NONE = 0x00,    // No monitoring
     PROTOMON_LAYER_MAC = 0x01,     // Monitor MAC
     PROTOMON_LAYER_ROUTING = 0x02, // Monitor Routing
     PROTOMON_LAYER_TOPO = 0x04,    // Monitor Topology
     PROTOMON_LAYER_ALL = 0xFF      // Monitor all layers
-} ProtoMon_Layer;
+} ProtoMon_Level;
 
 /**
  * @brief Initialize the Monitoring layer. Must be called BEFORE initializing the lower layers.

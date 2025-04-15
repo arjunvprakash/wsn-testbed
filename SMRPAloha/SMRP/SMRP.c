@@ -44,7 +44,7 @@ typedef struct
     int RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
-    NodeRole role;
+    LinkType link;
     NodeState state;
 } NodeInfo;
 
@@ -104,7 +104,7 @@ static void cleanupInactiveNodes();
 static void sendBeacon();
 static void *sendBeaconPeriodic(void *args);
 char *getNodeStateStr(const NodeState state);
-char *getNodeRoleStr(const NodeRole role);
+char *getNodeRoleStr(const LinkType link);
 
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
@@ -633,17 +633,17 @@ static void updateActiveNodes(uint8_t addr, int RSSI)
             neighbours.numActive++;
         }
     }
-    // Random assignment of role
+    // Random assignment of link
     if (new)
     {
         if (addr == ADDR_SINK)
         {
-            nodePtr->role = ROLE_NEXTHOP;
+            nodePtr->link = OUTBOUND;
         }
         else
         {
-            nodePtr->role = ROLE_NEXTHOP;
-            // nodePtr->role = rand() % 100 < 50 ? ROLE_NEXTHOP : ROLE_NODE;
+            nodePtr->link = OUTBOUND;
+            // nodePtr->link = rand() % 100 < 50 ? OUTBOUND : ROLE_NODE;
         }
     }    
     nodePtr->RSSI = RSSI;
@@ -686,7 +686,7 @@ static void cleanupInactiveNodes()
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
         {
             nodePtr->state = INACTIVE;
-            nodePtr->role = ROLE_NODE;
+            nodePtr->link = IDLE;
             neighbours.numActive--;
             inactive++;
             logMessage(INFO, "Node %02d inactive.\n", nodePtr->addr);
@@ -735,15 +735,15 @@ static void *sendBeaconPeriodic(void *args)
     return NULL;
 }
 
-char *getNodeRoleStr(const NodeRole role)
+char *getNodeRoleStr(const LinkType link)
 {
     char *roleStr;
-    switch (role)
+    switch (link)
     {
-    case ROLE_NEXTHOP:
+    case OUTBOUND:
         roleStr = "PARENT";
         break;
-    case ROLE_NODE:
+    case IDLE:
         roleStr = "NODE";
         break;
     default:
@@ -822,7 +822,7 @@ int Routing_getNeighbourData(char *buffer, uint16_t size)
         if (node.state != UNKNOWN)
         {
             uint8_t row[100];
-            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.role, node.RSSI);
+            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI);
 
             // Clear timestamp to avoid duplicate
             timestamp = 0L;

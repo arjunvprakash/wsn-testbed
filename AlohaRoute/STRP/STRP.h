@@ -19,12 +19,12 @@ typedef enum ParentSelectionStrategy
     CLOSEST_LOWER
 } ParentSelectionStrategy;
 
-typedef enum NodeRole
+typedef enum LinkType
 {
-    ROLE_NEXTHOP,
-    ROLE_CHILD,
-    ROLE_NODE
-} NodeRole;
+    OUTBOUND,
+    INBOUND,
+    IDLE
+} LinkType;
 
 typedef enum NodeState
 {
@@ -41,7 +41,7 @@ typedef struct
     int RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
-    NodeRole role;
+    LinkType link;
     uint8_t parent;
     NodeState state;
     int parentRSSI;
@@ -93,7 +93,7 @@ int STRP_sendRoutingTable();
 int STRP_timedRecvRoutingTable(STRP_Header *header, NodeRoutingTable *table, unsigned int timeout);
 NodeRoutingTable STRP_recvRoutingTable(STRP_Header *header);
 char *getNodeStateStr(NodeState state);
-char *getNodeRoleStr(NodeRole role);
+char *getNodeRoleStr(LinkType link);
 NodeRoutingTable getSinkRoutingTable();
 
 #endif

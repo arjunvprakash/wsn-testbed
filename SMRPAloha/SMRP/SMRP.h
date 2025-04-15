@@ -9,11 +9,11 @@
  * @brief Supported roles for neighbour nodes
  * @note ProtoMon visualisation depends on these roles (ProtoMon/viz/script.py)
  */
-typedef enum NodeRole
+typedef enum LinkType
 {
-    ROLE_NODE = 0,
-    ROLE_NEXTHOP = 2,
-} NodeRole;
+    IDLE = 0,
+    OUTBOUND = 2,
+} LinkType;
 
 /**
  * @brief Supported states of neighbour nodes

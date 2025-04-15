@@ -1,23 +1,19 @@
-#ifndef STRP_h
-#define STRP_H
+#ifndef ROUTING_H
+#define ROUTING_H
 #pragma once
 
-#include "../ALOHA/ALOHA.h"
-#include "../common.h"
-// #include "../routing.h"
+#include <stdint.h>
 
 /**
- * @brief Supported parent selection strategies
- *
+ * @brief Header information from the received message.
  */
-typedef enum ParentSelectionStrategy
+typedef struct Routing_Header
 {
-    RANDOM_LOWER,
-    RANDOM,
-    NEXT_LOWER,
-    CLOSEST,
-    CLOSEST_LOWER
-} ParentSelectionStrategy;
+    uint8_t src;  // Source of the packet
+    uint8_t dst;  // Destination of the packet
+    uint8_t prev; // Address of the previous hop
+    int RSSI;     // RSSI of the previous hop address
+} Routing_Header;
 
 /**
  * @brief Supported link types for neighbor nodes
@@ -42,59 +38,8 @@ typedef enum NodeState
     ACTIVE = 1
 } NodeState;
 
-/**
- * @brief Configuration struct for STRP protocol.
- */
-typedef struct STRP_Config
-{
-    // Node's own address
-    uint8_t self;
-
-    // Log level
-    // Default INFO
-    LogLevel loglevel;
-
-    // Default CLOSEST
-    ParentSelectionStrategy strategy;
-
-    // Duration for neighbour sensing (seconds)
-    // Default 15s
-    unsigned int senseDurationS;
-
-    // Interval between periodic beacons (seconds)
-    // Default 30s
-    unsigned int beaconIntervalS;
-
-    // Neighbor keepalive timeout (seconds)
-    // Default 60s
-    unsigned int nodeTimeoutS;
-
-    // Receive timeout for MAC layer (milliseconds)
-    // Default 1000ms
-    unsigned int recvTimeoutMs;
-
-} STRP_Config;
-
-/**
- * @brief Header information from the received message.
- */
-typedef struct Routing_Header
-{
-    uint8_t src;  // Source of the packet
-    uint8_t dst;  // Destination of the packet
-    uint8_t prev; // Address of the previous hop
-    int RSSI;     // RSSI of the previous hop address
-} Routing_Header;
-
-/**
- * @brief Initialize the STRP protocol.
- */
-int STRP_init(STRP_Config config);
-int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
-int STRP_recvMsg(Routing_Header *header, uint8_t *data);
-int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
-
 // To be able to be compatible with ProtoMon, the Routing protocol must declare the external function pointers
+
 /**
  * @brief Send data to the Routing layer.
  *
@@ -102,7 +47,6 @@ int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
  * @param data Pointer to the data to send.
  * @param len Length of the data.
  * @return 1 on success, 0 on error.
- * @note Dependency with ProtoMon
  */
 extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
 
@@ -112,7 +56,6 @@ extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
  * @param h Pointer to a Routing_Header structure.
  * @param data Pointer to a buffer for storing received message data.
  * @return Length of receoved message
- * @note Dependency with ProtoMon
  */
 extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 
@@ -123,26 +66,25 @@ extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
  * @param data Pointer to a buffer for storing received message data.
  * @param timeout Maximum wait time for a message (in milliseconds).
  * @return length of received message on success, -1 for timeout
- * @note Dependency with ProtoMon
  */
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
 /**
- * @returns size of the STRP packet header
+ * @returns size of the packet header
  * @note Dependency with ProtoMon
  */
 uint8_t Routing_getHeaderSize();
 
 /**
- * @brief Check if a packet is an STRP data packet.
+ * @brief Check if a packet is a data packet.
  * @param ctrl control flag of the packet
- * @returns 1 if the control flag is of an STRP data packet
+ * @returns 1 if the control flag is of a data packet
  * @note Dependency with ProtoMon
  */
 uint8_t Routing_isDataPkt(uint8_t ctrl);
 
 /**
- * @returns CSV header of metrics collected by STRP.
+ * @returns CSV header of metrics collected by Routing protocol.
  * @note Dependency with ProtoMon
  */
 uint8_t *Routing_getMetricsHeader();
@@ -154,7 +96,7 @@ uint8_t *Routing_getMetricsHeader();
 uint8_t *Routing_getNeighbourHeader();
 
 /**
- * @returns CSV data of metrics collected by STRP.
+ * @returns CSV data of metrics collected by Routing protocol.
  * @note Dependency with ProtoMon
  */
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
@@ -164,5 +106,4 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
  * @note Dependency with ProtoMon
  */
 int Routing_getNeighbourData(char *buffer, uint16_t size);
-
-#endif // STRP_H
+#endif // ROUTING_H

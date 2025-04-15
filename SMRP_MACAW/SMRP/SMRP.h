@@ -13,12 +13,12 @@
 // Constants
 // enums
 
-typedef enum NodeRole
+typedef enum LinkType
 {
     // Dependency : Graph generation script ../logs/script.py
-    ROLE_NODE = 0,
-    ROLE_NEXTHOP = 2,
-} NodeRole;
+    IDLE = 0,
+    OUTBOUND = 2,
+} LinkType;
 
 typedef enum NodeState
 {

@@ -48,7 +48,7 @@ typedef struct
     int RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
-    NodeRole role;
+    LinkType link;
     uint8_t parent;
     NodeState state;
     int parentRSSI;
@@ -136,7 +136,7 @@ static void selectClosestLowerNeighbour();
 static void sendBeacon();
 static void *sendBeaconPeriodic(void *args);
 char *getNodeStateStr(const NodeState state);
-char *getNodeRoleStr(const NodeRole role);
+char *getNodeRoleStr(const LinkType link);
 static char *getRoutingStrategyStr();
 
 static void initMetrics();
@@ -775,16 +775,16 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     }
     if (addr == parentAddr)
     {
-        nodePtr->role = ROLE_NEXTHOP;
+        nodePtr->link = OUTBOUND;
     }
     else if (parent == mac.addr)
     {
-        nodePtr->role = ROLE_CHILD;
+        nodePtr->link = INBOUND;
         child = true;
     }
     else
     {
-        nodePtr->role = ROLE_NODE;
+        nodePtr->link = IDLE;
     }
     if (parent != ADDR_BROADCAST)
     {
@@ -842,8 +842,8 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
             if (changed)
             {
                 sem_wait(&neighbours.mutex);
-                neighbours.nodes[prevParentAddr].role = ROLE_NODE;
-                neighbours.nodes[addr].role = ROLE_NEXTHOP;
+                neighbours.nodes[prevParentAddr].link = IDLE;
+                neighbours.nodes[addr].link = OUTBOUND;
                 sem_post(&neighbours.mutex);
                 if (config.loglevel >= DEBUG && prevParentAddr != INITIAL_PARENT)
                 {
@@ -870,7 +870,7 @@ static void selectClosestNeighbour()
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != ROLE_CHILD && node.RSSI > newParentRSSI && node.addr != parentAddr)
+            if (node.link != INBOUND && node.RSSI > newParentRSSI && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -883,8 +883,8 @@ static void selectClosestNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
-    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    neighbours.nodes[newParent].link = OUTBOUND;
+    neighbours.nodes[parentAddr].link = IDLE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
 }
@@ -902,7 +902,7 @@ void selectClosestLowerNeighbour()
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.role != ROLE_CHILD && node.RSSI >= newParentRSSI && node.addr < mac.addr && node.addr != parentAddr)
+            if (node.link != INBOUND && node.RSSI >= newParentRSSI && node.addr < mac.addr && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -915,8 +915,8 @@ void selectClosestLowerNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
-    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    neighbours.nodes[newParent].link = OUTBOUND;
+    neighbours.nodes[parentAddr].link = IDLE;
     sem_post(&neighbours.mutex);
     parentAddr = newParent;
 }
@@ -965,7 +965,7 @@ static void selectNextLowerNeighbour()
             {
                 printf("# %s - Active: %02d (%02d)\n", timestamp(), node.addr, node.RSSI);
             }
-            if (node.role != ROLE_CHILD && node.addr != parentAddr)
+            if (node.link != INBOUND && node.addr != parentAddr)
             {
                 newParent = node.addr;
                 newParentRSSI = node.RSSI;
@@ -973,8 +973,8 @@ static void selectNextLowerNeighbour()
         }
     }
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
-    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    neighbours.nodes[newParent].link = OUTBOUND;
+    neighbours.nodes[parentAddr].link = IDLE;
     sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
@@ -993,7 +993,7 @@ static void selectRandomNeighbour()
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr != parentAddr)
+            if (node.addr != ADDR_SINK && node.link != INBOUND && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -1013,8 +1013,8 @@ static void selectRandomNeighbour()
     }
 
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
-    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    neighbours.nodes[newParent].link = OUTBOUND;
+    neighbours.nodes[parentAddr].link = IDLE;
     sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
@@ -1033,7 +1033,7 @@ static void selectRandomLowerNeighbour()
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.addr != ADDR_SINK && node.role != ROLE_CHILD && node.addr < parentAddr)
+            if (node.addr != ADDR_SINK && node.link != INBOUND && node.addr < parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -1053,8 +1053,8 @@ static void selectRandomLowerNeighbour()
     }
 
     sem_wait(&neighbours.mutex);
-    neighbours.nodes[newParent].role = ROLE_NEXTHOP;
-    neighbours.nodes[parentAddr].role = ROLE_NODE;
+    neighbours.nodes[newParent].link = OUTBOUND;
+    neighbours.nodes[parentAddr].link = IDLE;
     sem_post(&neighbours.mutex);
 
     parentAddr = newParent;
@@ -1116,7 +1116,7 @@ static void cleanupInactiveNodes()
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
         {
             nodePtr->state = INACTIVE;
-            nodePtr->role = ROLE_NODE;
+            nodePtr->link = IDLE;
             neighbours.numActive--;
             inactive++;
             if (parentAddr == nodePtr->addr)
@@ -1178,18 +1178,18 @@ static void *sendBeaconPeriodic(void *args)
     return NULL;
 }
 
-char *getNodeRoleStr(const NodeRole role)
+char *getNodeRoleStr(const LinkType link)
 {
     char *roleStr;
-    switch (role)
+    switch (link)
     {
-    case ROLE_NEXTHOP:
+    case OUTBOUND:
         roleStr = "PARENT";
         break;
-    case ROLE_CHILD:
+    case INBOUND:
         roleStr = "CHILD";
         break;
-    case ROLE_NODE:
+    case IDLE:
         roleStr = "NODE";
         break;
     default:
@@ -1268,7 +1268,7 @@ int Routing_getNeighbourData(char *buffer, uint16_t size)
         if (node.state != UNKNOWN)
         {
             uint8_t row[100];
-            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.role, node.RSSI, node.parent, node.parentRSSI);
+            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
 
             // Clear timestamp to avoid duplicate
             timestamp = 0L;

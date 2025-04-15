@@ -116,7 +116,7 @@ static void initOutputFiles()
     }
 
     // Create mac.csv
-    if (config.monitoredLayers & PROTOMON_LAYER_MAC)
+    if (config.monitoredLevels & PROTOMON_LAYER_MAC)
     {
         char filePath[100];
         sprintf(filePath, "%s/%s", outputDir, macCSV);
@@ -144,7 +144,7 @@ static void initOutputFiles()
     }
 
     // Create network.csv
-    if (config.monitoredLayers & PROTOMON_LAYER_TOPO)
+    if (config.monitoredLevels & PROTOMON_LAYER_TOPO)
     {
         char filePath[100];
         sprintf(filePath, "%s/%s", outputDir, networkCSV);
@@ -172,7 +172,7 @@ static void initOutputFiles()
     }
 
     // Create routing.csv
-    if (config.monitoredLayers & PROTOMON_LAYER_ROUTING)
+    if (config.monitoredLevels & PROTOMON_LAYER_ROUTING)
     {
         char filePath[100];
         sprintf(filePath, "%s/%s", outputDir, routingCSV);
@@ -413,7 +413,7 @@ static void *sendMetrics_func(void *args)
     while (1)
     {
         // Send routing metrics to sink
-        if (config.monitoredLayers & PROTOMON_LAYER_ROUTING)
+        if (config.monitoredLevels & PROTOMON_LAYER_ROUTING)
         {
             uint8_t *buffer = (uint8_t *)malloc(bufferSize);
             if (buffer == NULL)
@@ -438,7 +438,7 @@ static void *sendMetrics_func(void *args)
             free(buffer);
         }
 
-        if (config.monitoredLayers & PROTOMON_LAYER_TOPO)
+        if (config.monitoredLevels & PROTOMON_LAYER_TOPO)
         {
             uint8_t *buffer = (uint8_t *)malloc(bufferSize);
             if (buffer == NULL)
@@ -464,7 +464,7 @@ static void *sendMetrics_func(void *args)
         }
 
         // Send MAC metrics to sink
-        if (config.monitoredLayers & PROTOMON_LAYER_MAC)
+        if (config.monitoredLevels & PROTOMON_LAYER_MAC)
         {
             uint8_t buffer[bufferSize];
             if (buffer == NULL)
@@ -531,12 +531,12 @@ void setConfigDefaults(ProtoMon_Config *c)
 void ProtoMon_init(ProtoMon_Config c)
 {
     // Make init idempotent
-    if (config.self != 0 || c.monitoredLayers == PROTOMON_LAYER_NONE)
+    if (config.self != 0 || c.monitoredLevels == PROTOMON_LAYER_NONE)
     {
         return;
     }
 
-    if (c.monitoredLayers != PROTOMON_LAYER_NONE)
+    if (c.monitoredLevels != PROTOMON_LAYER_NONE)
     {
         // Implicit registration of original functions
         Original_Routing_sendMsg = Routing_sendMsg;
@@ -557,7 +557,7 @@ void ProtoMon_init(ProtoMon_Config c)
         MAC_recv = &ProtoMon_MAC_recv;
         MAC_timedRecv = &ProtoMon_MAC_timedRecv;
     }
-    if (c.monitoredLayers & PROTOMON_LAYER_ROUTING)
+    if (c.monitoredLevels & PROTOMON_LAYER_ROUTING)
     {
         if (!Original_Routing_sendMsg || !Original_Routing_recvMsg || !Original_Routing_timedRecvMsg || !Original_MAC_sendMsg || !Original_MAC_recvMsg || !Original_MAC_timedRecvMsg)
         {
@@ -569,7 +569,7 @@ void ProtoMon_init(ProtoMon_Config c)
         fflush(stdout);
     }
 
-    if (c.monitoredLayers & PROTOMON_LAYER_MAC)
+    if (c.monitoredLevels & PROTOMON_LAYER_MAC)
     {
         if (!Original_MAC_sendMsg || !Original_MAC_recvMsg || !Original_MAC_timedRecvMsg)
         {
@@ -588,7 +588,7 @@ void ProtoMon_init(ProtoMon_Config c)
     initMetrics();
 
     // Enable visualization only when monitoring is enabled
-    if (c.monitoredLayers != PROTOMON_LAYER_NONE)
+    if (c.monitoredLevels != PROTOMON_LAYER_NONE)
     {
         if (config.self != ADDR_SINK)
         {
@@ -618,12 +618,12 @@ void ProtoMon_init(ProtoMon_Config c)
 
 static uint16_t getRoutingOverhead()
 {
-    return (config.monitoredLayers & PROTOMON_LAYER_ROUTING) ? ROUTING_OVERHEAD_SIZE : 0;
+    return (config.monitoredLevels & PROTOMON_LAYER_ROUTING) ? ROUTING_OVERHEAD_SIZE : 0;
 }
 
 static uint16_t getMACOverhead()
 {
-    return (config.monitoredLayers & PROTOMON_LAYER_MAC) ? MAC_OVERHEAD_SIZE : 0;
+    return (config.monitoredLevels & PROTOMON_LAYER_MAC) ? MAC_OVERHEAD_SIZE : 0;
 }
 
 static void resetMacMetrics()
