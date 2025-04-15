@@ -47,7 +47,7 @@ int main(int argc, char *argv[])
 	config.loglevel = INFO;
 	config.sendIntervalS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LAYER_ALL;
+	config.monitoredLevels = PROTOMON_LEVEL_ALL;
 	config.initialSendWaitS = 30;
 	// ProtoMon_init(config);
 

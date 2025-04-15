@@ -64,7 +64,7 @@ int main(int argc, char *argv[])
 	config.loglevel = INFO;
 	config.sendIntervalS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LAYER_ROUTING | PROTOMON_LAYER_MAC;
+	config.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC;
 	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 

@@ -42,11 +42,11 @@ typedef struct ProtoMon_Config
  */
 typedef enum ProtoMon_Level
 {
-    PROTOMON_LAYER_NONE = 0x00,    // No monitoring
-    PROTOMON_LAYER_MAC = 0x01,     // Monitor MAC
-    PROTOMON_LAYER_ROUTING = 0x02, // Monitor Routing
-    PROTOMON_LAYER_TOPO = 0x04,    // Monitor Topology
-    PROTOMON_LAYER_ALL = 0xFF      // Monitor all layers
+    PROTOMON_LEVEL_NONE = 0x00,    // No monitoring
+    PROTOMON_LEVEL_MAC = 0x01,     // Monitor MAC
+    PROTOMON_LEVEL_ROUTING = 0x02, // Monitor Routing
+    PROTOMON_LEVEL_TOPO = 0x04,    // Monitor Topology
+    PROTOMON_LEVEL_ALL = 0xFF      // Monitor all layers
 } ProtoMon_Level;
 
 /**
