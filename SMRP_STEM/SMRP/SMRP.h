@@ -9,22 +9,22 @@
  * @brief Supported roles for neighbour nodes
  * @note ProtoMon visualisation depends on these roles (ProtoMon/viz/script.py)
  */
-typedef enum LinkType
+typedef enum Routing_LinkType
 {
     IDLE = 0,
     OUTBOUND = 2,
-} LinkType;
+} Routing_LinkType;
 
 /**
  * @brief Supported states of neighbour nodes
  * @note ProtoMon visualisation depends on these states (ProtoMon/viz/script.py)
  */
-typedef enum NodeState
+typedef enum Routing_NodeState
 {
     UNKNOWN = -1,
     INACTIVE = 0,
     ACTIVE = 1
-} NodeState;
+} Routing_NodeState;
 
 /**
  * @brief Configuration struct for SMRP protocol.
@@ -137,7 +137,7 @@ uint8_t *Routing_getMetricsHeader();
  * @returns ""
  * @note Dependency with ProtoMon
  */
-uint8_t *Routing_getNeighbourHeader();
+uint8_t *Routing_getTopologyHeader();
 
 /**
  * @returns CSV data of metrics collected by STRP.
@@ -149,7 +149,7 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
  * @returns CSV data of neighbour nodes
  * @note Dependency with ProtoMon
  */
-int Routing_getNeighbourData(char *buffer, uint16_t size);
+int Routing_getTopologyData(char *buffer, uint16_t size);
 
 /**
  * @brief Get the address of a random active node from neighbour list.

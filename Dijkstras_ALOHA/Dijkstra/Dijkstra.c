@@ -761,7 +761,7 @@ uint8_t *Routing_getMetricsHeader()
 {
 	return "";
 }
-uint8_t *Routing_getNeighbourHeader()
+uint8_t *Routing_getTopologyHeader()
 {
 	return "";
 }
@@ -770,7 +770,7 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
 	sprintf(buffer, "");
 	return 0;
 }
-int Routing_getNeighbourData(char *buffer, uint16_t size)
+int Routing_getTopologyData(char *buffer, uint16_t size)
 {
 	sprintf(buffer, "");
 	return 0;

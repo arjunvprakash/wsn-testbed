@@ -103,8 +103,8 @@ static void tableQ_init();
 static void tableQ_enqueue(NodeRoutingTable table);
 static NodeRoutingTable tableQ_dequeue();
 static uint8_t tableQ_timed_dequeue(NodeRoutingTable *tab, struct timespec *ts);
-char *getNodeStateStr(const NodeState state);
-char *getNodeRoleStr(const LinkType link);
+char *getNodeStateStr(const Routing_NodeState state);
+char *getNodeRoleStr(const Routing_LinkType link);
 static char *getRoutingStrategyStr();
 static NodeRoutingTable ActiveNodesToNRT(const ActiveNodes activeNodes, uint8_t src);
 
@@ -1159,9 +1159,9 @@ static void parseRoutingTablePkt(DataPacket tab)
     {
         uint8_t addr = data[offset++];
         table.nodes[i].addr = addr;
-        NodeState state = (NodeState)data[offset++];
+        Routing_NodeState state = (Routing_NodeState)data[offset++];
         table.nodes[i].state = state;
-        LinkType link = (LinkType)data[offset++];
+        Routing_LinkType link = (Routing_LinkType)data[offset++];
         table.nodes[i].link = link;
         uint8_t parent = data[offset++];
         table.nodes[i].parent = parent;
@@ -1189,7 +1189,7 @@ static void parseRoutingTablePkt(DataPacket tab)
     tableQ_enqueue(table);
 }
 
-char *getNodeRoleStr(const LinkType link)
+char *getNodeRoleStr(const Routing_LinkType link)
 {
     char *roleStr;
     switch (link)
@@ -1229,7 +1229,7 @@ NodeRoutingTable getSinkRoutingTable()
     return table;
 }
 
-char *getNodeStateStr(const NodeState state)
+char *getNodeStateStr(const Routing_NodeState state)
 {
     char *stateStr;
     switch (state)

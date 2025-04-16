@@ -44,8 +44,8 @@ typedef struct
     int RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
-    LinkType link;
-    NodeState state;
+    Routing_LinkType link;
+    Routing_NodeState state;
 } NodeInfo;
 
 typedef struct
@@ -103,8 +103,8 @@ static void initNeighbours();
 static void cleanupInactiveNodes();
 static void sendBeacon();
 static void *sendBeaconPeriodic(void *args);
-char *getNodeStateStr(const NodeState state);
-char *getNodeRoleStr(const LinkType link);
+char *getNodeStateStr(const Routing_NodeState state);
+char *getNodeRoleStr(const Routing_LinkType link);
 
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
@@ -735,7 +735,7 @@ static void *sendBeaconPeriodic(void *args)
     return NULL;
 }
 
-char *getNodeRoleStr(const LinkType link)
+char *getNodeRoleStr(const Routing_LinkType link)
 {
     char *roleStr;
     switch (link)
@@ -753,7 +753,7 @@ char *getNodeRoleStr(const LinkType link)
     return roleStr;
 }
 
-char *getNodeStateStr(const NodeState state)
+char *getNodeStateStr(const Routing_NodeState state)
 {
     char *stateStr;
     switch (state)
@@ -808,7 +808,7 @@ static void initMetrics()
     sem_post(&metrics.mutex);
 }
 
-int Routing_getNeighbourData(char *buffer, uint16_t size)
+int Routing_getTopologyData(char *buffer, uint16_t size)
 {
     const ActiveNodes activeNodes = neighbours;
     uint8_t max = neighbours.maxAddr;
@@ -870,7 +870,7 @@ void setConfigDefaults(SMRP_Config *config)
     }
 }
 
-uint8_t *Routing_getNeighbourHeader()
+uint8_t *Routing_getTopologyHeader()
 {
     return "";
 }

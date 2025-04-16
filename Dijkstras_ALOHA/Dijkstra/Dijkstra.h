@@ -46,8 +46,8 @@ extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned in
 uint8_t Routing_getHeaderSize();
 uint8_t Routing_isDataPkt(uint8_t ctrl);
 uint8_t *Routing_getMetricsHeader();
-uint8_t *Routing_getNeighbourHeader();
+uint8_t *Routing_getTopologyHeader();
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
-int Routing_getNeighbourData(char *buffer, uint16_t size);
+int Routing_getTopologyData(char *buffer, uint16_t size);
 
 #endif //DIJKSTRA_H

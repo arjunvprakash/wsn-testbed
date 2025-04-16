@@ -155,9 +155,9 @@ static void initOutputFiles()
             fflush(stdout);
             exit(EXIT_FAILURE);
         }
-        const char *nwheader = "Timestamp,Source,Address,State,Role,RSSI";
+        const char *nwheader = "Timestamp,Source,Address,State,LinkType,RSSI";
         fprintf(file, "%s", nwheader);
-        uint8_t *extra = Routing_getNeighbourHeader();
+        uint8_t *extra = Routing_getTopologyHeader();
         if (strlen(extra))
         {
             fprintf(file, ",%s", extra); // Requires additional handling for these fields in viz/script.py
@@ -393,7 +393,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
     }
     else if (ctrl == CTRL_TAB)
     {
-        usedSize += Routing_getNeighbourData(buffer, bufferSize);
+        usedSize += Routing_getTopologyData(buffer, bufferSize);
     }
     // add terminating null character
     buffer[usedSize] = '\0';

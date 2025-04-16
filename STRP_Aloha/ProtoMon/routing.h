@@ -19,24 +19,24 @@ typedef struct Routing_Header
  * @brief Supported link types for neighbor nodes
  * @note ProtoMon visualisation depends on these roles (ProtoMon/viz/script.py)
  */
-typedef enum LinkType
+typedef enum Routing_LinkType
 {
     IDLE = 0,
     INBOUND = 1, // Needs additional handling in ProtoMon/viz/script.py
     OUTBOUND = 2,
     INOUTBOUND = 3,
-} LinkType;
+} Routing_LinkType;
 
 /**
  * @brief Supported states of neighbour nodes
  * @note ProtoMon visualisation depends on these states (ProtoMon/viz/script.py)
  */
-typedef enum NodeState
+typedef enum Routing_NodeState
 {
     UNKNOWN = -1,
     INACTIVE = 0,
     ACTIVE = 1
-} NodeState;
+} Routing_NodeState;
 
 // To be able to be compatible with ProtoMon, the Routing protocol must declare the external function pointers
 
@@ -70,7 +70,7 @@ extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
 /**
- * @returns size of the packet header
+ * @returns size of the routing header
  * @note Dependency with ProtoMon
  */
 uint8_t Routing_getHeaderSize();
@@ -93,7 +93,7 @@ uint8_t *Routing_getMetricsHeader();
  * @returns CSV header for additional fields of neighbour data.
  * @note Dependency with ProtoMon
  */
-uint8_t *Routing_getNeighbourHeader();
+uint8_t *Routing_getTopologyHeader();
 
 /**
  * @returns CSV data of metrics collected by Routing protocol.
@@ -105,5 +105,6 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
  * @returns CSV data of neighbour nodes
  * @note Dependency with ProtoMon
  */
-int Routing_getNeighbourData(char *buffer, uint16_t size);
+int Routing_getTopologyData(char *buffer, uint16_t size);
+
 #endif // ROUTING_H

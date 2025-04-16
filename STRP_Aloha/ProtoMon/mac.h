@@ -4,7 +4,9 @@
 
 #include <stdint.h>
 
-// To be able to be compatible with ProtoMon, the MAC protocol must declare these external function pointers
+// To be able to be compatible with ProtoMon, the MAC protocol must implement these APIs
+
+typedef struct MAC MAC;
 
 /**
  * @brief Send data to the MAC layer.
@@ -37,5 +39,22 @@ extern int (*MAC_recv)(MAC *h, unsigned char *data);
 extern int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout);
 
 
+/**
+ * @returns size of the MAC header
+ * @note Dependency with ProtoMon
+ */
+uint8_t MAC_getHeaderSize();
+
+/**
+ * @returns CSV header of metrics collected by MAC protocol.
+ * @note Dependency with ProtoMon
+ */
+uint8_t *MAC_getMetricsHeader();
+
+/**
+ * @returns CSV data of metrics collected by MAC protocol.
+ * @note Dependency with ProtoMon
+ */
+int MAC_getMetricsData(uint8_t *buffer, uint8_t addr);
 
 #endif // MAC_H
