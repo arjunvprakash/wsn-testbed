@@ -371,8 +371,8 @@ static void *recvT_func(void *args)
 		p += sizeof(recvH.src);
 
 		// Zieladresse speichern
-		recvH.dst_addr = *p;
-		p += sizeof(recvH.dst_addr);
+		recvH.dst = *p;
+		p += sizeof(recvH.dst);
 
 		if (r->debug)
 		{
@@ -387,7 +387,7 @@ static void *recvT_func(void *args)
 		}
 
 		// Wenn die Nachricht an diesen Pi adressiert ist
-		if (recvH.dst_addr == *addr)
+		if (recvH.dst == *addr)
 		{
 			// Variable für die Nachricht
 			recvMessage msg;
@@ -428,13 +428,13 @@ static void *recvT_func(void *args)
 		else
 		{
 			// Nächsten Knoten bestimmen
-			int next = nextNode(*addr, recvH.dst_addr);
+			int next = nextNode(*addr, recvH.dst);
 
 			// Kein Pfad zum Empfänger existiert
 			if (next == -1)
 			{
 				if (r->debug)
-					printf("Nachricht kann nicht weitergeleitet werden: Keine Verbindung zu pi%d.\n", recvH.dst_addr);
+					printf("Nachricht kann nicht weitergeleitet werden: Keine Verbindung zu pi%d.\n", recvH.dst);
 
 				continue;
 			}

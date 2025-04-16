@@ -99,7 +99,7 @@ static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
-static const unsigned short headerSize = 5; // [ ctrl | dest | src | len[2] ]
+static const unsigned short headerSize = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t); // [ ctrl | dest | src | len[2] ]
 static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
@@ -431,6 +431,18 @@ static void *recvPackets_func(void *args)
             uint8_t dest = *(pkt + sizeof(ctrl));
             uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
+            
+            if (config.loglevel >= TRACE)
+            {
+                logMessage(TRACE, "STRP:%s: ", __func__);
+                for (int i = 0; i < headerSize; i++)
+                    printf("%02X ", pkt[i]);
+                printf("|");
+                for (int i = headerSize; i < pktSize; i++)
+                    printf(" %02X", pkt[i]);
+                printf("\n");
+            }
+
             if (dest == macTemp->addr)
             {
                 DataPacket msg = deserializePacket(pkt);
@@ -575,6 +587,16 @@ static void *sendPackets_func(void *args)
         }
         else
         {
+            if (config.loglevel >= TRACE)
+            {
+                logMessage(TRACE, "STRP - %s: ", __func__);
+                for (int i = 0; i < headerSize; i++)
+                    printf("%02X ", pkt[i]);
+                printf("|");
+                for (int i = headerSize; i < pktSize; i++)
+                    printf(" %02X", pkt[i]);
+                printf("\n");
+            }
         }
         free(pkt);
         usleep(1000000); // Sleep 1s
@@ -1296,5 +1318,5 @@ void setConfigDefaults(STRP_Config *config)
 
 uint8_t *Routing_getTopologyHeader()
 {
-    return "Parent,ParentRSSI";
+    return "Timestamp,Source,Address,State,LinkType,RSSI,Parent,ParentRSSI";
 }

@@ -1,85 +1,130 @@
-127.0.0.1 - - [04/Apr/2025 18:48:53] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] "GET /plots/network_graph.png HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] "GET /plots/mac.html HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "GET /plots/routing.html HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /plots/mac.html HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "HEAD /plots/routing.html HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:48:53] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:48:53] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "GET /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "GET /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "GET /plots/routing.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /plots/routing.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] "HEAD /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:04] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:49:04] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "GET / HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "GET /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "GET /plots/mac.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "GET /plots/routing.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /plots/mac.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] "HEAD /plots/routing.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:49:25] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:49:25] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "GET /plots/network_graph.png HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "GET /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "GET /plots/routing.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /plots/routing.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] "HEAD /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:20] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:50:20] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "GET / HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "GET /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "GET /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "GET /plots/routing.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /plots/mac.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] "HEAD /plots/routing.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:25] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:50:25] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "GET / HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "GET /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] code 404, message File not found
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /network.csv HTTP/1.1" 404 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /mac.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "GET /plots/routing.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "GET /plots/mac.html HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /routing.csv HTTP/1.1" 200 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:40] "HEAD /plots/mac.html HTTP/1.1" 304 -
-127.0.0.1 - - [04/Apr/2025 18:50:41] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "GET /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "GET /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:17:43] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:17:43] "HEAD /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "GET /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "GET /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /plots/network_graph.png HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:01] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:01] "HEAD /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "GET /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "HEAD /plots/routing.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:10] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:10] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:17] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:18] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:18] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "GET /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /plots/mac.html HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] "HEAD /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:18] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:18] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /mac.csv HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:25] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:25] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "GET /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /routing.csv HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /plots/network_graph.png HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] "HEAD /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:30] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:30] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "GET /plots/routing.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] "HEAD /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:18:56] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:18:56] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "GET / HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "GET /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /network.csv HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /mac.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "GET /plots/mac.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "GET /plots/routing.html HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /plots/network_graph.png HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /routing.csv HTTP/1.1" 200 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] "HEAD /plots/mac.html HTTP/1.1" 304 -
+127.0.0.1 - - [16/Apr/2025 19:19:11] code 404, message File not found
+127.0.0.1 - - [16/Apr/2025 19:19:11] "GET /favicon.ico HTTP/1.1" 404 -
+127.0.0.1 - - [16/Apr/2025 19:19:12] "HEAD /plots/routing.html HTTP/1.1" 304 -

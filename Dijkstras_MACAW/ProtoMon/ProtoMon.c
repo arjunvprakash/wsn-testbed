@@ -155,13 +155,8 @@ static void initOutputFiles()
             fflush(stdout);
             exit(EXIT_FAILURE);
         }
-        const char *nwheader = "Timestamp,Source,Address,State,Role,RSSI";
-        fprintf(file, "%s", nwheader);
-        uint8_t *extra = Routing_getTopologyHeader();
-        if (strlen(extra))
-        {
-            fprintf(file, ",%s", extra); // Requires additional handling for these fields in viz/script.py
-        }
+        const char *nwheader = Routing_getTopologyHeader();
+        fprintf(file, "%s", nwheader);   
         fprintf(file, "\n");
         fflush(file);
         fclose(file);

@@ -26,6 +26,14 @@ typedef enum Routing_NodeState
     ACTIVE = 1
 } Routing_NodeState;
 
+typedef struct Routing_Header
+{
+    uint8_t src;  // Source of the packet
+    uint8_t dst;  // Destination of the packet
+    uint8_t prev; // Address of the previous hop
+    int RSSI;     // RSSI of the previous hop address
+} Routing_Header;
+
 /**
  * @brief Configuration struct for SMRP protocol.
  */

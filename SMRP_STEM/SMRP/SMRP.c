@@ -879,5 +879,5 @@ void setConfigDefaults(SMRP_Config *config)
 
 uint8_t *Routing_getTopologyHeader()
 {
-    return "";
+    return "Timestamp,Source,Address,State,LinkType,RSSI";
 }

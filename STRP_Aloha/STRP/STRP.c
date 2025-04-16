@@ -1318,5 +1318,5 @@ void setConfigDefaults(STRP_Config *config)
 
 uint8_t *Routing_getTopologyHeader()
 {
-    return "Parent,ParentRSSI";
+    return "Timestamp,Source,Address,State,LinkType,RSSI,Parent,ParentRSSI";
 }

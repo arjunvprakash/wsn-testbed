@@ -45,13 +45,5 @@ int ALOHA_timedrecv(MAC *, unsigned char *, unsigned int);
 int ALOHA_send(MAC *, unsigned char, unsigned char *, unsigned int);
 int ALOHA_Isend(MAC *, unsigned char, unsigned char *, unsigned int);
 
-// Access points for ProtoMon
-// extern int (*MAC_send)(MAC *, unsigned char, unsigned char *, unsigned int);
-// extern int (*MAC_recv)(MAC *, unsigned char *);
-// extern int (*MAC_timedRecv)(MAC *, unsigned char *, unsigned int);
-
-// uint8_t MAC_getHeaderSize();
-// uint8_t *MAC_getMetricsHeader();
-// int MAC_getMetricsData(uint8_t *buffer, uint8_t addr);
 
 #endif /* ALOHA_H */

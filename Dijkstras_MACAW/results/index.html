@@ -10,11 +10,13 @@
         document.addEventListener("DOMContentLoaded", function () {
             let missingFiles = false;
 
-            function checkVisualization(csvUrl, plotUrl, containerId) {
-                fetch(csvUrl, { method: 'HEAD' }) // Check if CSV exists
-                    .then(response => {
-                        if (response.ok) {
-                            // CSV exists, so check for the visualization file
+            function checkVisualization(csvUrls, plotUrl, containerId) {
+                // Check if any of the CSV files exist
+                Promise.all(csvUrls.map(csvUrl => fetch(csvUrl, { method: 'HEAD' })))
+                    .then(responses => {
+                        const csvExists = responses.some(response => response.ok);
+                        if (csvExists) {
+                            // At least one CSV exists, now check for the visualization file
                             fetch(plotUrl, { method: 'HEAD' })
                                 .then(res => {
                                     if (res.ok) {
@@ -34,7 +36,7 @@
                                     }
                                 });
                         } else {
-                            // CSV doesn't exist, hide the container
+                            // None of the CSV files exist, hide the container
                             document.getElementById(containerId).style.display = 'none';
                         }
                     })
@@ -44,14 +46,10 @@
             }
 
             // Check CSV before displaying corresponding plots
-            checkVisualization("network.csv", "plots/network_graph.png", "network_container");
-            checkVisualization("mac.csv", "plots/mac.html", "mac_container");
-            checkVisualization("routing.csv", "plots/routing.html", "routing_container");
-
-
+            checkVisualization(["network.csv", "routing.csv"], "plots/network_graph.png", "network_container");
+            checkVisualization(["mac.csv"], "plots/mac.html", "mac_container");
+            checkVisualization(["routing.csv"], "plots/routing.html", "routing_container");
         });
-
-
     </script>
 
     <style>
@@ -59,9 +57,6 @@
             text-align: center;
             margin: 20px 0;
             display: none;
-            width: 100%;
-            min-height: 500px;
-            overflow: visible;
             /* Initially hidden             */
         }
 
@@ -73,7 +68,6 @@
             /* Shown only if a file is missing */
         }
     </style>
-
 </head>
 
 <body>
@@ -87,11 +81,11 @@
     </div>
 
     <div id="mac_container" class="plot-container">
-        <iframe src="plots/mac.html" width="100%" height="800" frameborder="0" onload="adjustIframeHeight(this)"></iframe>
+        <iframe src="plots/mac.html" width="100%" height="900" frameborder="0"></iframe>
     </div>
 
     <div id="routing_container" class="plot-container">
-        <iframe src="plots/routing.html" width="100%" height="800" frameborder="0" onload="adjustIframeHeight(this)"></iframe>
+        <iframe src="plots/routing.html" width="100%" height="800" frameborder="0"></iframe>
     </div>
 
 
