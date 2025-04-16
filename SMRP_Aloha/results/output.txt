@@ -1,0 +1,392 @@
+2025-04-16T18:42:14 - Node: 14
+2025-04-16T18:42:14 - Role : SINK
+2025-04-16T18:42:14 - Sleep duration: 15000 ms
+2025-04-16T18:42:14 - Monitoring enabled for Routing layer
+2025-04-16T18:42:14 - Monitoring enabled for MAC layer
+ProtoMon : hop src:20 latency:1s
+# New neighbour: 20 (-4)
+# Active neighbours: 1 
+ProtoMon : hop src:15 latency:0s
+# New neighbour: 15 (00)
+# Active neighbours: 2 
+ProtoMon : hop src:27 latency:1s
+# New neighbour: 27 (-3)
+# Active neighbours: 3 
+ProtoMon : hop src:20 latency:1s
+ProtoMon : hop src:15 latency:2s
+ProtoMon : hop src:27 latency:2s
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:15 latency:3s
+ProtoMon : hop src:20 latency:4s
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:15 latency:4s
+ProtoMon : hop src:20 latency:5s
+ProtoMon : hop src:27 latency:6s
+ProtoMon : hop src:15 latency:5s
+ProtoMon : hop src:20 latency:6s
+ProtoMon : hop src:27 latency:7s
+ProtoMon : hop src:20 latency:7s
+ProtoMon : hop src:15 latency:7s
+ProtoMon : hop src:27 latency:8s
+ProtoMon : hop src:20 latency:8s
+2025-04-16T18:42:30 - Active neighbours: 3 
+2025-04-16T18:42:30 - TX: 27 msg: 14001 total: 01
+ProtoMon : hop src:15 latency:9s
+ProtoMon : hop src:27 latency:9s
+ProtoMon : hop src:20 latency:9s
+ProtoMon : hop src:15 latency:10s
+ProtoMon : hop src:27 latency:10s
+ProtoMon : hop src:15 latency:10s
+ProtoMon : hop src:27 latency:10s
+ProtoMon : hop src:15 latency:11s
+ProtoMon : hop src:27 latency:11s
+ProtoMon : hop src:20 latency:11s
+ProtoMon : hop src:27 latency:11s
+ProtoMon : hop src:20 latency:12s
+ProtoMon : hop src:15 latency:12s
+ProtoMon : hop src:15 latency:11s
+ProtoMon : hop src:15 latency:11s
+ProtoMon : hop src:20 latency:12s
+# Path:20-14
+2025-04-16T18:42:42 - FWD: 20 -> 15 total: 01
+ProtoMon : hop src:27 latency:12s
+# Path:27-14
+# ProtoMon : 27001 hops: 1 delay: 12 s
+# Path: 27-14
+2025-04-16T18:42:43 - RX: 27 (-3) src: 27 msg: 27001 total: 01
+ProtoMon : hop src:20 latency:0s
+# Path:15-27-20-14
+# ProtoMon : 15001 hops: 3 delay: 13 s
+# Path: 15-27-20-14
+2025-04-16T18:42:44 - RX: 20 (-4) src: 15 msg: 15001 total: 01
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:42:45 - Received Routing data of Node 27
+ProtoMon : hop src:20 latency:1s
+2025-04-16T18:42:46 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:42:47 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:42:48 - Received MAC data of Node 27
+ProtoMon : hop src:20 latency:0s
+# Path:20-14
+2025-04-16T18:42:49 - FWD: 20 -> 27 total: 02
+ProtoMon : hop src:15 latency:6s
+2025-04-16T18:42:51 - Received Routing data of Node 15
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:42:52 - Received Routing data of Node 20
+ProtoMon : hop src:15 latency:0s
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:42:54 - Received Neigbour data of Node 15
+2025-04-16T18:42:55 - Received MAC data of Node 20
+ProtoMon : hop src:27 latency:0s
+# Path:15-27-14
+# ProtoMon : 15002 hops: 2 delay: 14 s
+# Path: 15-27-14
+2025-04-16T18:43:00 - RX: 27 (-3) src: 15 msg: 15002 total: 02
+2025-04-16T18:43:00 - TX: 20 msg: 14002 total: 02
+ProtoMon : hop src:27 latency:0s
+# Path:ÞÿgÞÿgG-14
+ProtoMon : hop src:15 latency:0s
+# Path:
+ProtoMon : hop src:20 latency:2s
+# Path:
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:43:03 - Received MAC data of Node 15
+ProtoMon : hop src:15 latency:2s
+2025-04-16T18:43:07 - Received Routing data of Node 27
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:43:08 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:43:09 - Received MAC data of Node 27
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:43:11 - Received MAC data of Node 15
+ProtoMon : hop src:20 latency:0s
+# Path:15-20-14
+2025-04-16T18:43:25 - FWD: 15 -> 27 total: 01
+ProtoMon : hop src:15 latency:8s
+# Path:27-20-15-14
+# ProtoMon : 27003 hops: 3 delay: 25 s
+# Path: 27-20-15-14
+2025-04-16T18:43:26 - RX: 15 (00) src: 27 msg: 27003 total: 02
+2025-04-16T18:43:30 - TX: 20 msg: 14003 total: 03
+ProtoMon : hop src:20 latency:8s
+2025-04-16T18:43:33 - Received Routing data of Node 15
+2025-04-16T18:43:33 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:20 latency:9s
+2025-04-16T18:43:34 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:3s
+ProtoMon : hop src:15 latency:5s
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:43:37 - Received MAC data of Node 20
+ProtoMon : hop src:27 latency:22s
+# Path:27-14
+2025-04-16T18:43:49 - FWD: 27 -> 15 total: 01
+ProtoMon : hop src:27 latency:19s
+ProtoMon : hop src:20 latency:16s
+2025-04-16T18:43:51 - Received Neigbour data of Node 15
+ProtoMon : hop src:20 latency:16s
+# Path:20-14
+2025-04-16T18:43:52 - FWD: 20 -> 27 total: 03
+ProtoMon : hop src:15 latency:7s
+2025-04-16T18:43:52 - Received Routing data of Node 15
+ProtoMon : hop src:20 latency:8s
+# Path:15-20-14
+2025-04-16T18:43:53 - FWD: 15 -> 27 total: 02
+ProtoMon : hop src:27 latency:12s
+2025-04-16T18:43:54 - Received Routing data of Node 27
+ProtoMon : hop src:27 latency:7s
+2025-04-16T18:43:55 - Received Routing data of Node 15
+ProtoMon : hop src:27 latency:7s
+2025-04-16T18:43:56 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:7s
+# Path:20-27-14
+ProtoMon : hop src:15 latency:11s
+# ProtoMon : 20004 hops: 2 delay: 42 s
+# Path: 20-27-14
+2025-04-16T18:43:57 - RX: 15 (00) src: 20 msg: 20004 total: 01
+ProtoMon : hop src:15 latency:4s
+2025-04-16T18:43:58 - Received Neigbour data of Node 20
+ProtoMon : hop src:15 latency:4s
+# Path:15-14
+2025-04-16T18:43:59 - FWD: 15 -> 27 total: 03
+2025-04-16T18:43:59 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:0s
+# Path:27-14
+2025-04-16T18:44:00 - TX: 15 msg: 14004 total: 04
+Direct parent links : 24
+Direct child links : 0
+2025-04-16T18:44:23 - FWD: 27 -> 15 total: 02
+ProtoMon : hop src:27 latency:22s
+2025-04-16T18:44:24 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:21s
+2025-04-16T18:44:25 - Received Neigbour data of Node 15
+ProtoMon : hop src:15 latency:19s
+2025-04-16T18:44:26 - Received Routing data of Node 20
+ProtoMon : hop src:15 latency:20s
+ProtoMon : hop src:15 latency:20s
+2025-04-16T18:44:27 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:16s
+ProtoMon : hop src:20 latency:24s
+ProtoMon : hop src:27 latency:14s
+ProtoMon : hop src:27 latency:4s
+2025-04-16T18:44:30 - Received MAC data of Node 20
+2025-04-16T18:44:30 - TX: 15 msg: 14005 total: 05
+ProtoMon : hop src:15 latency:13s
+# Path:20-15-14
+2025-04-16T18:44:31 - Received Routing data of Node 27
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:15 latency:3s
+# ProtoMon : 20007 hops: 2 delay: 32 s
+# Path: 20-15-14
+2025-04-16T18:44:32 - RX: 15 (00) src: 20 msg: 20007 total: 02
+ProtoMon : hop src:27 latency:1s
+# Path:15-27-14
+2025-04-16T18:44:33 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:44:34 - Received Routing data of Node 27
+2025-04-16T18:44:34 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:27 latency:0s
+# Path:27-14
+# ProtoMon : 15007 hops: 2 delay: 33 s
+# Path: 27-14
+2025-04-16T18:44:35 - RX: 27 (-4) src: 15 msg: 15007 total: 03
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:15 latency:7s
+2025-04-16T18:44:36 - Received MAC data of Node 15
+ProtoMon : hop src:27 latency:1s
+# ProtoMon : 27009 hops: 1 delay: 6 s
+# Path: 27-14
+2025-04-16T18:44:37 - RX: 27 (-59) src: 27 msg: 27009 total: 03
+ProtoMon : hop src:15 latency:2s
+# Path:27-15-14
+ProtoMon : hop src:15 latency:2s
+# Path:ÞÿgtÞÿgG-14
+2025-04-16T18:44:38 - Received MAC data of Node 27
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:44:40 - Received MAC data of Node 15
+ProtoMon : hop src:15 latency:3s
+ProtoMon : hop src:15 latency:3s
+2025-04-16T18:44:41 - Received Routing data of Node 20
+ProtoMon : hop src:15 latency:2s
+# ProtoMon : 27007 hops: 2 delay: 41 s
+# Path: ÞÿgtÞÿgG-14
+2025-04-16T18:44:42 - RX: 15 (00) src: 27 msg: 27007 total: 04
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:44:43 - Received Neigbour data of Node 20
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:44:44 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:44:45 - Received MAC data of Node 20
+ProtoMon : hop src:15 latency:0s
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:44:46 - Received MAC data of Node 27
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:44:47 - Received MAC data of Node 27
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:44:48 - Received MAC data of Node 27
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:44:49 - Received Routing data of Node 15
+ProtoMon : hop src:20 latency:1s
+2025-04-16T18:44:50 - Received Routing data of Node 15
+2025-04-16T18:44:51 - Received Routing data of Node 27
+2025-04-16T18:44:52 - Received Neigbour data of Node 15
+2025-04-16T18:44:53 - Received Neigbour data of Node 27
+Direct parent links : 54
+Direct child links : 0
+Traceback (most recent call last):
+  File "/home/pi/sw_workspace/SMRP_Aloha/Debug/results/../../ProtoMon/viz/script.py", line 700, in <module>
+    routing_df = pd.read_csv(routing_csv)   
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1898, in _make_engine
+    return mapping[engine](f, **self.options)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/c_parser_wrapper.py", line 93, in __init__
+    self._reader = parsers.TextReader(src, **kwds)
+  File "parsers.pyx", line 574, in pandas._libs.parsers.TextReader.__cinit__
+  File "parsers.pyx", line 663, in pandas._libs.parsers.TextReader._get_header
+  File "parsers.pyx", line 874, in pandas._libs.parsers.TextReader._tokenize_rows
+  File "parsers.pyx", line 891, in pandas._libs.parsers.TextReader._check_tokenize_status
+  File "parsers.pyx", line 2053, in pandas._libs.parsers.raise_parser_error
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xde in position 1190: invalid continuation byte
+2025-04-16T18:44:54 - Received MAC data of Node 15
+ProtoMon : hop src:27 latency:3s
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:44:55 - Received Neigbour data of Node 15
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:44:56 - Received Routing data of Node 20
+2025-04-16T18:44:57 - Received MAC data of Node 20
+ProtoMon : hop src:15 latency:12s
+2025-04-16T18:45:00 - TX: 27 msg: 14006 total: 06
+2025-04-16T18:45:01 - Received MAC data of Node 27
+ProtoMon : hop src:27 latency:0s
+# Path:20-27-14
+# ProtoMon : 20009 hops: 2 delay: 32 s
+# Path: 20-27-14
+2025-04-16T18:45:02 - RX: 27 (-59) src: 20 msg: 20009 total: 03
+ProtoMon : hop src:27 latency:0s
+2025-04-16T18:45:04 - Received MAC data of Node 20
+ProtoMon : hop src:27 latency:0s
+# Path:15-27-14
+2025-04-16T18:45:11 - FWD: 15 -> 20 total: 04
+ProtoMon : hop src:27 latency:4s
+2025-04-16T18:45:12 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:45:13 - Received MAC data of Node 20
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:45:14 - Received Neigbour data of Node 27
+ProtoMon : hop src:15 latency:11s
+# Path:20-15-14
+2025-04-16T18:45:14 - FWD: 20 -> 27 total: 04
+ProtoMon : hop src:15 latency:9s
+ProtoMon : hop src:15 latency:3s
+2025-04-16T18:45:16 - Received Neigbour data of Node 20
+ProtoMon : hop src:15 latency:3s
+2025-04-16T18:45:17 - Received Routing data of Node 15
+ProtoMon : hop src:15 latency:3s
+2025-04-16T18:45:18 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:4s
+ProtoMon : hop src:27 latency:3s
+2025-04-16T18:45:19 - Received Neigbour data of Node 20
+ProtoMon : hop src:20 latency:0s
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:45:25 - Received Routing data of Node 15
+ProtoMon : hop src:15 latency:0s
+# Path:27-15-14
+2025-04-16T18:45:30 - TX: 15 msg: 14007 total: 07
+2025-04-16T18:45:32 - FWD: 27 -> 20 total: 03
+ProtoMon : hop src:15 latency:6s
+2025-04-16T18:45:32 - Received Neigbour data of Node 15
+ProtoMon : hop src:27 latency:8s
+2025-04-16T18:45:33 - Received Routing data of Node 27
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:45:34 - Received MAC data of Node 15
+ProtoMon : hop src:27 latency:1s
+2025-04-16T18:45:35 - Received MAC data of Node 20
+2025-04-16T18:45:35 - Visualising metrics. Open http://localhost:8000
+ProtoMon : hop src:27 latency:0s
+# Path:15-27-14
+Traceback (most recent call last):
+  File "/home/pi/sw_workspace/SMRP_Aloha/Debug/results/../../ProtoMon/viz/script.py", line 520, in <module>
+    routing_df = pd.read_csv(routing_csv)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1026, in read_csv
+    return _read(filepath_or_buffer, kwds)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 620, in _read
+    parser = TextFileReader(filepath_or_buffer, **kwds)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1620, in __init__
+    self._engine = self._make_engine(f, self.engine)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/readers.py", line 1898, in _make_engine
+    return mapping[engine](f, **self.options)
+  File "/home/pi/.local/lib/python3.9/site-packages/pandas/io/parsers/c_parser_wrapper.py", line 93, in __init__
+    self._reader = parsers.TextReader(src, **kwds)
+  File "parsers.pyx", line 574, in pandas._libs.parsers.TextReader.__cinit__
+  File "parsers.pyx", line 663, in pandas._libs.parsers.TextReader._get_header
+  File "parsers.pyx", line 874, in pandas._libs.parsers.TextReader._tokenize_rows
+  File "parsers.pyx", line 891, in pandas._libs.parsers.TextReader._check_tokenize_status
+  File "parsers.pyx", line 2053, in pandas._libs.parsers.raise_parser_error
+UnicodeDecodeError: 'utf-8' codec can't decode byte 0xde in position 1190: invalid continuation byte
+2025-04-16T18:45:46 - FWD: 15 -> 20 total: 05
+ProtoMon : hop src:27 latency:7s
+2025-04-16T18:45:47 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:7s
+ProtoMon : hop src:15 latency:15s
+2025-04-16T18:45:48 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:8s
+2025-04-16T18:45:49 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:7s
+# Path:20-27-14
+2025-04-16T18:45:49 - FWD: 20 -> 15 total: 05
+2025-04-16T18:45:50 - Received MAC data of Node 15
+ProtoMon : hop src:15 latency:8s
+ProtoMon : hop src:15 latency:9s
+2025-04-16T18:45:51 - Received MAC data of Node 27
+ProtoMon : hop src:27 latency:9s
+2025-04-16T18:45:52 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:8s
+ProtoMon : hop src:27 latency:9s
+2025-04-16T18:45:53 - Received MAC data of Node 20
+ProtoMon : hop src:27 latency:9s
+2025-04-16T18:45:54 - Received Routing data of Node 27
+ProtoMon : hop src:27 latency:10s
+2025-04-16T18:45:55 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:10s
+ProtoMon : hop src:27 latency:9s
+2025-04-16T18:45:56 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:9s
+2025-04-16T18:45:57 - Received MAC data of Node 15
+ProtoMon : hop src:15 latency:9s
+# Path:27-15-14
+2025-04-16T18:45:58 - FWD: 27 -> 20 total: 04
+2025-04-16T18:45:59 - Received MAC data of Node 27
+ProtoMon : hop src:15 latency:2s
+# Path:15-14
+ProtoMon : hop src:15 latency:1s
+# ProtoMon : 15014 hops: 1 delay: 13 s
+# Path: 15-14
+2025-04-16T18:46:00 - RX: 15 (00) src: 15 msg: 15014 total: 04
+ProtoMon : hop src:15 latency:1s
+2025-04-16T18:46:00 - TX: 20 msg: 14008 total: 08
+2025-04-16T18:46:01 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:0s
+# Path:27-14
+2025-04-16T18:46:02 - Received MAC data of Node 20
+# ProtoMon : 27015 hops: 1 delay: 2 s
+# Path: 27-14
+2025-04-16T18:46:03 - RX: 27 (-3) src: 27 msg: 27015 total: 05
+ProtoMon : hop src:15 latency:0s
+2025-04-16T18:46:06 - Received Neigbour data of Node 15
+ProtoMon : hop src:27 latency:8s
+2025-04-16T18:46:12 - Received Routing data of Node 20
+ProtoMon : hop src:27 latency:7s
+2025-04-16T18:46:13 - Received Routing data of Node 27
+ProtoMon : hop src:15 latency:1s
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:46:14 - Received Neigbour data of Node 20
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:46:15 - Received Neigbour data of Node 27
+ProtoMon : hop src:27 latency:2s
+2025-04-16T18:46:16 - Received MAC data of Node 20
+ProtoMon : hop src:20 latency:0s

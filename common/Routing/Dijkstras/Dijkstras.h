@@ -13,7 +13,7 @@
 typedef struct Routing_Header {
 	uint8_t ctrl;			// Kontrollflag
 	uint8_t src_addr;		// Absenderadresse
-	uint8_t dst_addr;		// Zieladresse
+	uint8_t dst;		// Zieladresse
 } Routing_Header;
 #define Routing_Header_len 3
 
