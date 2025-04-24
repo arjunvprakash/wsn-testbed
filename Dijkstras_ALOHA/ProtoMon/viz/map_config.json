@@ -1,0 +1,7 @@
+{
+    "active_edge_color": "yellow",
+    "node_color": "red",
+    "sink_color": "#12DFFF",
+    "node_size": 300,
+    "font_size": 7
+}

@@ -117,7 +117,15 @@ def draw_edges_from_dataframe(df, G, pos, ax, directed=False, config=None):
             edgeLabel = ''
         edgeAlpha = row['edge_alpha']
 
-        nodeColors = [sinkColor if node == root_node else nodeColor for node in G.nodes()]
+        nodeColors = [sinkColor if node == root_node else nodeColor for node in G.nodes()]        
+
+        # if not G.has_edge(source, address):
+        #         G.add_edge(source, address, label=edgeLabel, edge_color=edgeColor, alpha=edgeAlpha, style=edgeStyle, arrows=False if edgeStyle == 'dotted' else directed)
+
+    # nx.draw(G, pos, with_labels=True, node_size=nodeSize, ax=ax, node_color=nodeColors, font_size=fontSize, edge_color=edgeColor)
+    # edge_labels = nx.get_edge_attributes(G, 'label')
+    # nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels, ax=ax, label_pos=0.4, font_size=fontSize)
+
         nx.draw_networkx_nodes(G, pos, ax=ax, node_size=nodeSize, node_color=nodeColors)
         nx.draw_networkx_labels(G, pos, ax=ax, font_size=fontSize)
     
@@ -455,13 +463,14 @@ def plot_metricsV4(df, cols, layer, saveDir='plots'):
     plt.close(fig) 
 
 
-# Dependency: STRP/STRP.h
-class NodeRole(Enum):
-    ROLE_NODE = 0
-    ROLE_CHILD = 1
-    ROLE_NEXTHOP = 2
+# Dependency: routing.h
+class LinkType(Enum):
+    IDLE = 0
+    INBOUND = 1
+    OUTBOUND = 2
+    INOUTBOUND = 3
 
-# Dependency: STRP/STRP.h
+# Dependency: routing.h
 class NodeState(Enum):
     UNKNOWN = -1
     INACTIVE = 0
@@ -573,27 +582,40 @@ if os.path.exists(network_csv):
     inactive_nodes = {node for node, state in node_state_dict.items() if state == 0}
 
     ### Data extraction for Network Tree
-    # Check if ROLE column contains any CHILD entries
-    child_exist = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 1)].shape[0] > 0
+    # Check if LinkType column contains any INBOUND entries
+    # child_exist = df[(df['State'] != NodeState.UNKNOWN) & (df['LinkType'] == LinkType.INBOUND)].shape[0] > 0
 
-    # Check if the columns 'Parent' and 'ParentRSSI' exist in df
-    parentcols_exist = all(col in df.columns for col in ['Parent', 'ParentRSSI']) 
-
-    ###     Direct parent info
-    df_p1 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 2)][['Timestamp','Source', 'Address', 'RSSI']]
+    df_p1 = pd.DataFrame()   
     df_p2 = pd.DataFrame()
     df_p3 = pd.DataFrame()
+    df_p4 = pd.DataFrame()
+
+    ###     Direct parent info
+    df_p1 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.OUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
+    print(f"Direct parent links : {df_p1.shape[0]}")
 
     ###     Direct child info
-    if child_exist:
-        df_p2 = df[(df['State'] != NodeState.UNKNOWN) & (df['Role'] == 1)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
+    df_p2 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
+    print(f"Direct child links : {df_p2.shape[0]}")
 
-    ###     Indirect parent info
+    # Support for tree protocols: STRP
+    # Check if the columns 'Parent' and 'ParentRSSI' exist in df
+    parentcols_exist = all(col in df.columns for col in ['Parent', 'ParentRSSI']) 
+    ###    Extract indirect parent info
     if parentcols_exist:
-        df_p3 = df[df['State'] != NodeState.UNKNOWN][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+        df_p3 = df[df['State'] != NodeState.UNKNOWN.value][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
+        print(f"Indirect parent links : {df_p3.shape[0]}")
+
+    #  Bidirectional links     
+    df_p4 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INOUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
+    if not df_p4.empty:        
+        # Duplicate the rows and swap Source and Address
+        df_p4_swapped = df_p4.rename(columns={'Source': 'Address', 'Address': 'Source'})
+        df_p4 = pd.concat([df_p4, df_p4_swapped], ignore_index=True)
+        print(f"Bidirectional links : {df_p4.shape[0]}")
 
     ###     Combine
-    df_parent = pd.concat([df_p1, df_p2, df_p3], ignore_index=True)
+    df_parent = pd.concat([df_p1, df_p2, df_p3, df_p4], ignore_index=True)
     df_parent = df_parent[df_parent['Address'] > 0]
     df_parent = df_parent.sort_values('Timestamp', ascending=False)
 
@@ -613,7 +635,7 @@ if os.path.exists(network_csv):
 
     ### Data preparation for adjacency graph
     ###     Direct adjacency
-    df1 = df[df['State'] != NodeState.UNKNOWN][['Timestamp','Source', 'Address', 'RSSI']]
+    df1 = df[df['State'] != NodeState.UNKNOWN.value][['Timestamp','Source', 'Address', 'RSSI']]
     df1['key'] = df1.apply(lambda row: tuple(sorted([row['Source'], row['Address']])), axis=1)
     df1 = df1.apply(get_edge_style, axis=1, directed=False)
     ###     Combine with parent info
