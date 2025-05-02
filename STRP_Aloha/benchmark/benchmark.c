@@ -7,6 +7,7 @@
 #include <pthread.h>
 #include <math.h>
 #include <signal.h>
+#include <stdbool.h>
 
 #include "../common.h"
 #include "../util.h"
@@ -23,15 +24,27 @@ static const char *inputFile = "send.csv";
 static const char *resultsDir = "results";
 
 static uint8_t self;
-static unsigned int runtTimeS = 120;
+static unsigned int runtTimeS = 180;
 static unsigned int startTime;
 static unsigned long long startTimeMs;
 
 static pthread_t recvT;
 static pthread_t sendT;
 
+ProtoMon_Config config;
+STRP_Config strp;
+
+static bool monitoringEnabled = false;
+
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
+int killProcessOnPort(int port);
+static void signalHandler(int signum);
+static void generateGraph();
+static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp);
+static void installDependencies();
+static void createHttpServer(int port);
+
 
 int main(int argc, char *argv[])
 {
@@ -46,19 +59,20 @@ int main(int argc, char *argv[])
 
 	fflush(stdout);
 
-	ProtoMon_Config config;
-	config.vizIntervalS = 60;
+	config.vizIntervalS = 120;
 	config.loglevel = INFO;
-	config.sendIntervalS = 30;
+	config.sendIntervalS = 60;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
 	config.initialSendWaitS = 15;
-	// ProtoMon_init(config);
+	if (monitoringEnabled)
+	{
+		ProtoMon_init(config);
+	}
 
-	STRP_Config strp;
-	strp.beaconIntervalS = 30;
+	strp.beaconIntervalS = 60;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 60;
+	strp.nodeTimeoutS = 120;
 	strp.recvTimeoutMs = 1000;
 	strp.self = self;
 	strp.senseDurationS = 15;
@@ -88,10 +102,32 @@ int main(int argc, char *argv[])
 			exit(EXIT_FAILURE);
 		}
 		pthread_join(recvT, NULL);
+
+		generateGraph();
+
+		sleep(600);
 	}
+	killProcessOnPort(HTTP_PORT);
 	logMessage(INFO, "Shutting down\n");
 	fflush(stdout);
 	return 0;
+}
+
+// Generate a string with the experiment configuration
+static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
+{
+	sprintf(configStr, "Application: self=%d,runtTimeS=%d\n", self, runtTimeS);
+	if (monitoringEnabled)
+	{
+		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
+				protomon.vizIntervalS, protomon.sendIntervalS, protomon.monitoredLevels, protomon.initialSendWaitS);
+	}
+	else
+	{
+		sprintf(configStr + strlen(configStr), "ProtoMon: disabled\n");
+	}
+	sprintf(configStr + strlen(configStr), "STRP: beaconIntervalS=%d,nodeTimeoutS=%d,recvTimeoutMs=%d,senseDurationS=%d,strategy=%d\n",
+			strp.beaconIntervalS, strp.nodeTimeoutS, strp.recvTimeoutMs, strp.senseDurationS, strp.strategy);
 }
 
 static void installDependencies()
@@ -169,10 +205,14 @@ static void generateGraph()
 
 	chdir(resultsDir);
 	char cmd[100];
-	sprintf(cmd, "python ../../benchmark/viz/script.py %lld", startTimeMs);
+	char configStr[500];
+	getConfigStr(configStr, config, strp);
+	logMessage(INFO, "Config:\n %s\n", configStr);
+	sprintf(cmd, "python ../../benchmark/viz/script.py --config='%s'", configStr);
 	if (system(cmd) != 0)
 	{
 		logMessage(ERROR, "Error generating graph\n");
+		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
 	else
@@ -181,9 +221,7 @@ static void generateGraph()
 	}
 	fflush(stdout);
 
-	sprintf(cmd, "fuser %d/tcp > /dev/null 2>&1", HTTP_PORT);
-	// int v = system(cmd);
-	if (system(cmd) != 0)
+	if (!monitoringEnabled)
 	{
 		killProcessOnPort(HTTP_PORT);
 		createHttpServer(HTTP_PORT);
@@ -204,7 +242,6 @@ static void *recvMsg_func(void *args)
 	Routing_Header *header = (Routing_Header *)args;
 	unsigned int count = 0;
 
-	// Print current working directory
 	char cmd[150];
 	char cwd[1024];
 	getcwd(cwd, sizeof(cwd));
@@ -214,7 +251,12 @@ static void *recvMsg_func(void *args)
 	if (strstr(cwd, resultsDir) == NULL)
 	{
 		sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s'", resultsDir, resultsDir);
-		system(cmd);
+		if (system(cmd) != 0)
+		{
+			logMessage(ERROR, "Failed to create results directory: %s\n", resultsDir);
+			fflush(stdout);
+			exit(EXIT_FAILURE);
+		}
 		// Change to the results directory
 		chdir(resultsDir);
 	}
@@ -240,7 +282,7 @@ static void *recvMsg_func(void *args)
 		exit(EXIT_FAILURE);
 	}
 	fprintf(file, "%s\n", cols);
-	fflush(file);
+	// fflush(file);
 
 	while (time(NULL) - startTime < runtTimeS)
 	{
@@ -253,7 +295,7 @@ static void *recvMsg_func(void *args)
 
 			char seqId[4];
 			char timestamp[14];
-			if (sscanf(buffer, "%[^_]_%s", &seqId, &timestamp) == 2)
+			if (sscanf(buffer, "%[^_]_%s", seqId, timestamp) == 2)
 			{
 				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld\n", count++ == 0 ? startTimeMs : currentTimeMs, self, header->src, seqId, timestamp, currentTimeMs);
 				logMessage(INFO, "RX: %02d (%02d) src: %02d msg: %s total: %02d\n", header->prev, header->RSSI, header->src, seqId, ++total[header->src]);
@@ -261,7 +303,7 @@ static void *recvMsg_func(void *args)
 			}
 			else
 			{
-				logMessage(ERROR, "Malformed message received: %s\n", buffer);
+				logMessage(ERROR, "Malformed message received from src: %02d, buffer: %s\n", header->src, buffer);
 			}
 		}
 		usleep((rand() % 200000) + 1000000); // Sleep 1-1.2s to prevent busy waiting
@@ -272,6 +314,7 @@ static void *recvMsg_func(void *args)
 	generateGraph();
 
 	sleep(600);
+
 	return NULL;
 }
 

@@ -592,11 +592,11 @@ if os.path.exists(network_csv):
 
     ###     Direct parent info
     df_p1 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.OUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
-    print(f"Direct parent links : {df_p1.shape[0]}")
+    # print(f"Direct parent links : {df_p1.shape[0]}")
 
     ###     Direct child info
     df_p2 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
-    print(f"Direct child links : {df_p2.shape[0]}")
+    # print(f"Direct child links : {df_p2.shape[0]}")
 
     # Support for tree protocols: STRP
     # Check if the columns 'Parent' and 'ParentRSSI' exist in df
@@ -604,7 +604,7 @@ if os.path.exists(network_csv):
     ###    Extract indirect parent info
     if parentcols_exist:
         df_p3 = df[df['State'] != NodeState.UNKNOWN.value][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
-        print(f"Indirect parent links : {df_p3.shape[0]}")
+        # print(f"Indirect parent links : {df_p3.shape[0]}")
 
     #  Bidirectional links     
     df_p4 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INOUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
@@ -612,7 +612,7 @@ if os.path.exists(network_csv):
         # Duplicate the rows and swap Source and Address
         df_p4_swapped = df_p4.rename(columns={'Source': 'Address', 'Address': 'Source'})
         df_p4 = pd.concat([df_p4, df_p4_swapped], ignore_index=True)
-        print(f"Bidirectional links : {df_p4.shape[0]}")
+        # print(f"Bidirectional links : {df_p4.shape[0]}")
 
     ###     Combine
     df_parent = pd.concat([df_p1, df_p2, df_p3, df_p4], ignore_index=True)
