@@ -13,11 +13,13 @@
 #include "../util.h"
 #include "../STRP/STRP.h"
 #include "../ProtoMon/ProtoMon.h"
+
 #define HTTP_PORT 8000
+#define CSV_COLS 4
 
 // Configuration flags
 
-static LogLevel loglevel = INFO;
+static LogLevel loglevel = DEBUG;
 static const char *outputDir = "benchmark";
 static const char *outputFile = "recv.csv";
 static const char *inputFile = "send.csv";
@@ -36,15 +38,16 @@ STRP_Config strp;
 
 static bool monitoringEnabled = false;
 
+static const unsigned short minPayloadSize = 17; // minimum payload size 17 bytes => seqId (3) + '_' (1) + timestamp_ms (13)
+
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
-int killProcessOnPort(int port);
-static void signalHandler(int signum);
+int stopProcessOnPort(int port);
+static void exitHandler(int signum);
 static void generateGraph();
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp);
 static void installDependencies();
-static void createHttpServer(int port);
-
+static void startHttpServer(int port);
 
 int main(int argc, char *argv[])
 {
@@ -79,6 +82,17 @@ int main(int argc, char *argv[])
 	strp.strategy = NEXT_LOWER;
 	STRP_init(strp);
 
+	// Sleep until the next multiple of 10 seconds
+	time_t now = time(NULL);
+	struct tm *wakeUpTime = localtime(&now);
+	unsigned short seconds = 10 - (wakeUpTime->tm_sec % 10);
+	// if (seconds < 10)
+	{
+		logMessage(INFO, "Sleeping for %d seconds\n", seconds);
+		fflush(stdout);
+		sleep(seconds);
+	}
+
 	startTime = time(NULL);
 	startTimeMs = getEpochMs();
 	if (self != ADDR_SINK)
@@ -103,11 +117,19 @@ int main(int argc, char *argv[])
 		}
 		pthread_join(recvT, NULL);
 
-		generateGraph();
+		// Register signal handler to stop the HTTP server on exit
+		// signal(SIGINT, exitHandler);
+		// signal(SIGTERM, exitHandler);
+		// signal(SIGILL, exitHandler);
+		// signal(SIGABRT, exitHandler);
+		// signal(SIGSEGV, exitHandler);
+		// signal(SIGFPE, exitHandler);
+
+		// generateGraph();
 
 		sleep(600);
 	}
-	killProcessOnPort(HTTP_PORT);
+	stopProcessOnPort(HTTP_PORT);
 	logMessage(INFO, "Shutting down\n");
 	fflush(stdout);
 	return 0;
@@ -155,7 +177,7 @@ static void installDependencies()
 }
 
 // Check if a process is running on the specified TCP port and kill it
-int killProcessOnPort(int port)
+int stopProcessOnPort(int port)
 {
 	char cmd[100];
 	sprintf(cmd, "fuser -k %d/tcp > /dev/null 2>&1", port);
@@ -167,12 +189,12 @@ int killProcessOnPort(int port)
 	}
 }
 
-static void signalHandler(int signum)
+static void exitHandler(int signum)
 {
 	if (signum == SIGINT || signum == SIGTERM || signum == SIGABRT || signum == SIGSEGV || signum == SIGILL || signum == SIGFPE)
 	{
 		{
-			killProcessOnPort(HTTP_PORT);
+			stopProcessOnPort(HTTP_PORT);
 			if (loglevel >= DEBUG)
 			{
 				logMessage(DEBUG, "Stopped HTTP server on port %d\n", HTTP_PORT);
@@ -182,7 +204,7 @@ static void signalHandler(int signum)
 	}
 }
 
-void createHttpServer(int port)
+void startHttpServer(int port)
 {
 	char cmd[100];
 	sprintf(cmd, "python3 -m http.server %d --bind 0.0.0.0 > httplogs.txt 2>&1 &", port);
@@ -207,7 +229,7 @@ static void generateGraph()
 	char cmd[100];
 	char configStr[500];
 	getConfigStr(configStr, config, strp);
-	logMessage(INFO, "Config:\n %s\n", configStr);
+	logMessage(INFO, "Config:\n%s\n", configStr);
 	sprintf(cmd, "python ../../benchmark/viz/script.py --config='%s'", configStr);
 	if (system(cmd) != 0)
 	{
@@ -223,16 +245,16 @@ static void generateGraph()
 
 	if (!monitoringEnabled)
 	{
-		killProcessOnPort(HTTP_PORT);
-		createHttpServer(HTTP_PORT);
+		stopProcessOnPort(HTTP_PORT);
+		startHttpServer(HTTP_PORT);
 
 		// Register signal handler to stop the HTTP server on exit
-		signal(SIGINT, signalHandler);
-		signal(SIGTERM, signalHandler);
-		signal(SIGILL, signalHandler);
-		signal(SIGABRT, signalHandler);
-		signal(SIGSEGV, signalHandler);
-		signal(SIGFPE, signalHandler);
+		// signal(SIGINT, exitHandler);
+		// signal(SIGTERM, exitHandler);
+		// signal(SIGILL, exitHandler);
+		// signal(SIGABRT, exitHandler);
+		// signal(SIGSEGV, exitHandler);
+		// signal(SIGFPE, exitHandler);
 	}
 }
 
@@ -277,7 +299,7 @@ static void *recvMsg_func(void *args)
 	FILE *file = fopen(filePath, "w");
 	if (file == NULL)
 	{
-		logMessage(ERROR, "Failed to open recv.csv\n");
+		logMessage(ERROR, "Failed to open %s\n", filePath);
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
@@ -295,7 +317,8 @@ static void *recvMsg_func(void *args)
 
 			char seqId[4];
 			char timestamp[14];
-			if (sscanf(buffer, "%[^_]_%s", seqId, timestamp) == 2)
+			char filler[25];
+			if (sscanf(buffer, "%[^_]_%[^_]_%s", seqId, timestamp, filler) >= 2)
 			{
 				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld\n", count++ == 0 ? startTimeMs : currentTimeMs, self, header->src, seqId, timestamp, currentTimeMs);
 				logMessage(INFO, "RX: %02d (%02d) src: %02d msg: %s total: %02d\n", header->prev, header->RSSI, header->src, seqId, ++total[header->src]);
@@ -313,7 +336,7 @@ static void *recvMsg_func(void *args)
 
 	generateGraph();
 
-	sleep(600);
+	// sleep(600);
 
 	return NULL;
 }
@@ -329,12 +352,12 @@ static void *sendMsg_func(void *args)
 	FILE *file = fopen(filePath, "r");
 	if (file == NULL)
 	{
-		logMessage(ERROR, "Failed to open config.txt\n");
+		logMessage(ERROR, "Failed to open %s\n", filePath);
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
 	char line[256];
-	while (time(NULL) - startTime < runtTimeS)
+	while ((time(NULL) - startTime) < runtTimeS)
 	{
 		if (fgets(line, sizeof(line), file) == NULL)
 		{
@@ -345,7 +368,7 @@ static void *sendMsg_func(void *args)
 			continue; // Skip header line
 		}
 
-		if (loglevel == DEBUG)
+		// if (loglevel == DEBUG)
 		{
 			logMessage(DEBUG, "Line: %s\n", line);
 		}
@@ -353,18 +376,23 @@ static void *sendMsg_func(void *args)
 		char sleep[10];
 		char nodes[25];
 		char dest[2];
+		char size[3];
 
-		if (sscanf(line, "%[^,],%[^,],%s", &nodes, &sleep, &dest) != 3)
+		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
 		{
 			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
+			fflush(stdout);
+			// exit(EXIT_FAILURE);
 			continue;
 		}
 
 		unsigned long sendTime = atoll(sleep);
-		if (loglevel == DEBUG)
+		unsigned short payloadSize = atoi(size);
+		// if (loglevel == DEBUG)
 		{
-			logMessage(DEBUG, "Sleep: %s\n", sleep);
+			logMessage(DEBUG, "SendTime: %s\n", sendTime);
 			logMessage(DEBUG, "Nodes: %s\n", nodes);
+			logMessage(DEBUG, "Destination: %s\n", dest);
 			fflush(stdout);
 		}
 
@@ -410,13 +438,36 @@ static void *sendMsg_func(void *args)
 			logMessage(INFO, "Sleep : %d ms\n", sleepMs);
 			fflush(stdout);
 		}
-		usleep(sleepMs * 1000);
 
 		char buffer[20];
-		sprintf(buffer, "%03d_%lld", ++total, getEpochMs());
+		if (payloadSize > minPayloadSize)
+		{
+			// Generate a random string of size payloadSize - 1 (excluding _ separator)
+			char additionalBytes[payloadSize - minPayloadSize];
+			additionalBytes[0] = '_';
+			memset(additionalBytes + 1, 'a' + (rand() % 26), payloadSize - minPayloadSize - 1);
+
+			sprintf(buffer, "%03d_%lld%s", ++total, getEpochMs(), additionalBytes);
+		}
+		else
+		{
+			if (payloadSize < minPayloadSize)
+			{
+				logMessage(DEBUG, "Payload size %d is less than minimum size %d\n. Sending default payload.", payloadSize, minPayloadSize);
+				fflush(stdout);
+			}
+			sprintf(buffer, "%03d_%lld", ++total, getEpochMs());
+		}
 
 		uint8_t dest_addr = atoi(dest);
 
+		if ((time(NULL) - startTime) >= runtTimeS)
+		{
+			fclose(file);
+			return NULL;
+		}
+
+		usleep(sleepMs * 1000);
 		if (Routing_sendMsg(dest_addr, buffer, strlen(buffer)))
 		{
 			logMessage(INFO, "TX: %02d msg: %s total: %02d\n", dest_addr, buffer, total);
@@ -424,6 +475,11 @@ static void *sendMsg_func(void *args)
 		}
 	}
 	fclose(file);
-	sleep(runtTimeS - (time(NULL) - startTime)); // Sleep for the remaining time
+	unsigned long idleTime = runtTimeS - (time(NULL) - startTime);
+	if (idleTime > 0)
+	{
+		logMessage(INFO, "Waiting %d seconds for forwarding\n", idleTime);
+		sleep(idleTime); // Sleep for the remaining time
+	}
 	return NULL;
 }

@@ -299,13 +299,16 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         {
             // Generate CSV row for each non zero node
             const MAC_Data data = metrics.data[i];
-            if (data.sent > 0 || data.recv > 0)
+            // if (data.sent > 0 || data.recv > 0)
             {
                 uint8_t row[150];
                 memset(row, 0, sizeof(row));
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = MAC_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, (data.sent + metrics.data[0].broadcast), data.recv, data.recv > 0 ? (data.latency / data.recv) : 0);
                 if (extraLen)
                 {
@@ -343,13 +346,16 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         {
             const Routing_Data data = metrics.data[i];
             // Generate CSV row for each non zero node
-            if (data.sent > 0 || data.recv > 0)
+            // if (data.sent > 0 || data.recv > 0)
             {
                 uint8_t row[150];
                 memset(row, 0, sizeof(row));
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = Routing_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (data.totalLatency / data.recv) : 0);
                 if (extraLen)
                 {
