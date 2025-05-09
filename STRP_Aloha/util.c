@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdio.h>  // printf
 #include <stdarg.h> // va_list, va_start, va_end
+#include <sys/time.h> // clock_gettime
 
 #include "common.h"
 
@@ -77,4 +78,15 @@ void logMessage(LogLevel logLevel, const char *format, ...)
     vprintf(format, args);
     // fflush(stdout);
     va_end(args);
+}
+
+/**
+ * @brief Get the current epoch time in milliseconds
+ * @return long long - current epoch time in milliseconds
+ */
+long long getEpochMs()
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    return (long long)(ts.tv_sec * 1000LL + ts.tv_nsec / 1000000LL);
 }

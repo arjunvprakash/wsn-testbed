@@ -156,7 +156,7 @@ static void initOutputFiles()
             exit(EXIT_FAILURE);
         }
         const char *nwheader = Routing_getTopologyHeader();
-        fprintf(file, "%s", nwheader);   
+        fprintf(file, "%s", nwheader);
         fprintf(file, "\n");
         fflush(file);
         fclose(file);
@@ -767,7 +767,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
-        // if (config.loglevel >= DEBUG)
+        if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -894,7 +894,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
         temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
-        // if (config.loglevel >= DEBUG)
+        if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -1095,7 +1095,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
             unsigned int latency = (time(NULL) - mac_ts);
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "ProtoMon : hop src:%02d latency:%ds\n", src, latency);
             }
@@ -1136,7 +1136,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "Path:%s\n", p);
             }
@@ -1211,7 +1211,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
             unsigned int latency = (time(NULL) - mac_ts);
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 printf("ProtoMon : hop src:%02d latency:%ds\n", src, latency);
             }
@@ -1251,7 +1251,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "Path:%s\n", p);
             }

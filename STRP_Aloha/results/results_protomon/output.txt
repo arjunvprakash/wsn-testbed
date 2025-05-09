@@ -1,0 +1,61 @@
+2025-04-25T16:55:58 - Node: 14
+2025-04-25T16:55:58 - Role : SINK
+2025-04-25T16:55:58 - Monitoring enabled for Routing layer
+2025-04-25T16:55:58 - Monitoring enabled for MAC layer
+2025-04-25T16:56:00 - Routing Strategy:  NEXT_LOWER
+2025-04-25T16:56:27 - Received Neigbour data of Node 15
+2025-04-25T16:56:28 - Received MAC data of Node 15
+2025-04-25T16:56:29 - Received Neigbour data of Node 20
+2025-04-25T16:56:30 - Received MAC data of Node 20
+2025-04-25T16:56:31 - Received Neigbour data of Node 27
+2025-04-25T16:56:43 - Received MAC data of Node 27
+2025-04-25T16:56:44 - RX: 15 (00) src: 15 msg: 001 total: 01
+2025-04-25T16:56:45 - Received Routing data of Node 15
+2025-04-25T16:56:46 - Received Neigbour data of Node 15
+2025-04-25T16:56:48 - Received MAC data of Node 15
+2025-04-25T16:56:53 - RX: 15 (00) src: 27 msg: 001 total: 01
+2025-04-25T16:56:54 - RX: 15 (00) src: 20 msg: 001 total: 01
+2025-04-25T16:56:59 - RX: 15 (00) src: 15 msg: 002 total: 02
+2025-04-25T16:57:01 - Received Routing data of Node 27
+2025-04-25T16:57:01 - Visualising metrics. Open http://localhost:8000
+2025-04-25T16:57:02 - Received Routing data of Node 20
+2025-04-25T16:57:03 - RX: 15 (00) src: 15 msg: 003 total: 03
+2025-04-25T16:57:09 - Received Neigbour data of Node 20
+2025-04-25T16:57:10 - RX: 15 (00) src: 15 msg: 004 total: 04
+2025-04-25T16:57:11 - Received Neigbour data of Node 27
+2025-04-25T16:57:12 - RX: 15 (00) src: 15 msg: 005 total: 05
+2025-04-25T16:57:13 - Received MAC data of Node 20
+2025-04-25T16:57:14 - RX: 15 (00) src: 15 msg: 006 total: 06
+2025-04-25T16:57:15 - RX: 15 (00) src: 20 msg: 002 total: 02
+2025-04-25T16:57:16 - Received Routing data of Node 15
+2025-04-25T16:57:17 - Received Neigbour data of Node 15
+2025-04-25T16:57:18 - Received MAC data of Node 15
+2025-04-25T16:57:23 - Received MAC data of Node 27
+2025-04-25T16:57:25 - RX: 15 (00) src: 20 msg: 003 total: 03
+2025-04-25T16:57:28 - RX: 15 (-59) src: 27 msg: 002 total: 02
+2025-04-25T16:57:37 - RX: 15 (-59) src: 20 msg: 004 total: 04
+Direct parent links : 5
+Direct child links : 2
+Indirect parent links : 21
+2025-04-25T16:57:43 - RX: 15 (-59) src: 27 msg: 003 total: 03
+2025-04-25T16:57:44 - Received Neigbour data of Node 15
+2025-04-25T16:57:45 - Received MAC data of Node 15
+2025-04-25T16:57:48 - RX: 15 (-59) src: 20 msg: 005 total: 05
+2025-04-25T16:57:59 - RX: 15 (-59) src: 27 msg: 004 total: 04
+2025-04-25T16:58:00 - RX: 15 (00) src: 20 msg: 006 total: 06
+2025-04-25T16:58:01 - Received Routing data of Node 20
+2025-04-25T16:58:02 - RX: 15 (00) src: 27 msg: 005 total: 05
+2025-04-25T16:58:04 - Received Neigbour data of Node 20
+2025-04-25T16:58:04 - Visualising metrics. Open http://localhost:8000
+2025-04-25T16:58:05 - RX: 15 (00) src: 27 msg: 006 total: 06
+2025-04-25T16:58:06 - Received MAC data of Node 20
+2025-04-25T16:58:07 - Received Routing data of Node 27
+2025-04-25T16:58:08 - Received Neigbour data of Node 20
+2025-04-25T16:58:09 - Received Neigbour data of Node 27
+2025-04-25T16:58:10 - Received MAC data of Node 27
+2025-04-25T16:58:11 - Received MAC data of Node 20
+2025-04-25T16:58:14 - Received Neigbour data of Node 15
+2025-04-25T16:58:29 - Benchmark results: http://localhost:8000/benchmark
+Direct parent links : 11
+Direct child links : 2
+Indirect parent links : 42
