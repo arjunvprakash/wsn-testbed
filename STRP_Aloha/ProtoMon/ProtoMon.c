@@ -14,7 +14,6 @@
 #include "../util.h"
 
 #define HTTP_PORT 8000
-#define MAX_PAYLOAD_SIZE 240
 
 typedef enum
 {
@@ -306,6 +305,9 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = MAC_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, (data.sent + metrics.data[0].broadcast), data.recv, data.recv > 0 ? (data.latency / data.recv) : 0);
                 if (extraLen)
                 {
@@ -350,6 +352,9 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = Routing_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (data.totalLatency / data.recv) : 0);
                 if (extraLen)
                 {
@@ -403,7 +408,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
 
 static void *sendMetrics_func(void *args)
 {
-    sleep(config.initialSendWaitS);
+    sleep(config.initialSendWaitS + config.sendIntervalS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {

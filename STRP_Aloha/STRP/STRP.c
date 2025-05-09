@@ -150,6 +150,12 @@ int STRP_init(STRP_Config c)
         return 1;
     }
 
+    if (c.strategy == FIXED && c.self != ADDR_SINK && (c.parentTable == NULL || *(c.parentTable + c.self) == 0))
+    {
+        logMessage(ERROR, "STRP: parentTable not provided with FIXED strategy.");
+        exit(EXIT_FAILURE);
+    }
+
     pthread_t sendBeaconT;
     setConfigDefaults(&c);
     config = c;
@@ -169,11 +175,11 @@ int STRP_init(STRP_Config c)
 
     if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
     {
-        printf("### Error: Failed to create Routing receive thread");
+        logMessage(ERROR, "STRP: Failed to create Routing receive thread");
         exit(EXIT_FAILURE);
     }
 
-    printf("%s - Routing Strategy:  %s\n", timestamp(), getRoutingStrategyStr());
+    logMessage(INFO, "Routing Strategy:  %s\n", getRoutingStrategyStr());
 
     senseNeighbours();
 
@@ -181,14 +187,14 @@ int STRP_init(STRP_Config c)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
         {
-            printf("### Error: Failed to create Routing send thread");
+            logMessage(ERROR, "STRP: Failed to create Routing send thread");
             exit(EXIT_FAILURE);
         }
     }
     // Beacon thread
     if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
     {
-        printf("### Error: Failed to create sendBeaconPeriodic thread");
+        logMessage(ERROR, "STRP: Failed to create sendBeaconPeriodic thread");
         exit(EXIT_FAILURE);
     }
     return 1;
@@ -414,7 +420,7 @@ static void *recvPackets_func(void *args)
     time_t current;
     while (1)
     {
-        uint8_t *pkt = (uint8_t *)malloc(240);
+        uint8_t *pkt = (uint8_t *)malloc(MAX_PAYLOAD_SIZE);
         if (!pkt)
         {
             continue;
@@ -431,7 +437,7 @@ static void *recvPackets_func(void *args)
             uint8_t dest = *(pkt + sizeof(ctrl));
             uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
             updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
-            
+
             if (config.loglevel >= TRACE)
             {
                 logMessage(TRACE, "STRP:%s: ", __func__);
@@ -699,7 +705,10 @@ static void *receiveBeaconHandler(void *args)
 
 static void senseNeighbours()
 {
-    parentAddr = INITIAL_PARENT;
+    if (config.strategy != FIXED)
+    {
+        parentAddr = INITIAL_PARENT;
+    }
     neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
 
     do
@@ -725,9 +734,23 @@ static void senseNeighbours()
             fflush(stdout);
         }
 
-        if (config.self != ADDR_SINK && parentAddr == INITIAL_PARENT)
+        if (config.self != ADDR_SINK)
         {
-            printf("%s - No neighbors detected.Trying again...\n", timestamp());
+            if (parentAddr == INITIAL_PARENT)
+            {
+                printf("%s - No neighbors detected.Trying again...\n", timestamp());
+            }
+            // else if (neighbours.nodes[parentAddr].RSSI == MIN_RSSI)
+            // {
+            //     // Strategy = FIXED
+            //     // Exit if assigned parent node not a neighbor
+            //     logMessage(ERROR, "STRP: Parent node %d not a neighbor\n");
+            //     exit(EXIT_FAILURE);
+            // }
+            else
+            {
+                break;
+            }
         }
         else
         {
@@ -810,7 +833,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
         }
 
         // change parent if new neighbour fits
-        if (mac.addr != ADDR_SINK && !child && addr != parentAddr)
+        if (config.strategy != FIXED && mac.addr != ADDR_SINK && !child && addr != parentAddr)
         {
             bool changed = false;
             uint8_t prevParentAddr = parentAddr;
@@ -940,6 +963,9 @@ char *getRoutingStrategyStr()
         break;
     case CLOSEST_LOWER:
         strategyStr = "CLOSEST_LOWER";
+        break;
+    case FIXED:
+        strategyStr = "FIXED";
         break;
     default:
         strategyStr = "UNKNOWN";
@@ -1080,6 +1106,9 @@ static void changeParent()
         break;
     case CLOSEST_LOWER:
         selectClosestLowerNeighbour();
+        break;
+    case FIXED:
+        parentAddr = *(config.parentTable + config.self);
         break;
     default:
         selectNextLowerNeighbour();
@@ -1313,6 +1342,10 @@ void setConfigDefaults(STRP_Config *config)
     if (config->loglevel == 0)
     {
         config->loglevel = INFO;
+    }
+    if (config->strategy == FIXED)
+    {
+        parentAddr = *(config->parentTable + config->self);
     }
 }
 

@@ -583,7 +583,6 @@ if os.path.exists(network_csv):
 
     ### Data extraction for Network Tree
     # Check if LinkType column contains any INBOUND entries
-    # child_exist = df[(df['State'] != NodeState.UNKNOWN) & (df['LinkType'] == LinkType.INBOUND)].shape[0] > 0
 
     df_p1 = pd.DataFrame()   
     df_p2 = pd.DataFrame()
