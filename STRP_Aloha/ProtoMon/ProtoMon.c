@@ -14,7 +14,6 @@
 #include "../util.h"
 
 #define HTTP_PORT 8000
-#define MAX_PAYLOAD_SIZE 240
 
 typedef enum
 {
@@ -299,7 +298,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         {
             // Generate CSV row for each non zero node
             const MAC_Data data = metrics.data[i];
-            // if (data.sent > 0 || data.recv > 0)
+            if (data.sent > 0 || data.recv > 0)
             {
                 uint8_t row[150];
                 memset(row, 0, sizeof(row));
@@ -346,7 +345,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         {
             const Routing_Data data = metrics.data[i];
             // Generate CSV row for each non zero node
-            // if (data.sent > 0 || data.recv > 0)
+            if (data.sent > 0 || data.recv > 0)
             {
                 uint8_t row[150];
                 memset(row, 0, sizeof(row));
@@ -409,7 +408,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
 
 static void *sendMetrics_func(void *args)
 {
-    sleep(config.initialSendWaitS);
+    sleep(config.initialSendWaitS + config.sendIntervalS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {

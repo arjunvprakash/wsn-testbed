@@ -1,8 +1,0 @@
-127.0.0.1 - - [25/Apr/2025 17:07:18] "GET /benchmark/ HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2025 17:07:18] "GET /benchmark/msg_delay.png HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2025 17:07:18] "GET /benchmark/msg_time.png HTTP/1.1" 200 -
-127.0.0.1 - - [25/Apr/2025 17:07:19] code 404, message File not found
-127.0.0.1 - - [25/Apr/2025 17:07:19] "GET /favicon.ico HTTP/1.1" 404 -
-127.0.0.1 - - [25/Apr/2025 17:07:21] "GET /benchmark/ HTTP/1.1" 304 -
-127.0.0.1 - - [25/Apr/2025 17:07:21] "GET /benchmark/msg_time.png HTTP/1.1" 304 -
-127.0.0.1 - - [25/Apr/2025 17:07:21] "GET /benchmark/msg_delay.png HTTP/1.1" 304 -

@@ -684,7 +684,7 @@ static void *sendMsg_func(void *args)
 			/*
 			if (ambientNoise(mac) <= mac->noiseThreshold)
 			{
-				if (mac->debug)
+				// if (mac->debug)
 					printf("Noise is too high.\n");
 
 				if (msg.addr != ADDR_BROADCAST)
@@ -716,9 +716,10 @@ static void *sendMsg_func(void *args)
 
 				continue;
 			}
-			*/
+			*/			
 
-			// Nachricht versenden
+			// Sleep for a short random duration 
+			msleep(100 + rand() % 101);
 			SX1262_send(buffer, MAC_Header_len + msg.len);
 
 			// Update metrics

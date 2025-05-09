@@ -19,35 +19,106 @@
 
 // Configuration flags
 
-static LogLevel loglevel = DEBUG;
+static LogLevel loglevel = INFO;
 static const char *outputDir = "benchmark";
 static const char *outputFile = "recv.csv";
 static const char *inputFile = "send.csv";
 static const char *resultsDir = "results";
 
 static uint8_t self;
-static unsigned int runtTimeS = 180;
 static unsigned int startTime;
 static unsigned long long startTimeMs;
+static char configStr[300];
+static const unsigned short minPayloadSize = 17; // minimum payload size 17 bytes => seqId (3) + '_' (1) + timestamp_ms (13)
 
 static pthread_t recvT;
 static pthread_t sendT;
 
 ProtoMon_Config config;
 STRP_Config strp;
+static uint8_t parentTable[MAX_ACTIVE_NODES], hopCountTable[MAX_ACTIVE_NODES];
 
 static bool monitoringEnabled = false;
+static unsigned int runtTimeS = 240;
+static unsigned short maxSyncSleepS = 30;
+static unsigned short senseDurationS = 20;
 
-static const unsigned short minPayloadSize = 17; // minimum payload size 17 bytes => seqId (3) + '_' (1) + timestamp_ms (13)
+static void initParentTable()
+{
+	parentTable[1] = 5;
+	parentTable[4] = 5;
+	parentTable[5] = 7;
+	parentTable[6] = 7;
+	parentTable[7] = 9;
+	parentTable[8] = 9;
+	parentTable[9] = ADDR_SINK;
+	parentTable[12] = 15;
+	parentTable[13] = 15;
+	// parentTable[14] = 0; // Sink
+	parentTable[15] = 16;
+	parentTable[16] = 19;
+	parentTable[18] = 19;
+	parentTable[19] = ADDR_SINK;
+	parentTable[20] = 23;
+	parentTable[21] = 23;
+	parentTable[22] = 23;
+	parentTable[23] = 25;
+	parentTable[24] = 25;
+	parentTable[25] = 28;
+	parentTable[27] = 28;
+	parentTable[28] = ADDR_SINK;
+}
+
+static unsigned short getHopCount(uint8_t node)
+{
+	uint8_t parent = parentTable[node];
+	if (node == ADDR_SINK || parent == 0)
+	{
+		return 0;
+	}
+	if (parent == ADDR_SINK)
+	{
+		return 1;
+	}
+	else
+	{
+		return 1 + getHopCount(parent);
+	}
+}
+
+static void initHopCountTable()
+{
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------\nHopCount Config:\n");
+	}
+	for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
+	{
+		if (parentTable[i] > 0)
+		{
+			hopCountTable[i] = getHopCount(i);
+			if (loglevel >= DEBUG)
+			{
+				logMessage(DEBUG, "%02d: %d\n", i, hopCountTable[i]);
+			}
+		}
+	}
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------");
+	}
+}
 
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
-int stopProcessOnPort(int port);
+static int stopProcessOnPort(int port);
 static void exitHandler(int signum);
 static void generateGraph();
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp);
+static void syncTime(unsigned int n);
 static void installDependencies();
 static void startHttpServer(int port);
+static void initOutputDir();
 
 int main(int argc, char *argv[])
 {
@@ -62,39 +133,52 @@ int main(int argc, char *argv[])
 
 	fflush(stdout);
 
-	config.vizIntervalS = 120;
+	initParentTable();
+	if (self == ADDR_SINK)
+	{
+		initHopCountTable();
+	}
+
+	strp.beaconIntervalS = 32;
+	strp.loglevel = INFO;
+	strp.nodeTimeoutS = 63;
+	strp.recvTimeoutMs = 1000;
+	strp.self = self;
+	strp.senseDurationS = senseDurationS;
+	strp.strategy = FIXED;
+	strp.parentTable = parentTable;
+	STRP_init(strp);
+
+	config.vizIntervalS = 60;
 	config.loglevel = INFO;
-	config.sendIntervalS = 60;
+	config.sendIntervalS = 30;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = 15;
+	config.initialSendWaitS = maxSyncSleepS;
 	if (monitoringEnabled)
 	{
 		ProtoMon_init(config);
 	}
 
-	strp.beaconIntervalS = 60;
-	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 120;
-	strp.recvTimeoutMs = 1000;
-	strp.self = self;
-	strp.senseDurationS = 15;
-	strp.strategy = NEXT_LOWER;
-	STRP_init(strp);
-
-	// Sleep until the next multiple of 10 seconds
-	time_t now = time(NULL);
-	struct tm *wakeUpTime = localtime(&now);
-	unsigned short seconds = 10 - (wakeUpTime->tm_sec % 10);
-	// if (seconds < 10)
+	if (self == ADDR_SINK)
 	{
-		logMessage(INFO, "Sleeping for %d seconds\n", seconds);
-		fflush(stdout);
-		sleep(seconds);
+		initOutputDir();
+		installDependencies();
+		if (!monitoringEnabled)
+		{
+			stopProcessOnPort(HTTP_PORT);
+			startHttpServer(HTTP_PORT);
+		}
 	}
+	syncTime(maxSyncSleepS);
 
 	startTime = time(NULL);
 	startTimeMs = getEpochMs();
+
+	getConfigStr(configStr, config, strp);
+	logMessage(INFO, "Config:\n%s\n", configStr);
+	fflush(stdout);
+
 	if (self != ADDR_SINK)
 	{
 		Routing_Header header;
@@ -117,22 +201,29 @@ int main(int argc, char *argv[])
 		}
 		pthread_join(recvT, NULL);
 
-		// Register signal handler to stop the HTTP server on exit
-		// signal(SIGINT, exitHandler);
-		// signal(SIGTERM, exitHandler);
-		// signal(SIGILL, exitHandler);
-		// signal(SIGABRT, exitHandler);
-		// signal(SIGSEGV, exitHandler);
-		// signal(SIGFPE, exitHandler);
+		generateGraph();
 
-		// generateGraph();
+		sleep(1800);
 
-		sleep(600);
+		stopProcessOnPort(HTTP_PORT);
 	}
-	stopProcessOnPort(HTTP_PORT);
 	logMessage(INFO, "Shutting down\n");
 	fflush(stdout);
 	return 0;
+}
+
+static void syncTime(unsigned int n)
+{
+	// Sleep until the next multiple of n seconds
+	time_t now = time(NULL);
+	struct tm *wakeUpTime = localtime(&now);
+	unsigned short seconds = n - (wakeUpTime->tm_sec % n);
+	if (seconds < n)
+	{
+		logMessage(INFO, "Sleeping for %d seconds\n", seconds);
+		fflush(stdout);
+		sleep(seconds);
+	}
 }
 
 // Generate a string with the experiment configuration
@@ -187,6 +278,7 @@ int stopProcessOnPort(int port)
 	{
 		logMessage(DEBUG, "Port %d freed\n", port);
 	}
+	return v;
 }
 
 static void exitHandler(int signum)
@@ -195,7 +287,7 @@ static void exitHandler(int signum)
 	{
 		{
 			stopProcessOnPort(HTTP_PORT);
-			if (loglevel >= DEBUG)
+			// if (loglevel >= DEBUG)
 			{
 				logMessage(DEBUG, "Stopped HTTP server on port %d\n", HTTP_PORT);
 			}
@@ -207,7 +299,7 @@ static void exitHandler(int signum)
 void startHttpServer(int port)
 {
 	char cmd[100];
-	sprintf(cmd, "python3 -m http.server %d --bind 0.0.0.0 > httplogs.txt 2>&1 &", port);
+	sprintf(cmd, "python3 -m http.server %d --bind 0.0.0.0 > httplogs.txt 2>&1&", port);
 	if (system(cmd) != 0)
 	{
 		logMessage(ERROR, "Error starting HTTP server\n");
@@ -219,17 +311,21 @@ void startHttpServer(int port)
 		logMessage(DEBUG, "HTTP server started on port: %d\n", port);
 		fflush(stdout);
 	}
+
+	// Register signal handler to stop the HTTP server on exit
+	signal(SIGINT, exitHandler);
+	signal(SIGTERM, exitHandler);
+	signal(SIGILL, exitHandler);
+	signal(SIGABRT, exitHandler);
+	signal(SIGSEGV, exitHandler);
+	signal(SIGFPE, exitHandler);
 }
 
 static void generateGraph()
 {
-	installDependencies();
+	// chdir(resultsDir);
 
-	chdir(resultsDir);
-	char cmd[100];
-	char configStr[500];
-	getConfigStr(configStr, config, strp);
-	logMessage(INFO, "Config:\n%s\n", configStr);
+	char cmd[500];
 	sprintf(cmd, "python ../../benchmark/viz/script.py --config='%s'", configStr);
 	if (system(cmd) != 0)
 	{
@@ -242,20 +338,6 @@ static void generateGraph()
 		logMessage(INFO, "Benchmark results: http://localhost:%d/benchmark\n", HTTP_PORT);
 	}
 	fflush(stdout);
-
-	if (!monitoringEnabled)
-	{
-		stopProcessOnPort(HTTP_PORT);
-		startHttpServer(HTTP_PORT);
-
-		// Register signal handler to stop the HTTP server on exit
-		// signal(SIGINT, exitHandler);
-		// signal(SIGTERM, exitHandler);
-		// signal(SIGILL, exitHandler);
-		// signal(SIGABRT, exitHandler);
-		// signal(SIGSEGV, exitHandler);
-		// signal(SIGFPE, exitHandler);
-	}
 }
 
 static void *recvMsg_func(void *args)
@@ -264,47 +346,9 @@ static void *recvMsg_func(void *args)
 	Routing_Header *header = (Routing_Header *)args;
 	unsigned int count = 0;
 
-	char cmd[150];
-	char cwd[1024];
-	getcwd(cwd, sizeof(cwd));
-	// With ProtoMon enabled cwd: Debug/results
-	// With ProtoMon disabled cwd: Debug
-	// if results not exist create it and chdir to Debug/results
-	if (strstr(cwd, resultsDir) == NULL)
-	{
-		sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s'", resultsDir, resultsDir);
-		if (system(cmd) != 0)
-		{
-			logMessage(ERROR, "Failed to create results directory: %s\n", resultsDir);
-			fflush(stdout);
-			exit(EXIT_FAILURE);
-		}
-		// Change to the results directory
-		chdir(resultsDir);
-	}
-
-	// Create output dir
-	sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../../benchmark/viz/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
-	if (system(cmd) != 0)
-	{
-		logMessage(ERROR, "%s - Error creating results dir\n", __func__);
-		fflush(stdout);
-		exit(EXIT_FAILURE);
-	}
-
 	char filePath[100];
 	sprintf(filePath, "%s/%s", outputDir, outputFile);
-	const char *cols = "Timestamp,Source,Address,SeqId,SentTimestamp,RecvTimestamp";
-
-	FILE *file = fopen(filePath, "w");
-	if (file == NULL)
-	{
-		logMessage(ERROR, "Failed to open %s\n", filePath);
-		fflush(stdout);
-		exit(EXIT_FAILURE);
-	}
-	fprintf(file, "%s\n", cols);
-	// fflush(file);
+	FILE *file = fopen(filePath, "a");
 
 	while (time(NULL) - startTime < runtTimeS)
 	{
@@ -320,8 +364,8 @@ static void *recvMsg_func(void *args)
 			char filler[25];
 			if (sscanf(buffer, "%[^_]_%[^_]_%s", seqId, timestamp, filler) >= 2)
 			{
-				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld\n", count++ == 0 ? startTimeMs : currentTimeMs, self, header->src, seqId, timestamp, currentTimeMs);
-				logMessage(INFO, "RX: %02d (%02d) src: %02d msg: %s total: %02d\n", header->prev, header->RSSI, header->src, seqId, ++total[header->src]);
+				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d\n", count++ == 0 ? startTimeMs : currentTimeMs, self, header->src, seqId, timestamp, currentTimeMs, hopCountTable[header->src]);
+				logMessage(INFO, "RX: %02d (%02d) src: %02d hops: %d msg: %s total: %02d\n", header->prev, header->RSSI, header->src, hopCountTable[header->src], seqId, ++total[header->src]);
 				fflush(stdout);
 			}
 			else
@@ -334,11 +378,58 @@ static void *recvMsg_func(void *args)
 	fflush(file);
 	fclose(file);
 
-	generateGraph();
-
-	// sleep(600);
-
 	return NULL;
+}
+
+static void initOutputDir()
+{
+	char cmd[150];
+
+	// With ProtoMon enabled cwd: Debug/results
+	// With ProtoMon disabled cwd: Debug
+	// if results not exist create it and chdir to Debug/results
+
+	// char cwd[1024];
+	// getcwd(cwd, sizeof(cwd));
+	// if (strstr(cwd, resultsDir) == NULL)
+	if (!monitoringEnabled)
+	{
+		// Create results dir
+		sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s'", resultsDir, resultsDir);
+		if (system(cmd) != 0)
+		{
+			logMessage(ERROR, "Failed to create results directory: %s\n", resultsDir);
+			fflush(stdout);
+			exit(EXIT_FAILURE);
+		}
+
+		// Change to the results dir
+		chdir(resultsDir);
+	}
+
+	// Create output dir
+	sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s' && cp '../../benchmark/viz/index.html' '%s/index.html'", outputDir, outputDir, outputDir);
+	if (system(cmd) != 0)
+	{
+		logMessage(ERROR, "%s - Error creating results dir\n", __func__);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+
+	char filePath[100];
+	sprintf(filePath, "%s/%s", outputDir, outputFile);
+	const char *cols = "Timestamp,Source,Address,SeqId,SentTimestamp,RecvTimestamp,HopCount";
+
+	FILE *file = fopen(filePath, "w");
+	if (file == NULL)
+	{
+		logMessage(ERROR, "Failed to open %s\n", filePath);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+	fprintf(file, "%s\n", cols);
+	fflush(file);
+	fclose(file);
 }
 
 static void *sendMsg_func(void *args)
@@ -368,7 +459,7 @@ static void *sendMsg_func(void *args)
 			continue; // Skip header line
 		}
 
-		// if (loglevel == DEBUG)
+		if (loglevel == DEBUG)
 		{
 			logMessage(DEBUG, "Line: %s\n", line);
 		}
@@ -382,19 +473,13 @@ static void *sendMsg_func(void *args)
 		{
 			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
 			fflush(stdout);
-			// exit(EXIT_FAILURE);
-			continue;
+			exit(EXIT_FAILURE);
+			// continue;
 		}
 
 		unsigned long sendTime = atoll(sleep);
 		unsigned short payloadSize = atoi(size);
-		// if (loglevel == DEBUG)
-		{
-			logMessage(DEBUG, "SendTime: %s\n", sendTime);
-			logMessage(DEBUG, "Nodes: %s\n", nodes);
-			logMessage(DEBUG, "Destination: %s\n", dest);
-			fflush(stdout);
-		}
+		uint8_t dest_addr = atoi(dest);
 
 		// List of nodes for which the config applies
 		// * for all nodes, !xx|yy|zz to exclude node xx, yy & zz and xx|yy|zz for nodes node xx, yy & zz
@@ -405,6 +490,12 @@ static void *sendMsg_func(void *args)
 			if (sendTime > waitIdle)
 			{
 				waitIdle = sendTime;
+			}
+			else
+			{
+				logMessage(ERROR, "Line %d : Delta to SendTime negative on Node %02d.\n", numLine, self);
+				fflush(stdout);
+				exit(EXIT_FAILURE);
 			}
 		}
 		else
@@ -423,12 +514,19 @@ static void *sendMsg_func(void *args)
 			}
 			if ((include && !match) || (!include && match))
 			{
-				if (sendTime > waitIdle)
+				if (loglevel >= DEBUG)
 				{
-					waitIdle = sendTime;
+					logMessage(DEBUG, "Line %d: node %02d excluded.\n", numLine, self);
+					fflush(stdout);
 				}
-				continue; // Skip this line based on inclusion or exclusion logic
+				continue; // Skip the current line based on inclusion or exclusion logic
 			}
+		}
+
+		if (loglevel == DEBUG)
+		{
+			logMessage(DEBUG, "SendTime: %ld, Destination: %02d\n", sendTime, dest_addr);
+			fflush(stdout);
 		}
 
 		long sleepMs = sendTime - prevSleep;
@@ -445,7 +543,10 @@ static void *sendMsg_func(void *args)
 			// Generate a random string of size payloadSize - 1 (excluding _ separator)
 			char additionalBytes[payloadSize - minPayloadSize];
 			additionalBytes[0] = '_';
-			memset(additionalBytes + 1, 'a' + (rand() % 26), payloadSize - minPayloadSize - 1);
+			if (payloadSize - minPayloadSize > 1)
+			{
+				memset(additionalBytes + 1, 'a' + ((payloadSize - minPayloadSize) % 26), payloadSize - minPayloadSize - 1);
+			}
 
 			sprintf(buffer, "%03d_%lld%s", ++total, getEpochMs(), additionalBytes);
 		}
@@ -453,13 +554,11 @@ static void *sendMsg_func(void *args)
 		{
 			if (payloadSize < minPayloadSize)
 			{
-				logMessage(DEBUG, "Payload size %d is less than minimum size %d\n. Sending default payload.", payloadSize, minPayloadSize);
+				logMessage(DEBUG, "Payload size %d < minimum %d.Sending default.\n", payloadSize, minPayloadSize);
 				fflush(stdout);
 			}
 			sprintf(buffer, "%03d_%lld", ++total, getEpochMs());
 		}
-
-		uint8_t dest_addr = atoi(dest);
 
 		if ((time(NULL) - startTime) >= runtTimeS)
 		{
@@ -481,5 +580,6 @@ static void *sendMsg_func(void *args)
 		logMessage(INFO, "Waiting %d seconds for forwarding\n", idleTime);
 		sleep(idleTime); // Sleep for the remaining time
 	}
+	fflush(stdout);
 	return NULL;
 }

@@ -12,11 +12,12 @@
  */
 typedef enum ParentSelectionStrategy
 {
-    RANDOM_LOWER,
-    RANDOM,
-    NEXT_LOWER,
-    CLOSEST,
-    CLOSEST_LOWER
+    RANDOM_LOWER,  // Choose a random neighbor with address lower than self
+    RANDOM,        // Choose a random neighbor
+    NEXT_LOWER,    // Choose the neighbor with next lower address than self
+    CLOSEST,       // Choose the neighbor with least RSSI
+    CLOSEST_LOWER, // Choose the closest neighbor with address lower than self
+    FIXED          // Use the parent assignment in the config
 } ParentSelectionStrategy;
 
 typedef struct Routing_Header
@@ -58,8 +59,10 @@ typedef struct STRP_Config
     // Default 1000ms
     unsigned int recvTimeoutMs;
 
-} STRP_Config;
+    // Pointer to parent array of size MAX_ACTIVE_NODES indexed by node address
+    uint8_t *parentTable;
 
+} STRP_Config;
 
 /**
  * @brief Initialize the STRP protocol.
