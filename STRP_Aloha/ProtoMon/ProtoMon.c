@@ -14,7 +14,6 @@
 #include "../util.h"
 
 #define HTTP_PORT 8000
-#define MAX_PAYLOAD_SIZE 240
 
 typedef enum
 {
@@ -156,7 +155,7 @@ static void initOutputFiles()
             exit(EXIT_FAILURE);
         }
         const char *nwheader = Routing_getTopologyHeader();
-        fprintf(file, "%s", nwheader);   
+        fprintf(file, "%s", nwheader);
         fprintf(file, "\n");
         fflush(file);
         fclose(file);
@@ -306,6 +305,9 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = MAC_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, (data.sent + metrics.data[0].broadcast), data.recv, data.recv > 0 ? (data.latency / data.recv) : 0);
                 if (extraLen)
                 {
@@ -350,6 +352,9 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = Routing_getMetricsData(extra, i);
+                if (!extraLen){
+                    continue;
+                }
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (data.totalLatency / data.recv) : 0);
                 if (extraLen)
                 {
@@ -403,7 +408,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
 
 static void *sendMetrics_func(void *args)
 {
-    sleep(config.initialSendWaitS);
+    sleep(config.initialSendWaitS + config.sendIntervalS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {
@@ -767,7 +772,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
-        // if (config.loglevel >= DEBUG)
+        if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -894,7 +899,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
         temp += dataLen + 1;
 
         uint16_t latency = (time(NULL) - ts);
-        // if (config.loglevel >= DEBUG)
+        if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
             logMessage(DEBUG, "Path: %s\n", lastPath);
@@ -1095,7 +1100,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
             unsigned int latency = (time(NULL) - mac_ts);
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "ProtoMon : hop src:%02d latency:%ds\n", src, latency);
             }
@@ -1136,7 +1141,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "Path:%s\n", p);
             }
@@ -1211,7 +1216,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
             unsigned int latency = (time(NULL) - mac_ts);
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 printf("ProtoMon : hop src:%02d latency:%ds\n", src, latency);
             }
@@ -1251,7 +1256,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             p = extendedData + len + pathLen;
             uint8_t totalPathLen = ((numHops + 1) * 3) - 1;
             p -= totalPathLen;
-            // if (config.loglevel >= DEBUG)
+            if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "Path:%s\n", p);
             }

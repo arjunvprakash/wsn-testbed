@@ -18,6 +18,8 @@
  */
 #define ADDR_SINK 0XE
 
+#define MAX_PAYLOAD_SIZE 512
+
 /**
  * @brief Enum for log levels used in the logging system.
  */
