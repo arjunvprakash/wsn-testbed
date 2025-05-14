@@ -29,44 +29,44 @@ static uint8_t self;
 static unsigned int startTime;
 static unsigned long long startTimeMs;
 static char configStr[300];
-static const unsigned short minPayloadSize = 17; // minimum payload size 17 bytes => seqId (3) + '_' (1) + timestamp_ms (13)
+static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
 
 static pthread_t recvT;
 static pthread_t sendT;
 
 ProtoMon_Config config;
 STRP_Config strp;
-static uint8_t parentTable[MAX_ACTIVE_NODES], hopCountTable[MAX_ACTIVE_NODES];
+static uint8_t parentTable[MAX_ACTIVE_NODES], hopCountTable[MAX_ACTIVE_NODES], pktCountTable[MAX_ACTIVE_NODES];
 
 static bool monitoringEnabled = false;
-static unsigned int runtTimeS = 240;
-static unsigned short maxSyncSleepS = 30;
-static unsigned short senseDurationS = 20;
+static unsigned int runtTimeS = 120;
+static unsigned short maxSyncSleepS = 10;
+static unsigned short senseDurationS = 5;
 
 static void initParentTable()
 {
-	parentTable[1] = 5;
-	parentTable[4] = 5;
-	parentTable[5] = 7;
-	parentTable[6] = 7;
-	parentTable[7] = 9;
-	parentTable[8] = 9;
-	parentTable[9] = ADDR_SINK;
-	parentTable[12] = 15;
-	parentTable[13] = 15;
+	// parentTable[1] = 5;
+	// parentTable[4] = 5;
+	// parentTable[5] = 7;
+	// parentTable[6] = 7;
+	parentTable[7] = 13;
+	parentTable[8] = 13;
+	// parentTable[9] = ADDR_SINK;
+	// parentTable[12] = 15;
+	parentTable[13] = ADDR_SINK;
 	// parentTable[14] = 0; // Sink
-	parentTable[15] = 16;
-	parentTable[16] = 19;
-	parentTable[18] = 19;
-	parentTable[19] = ADDR_SINK;
-	parentTable[20] = 23;
-	parentTable[21] = 23;
-	parentTable[22] = 23;
-	parentTable[23] = 25;
-	parentTable[24] = 25;
-	parentTable[25] = 28;
-	parentTable[27] = 28;
-	parentTable[28] = ADDR_SINK;
+	// parentTable[15] = 16;
+	// parentTable[16] = 19;
+	parentTable[18] = ADDR_SINK;
+	// parentTable[19] = ADDR_SINK;
+	parentTable[20] = 18;
+	// parentTable[21] = 23;
+	parentTable[22] = 18;
+	// // parentTable[23] = 25;
+	parentTable[24] = 22;
+	// parentTable[25] = 28;
+	parentTable[27] = 22;
+	// parentTable[28] = ADDR_SINK;
 }
 
 static unsigned short getHopCount(uint8_t node)
@@ -82,7 +82,12 @@ static unsigned short getHopCount(uint8_t node)
 	}
 	else
 	{
-		return 1 + getHopCount(parent);
+		if (hopCountTable[parent] == 0)
+		{
+			hopCountTable[parent] = getHopCount(parent);
+		}
+
+		return 1 + hopCountTable[parent];
 	}
 }
 
@@ -90,7 +95,8 @@ static void initHopCountTable()
 {
 	if (loglevel >= DEBUG)
 	{
-		logMessage(DEBUG, "------\nHopCount Config:\n");
+		logMessage(DEBUG, "------\n");
+		logMessage(DEBUG, "HopCount:\n");
 	}
 	for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
 	{
@@ -106,6 +112,141 @@ static void initHopCountTable()
 	if (loglevel >= DEBUG)
 	{
 		logMessage(DEBUG, "------");
+	}
+}
+
+static void initPktCountTable()
+{
+	int numLine;
+	char filePath[100];
+	sprintf(filePath, "../../benchmark/%s", inputFile);
+	// Read from config.txt
+	FILE *file = fopen(filePath, "r");
+	if (file == NULL)
+	{
+		logMessage(ERROR, "Failed to open %s\n", filePath);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+	char line[256];
+	while (fgets(line, sizeof(line), file) != NULL)
+	{
+		if (numLine++ == 0)
+		{
+			continue; // Skip header line
+		}
+
+		char sleep[10];
+		char nodes[100];
+		char dest[2];
+		char size[3];
+
+		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
+		{
+			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
+			fflush(stdout);
+			// exit(EXIT_FAILURE);
+			continue;
+		}
+
+		if (loglevel >= TRACE)
+		{
+			logMessage(TRACE, "Nodes Expr: %s\n", nodes);
+		}
+
+		if (nodes[0] == '*')
+		{
+			// Include all nodes, no filtering needed
+			pktCountTable[0]++;
+		}
+		else
+		{
+			int include = (nodes[0] != '!');
+			if (!include && nodes[1] == '*')
+			{
+				continue;
+			}
+
+			char *token = strtok(include ? nodes : nodes + 1, "|");
+			int match = 0;
+			while (token != NULL)
+			{
+				uint8_t addr = atoi(token);
+				if (include)
+				{
+					pktCountTable[addr]++;
+				}
+				else
+				{
+					pktCountTable[addr]--;
+				}
+				if (loglevel >= TRACE)
+				{
+					logMessage(TRACE, "%02d: %d\n", addr, pktCountTable[addr]);
+				}
+				token = strtok(NULL, "|");
+			}
+		}
+	}
+	fclose(file);
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------\n");
+		logMessage(DEBUG, "Packet Count:\n");
+	}
+	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
+	{
+
+		if (parentTable[i] > 0)
+		{
+			pktCountTable[i] += pktCountTable[0];
+			if (loglevel >= DEBUG)
+			{
+				logMessage(DEBUG, "%02d: %d\n", i, pktCountTable[i]);
+			}
+		}
+	}
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------\n");
+	}
+}
+
+// List of nodes for which the config applies
+// * to include all nodes
+//  !xx|yy|zz to exclude node xx, yy & zz and
+//  xx|yy|zz to include nodes xx, yy & zz
+static int searchNodesExpr(char *nodes, uint8_t addr)
+{
+	if (nodes[0] == '*')
+	{
+		// Include all nodes, no filtering needed
+		return 1;
+	}
+	else
+	{
+		int include = (nodes[0] != '!');
+		if (!include && nodes[1] == '*')
+		{
+			return 0;
+		}
+
+		char *token = strtok(include ? nodes : nodes + 1, "|");
+		int match = 0;
+		while (token != NULL)
+		{
+			if (atoi(token) == addr)
+			{
+				match = 1;
+				break;
+			}
+			token = strtok(NULL, "|");
+		}
+		if ((include && !match) || (!include && match))
+		{
+			return 0; // addr is not included
+		}
+		return 1;
 	}
 }
 
@@ -163,6 +304,7 @@ int main(int argc, char *argv[])
 	if (self == ADDR_SINK)
 	{
 		initOutputDir();
+		initPktCountTable();
 		installDependencies();
 		if (!monitoringEnabled)
 		{
@@ -362,10 +504,18 @@ static void *recvMsg_func(void *args)
 			char seqId[4];
 			char timestamp[14];
 			char filler[25];
-			if (sscanf(buffer, "%[^_]_%[^_]_%s", seqId, timestamp, filler) >= 2)
+			char addr[3];
+			// if (loglevel >= DEBUG)
 			{
-				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d\n", count++ == 0 ? startTimeMs : currentTimeMs, self, header->src, seqId, timestamp, currentTimeMs, hopCountTable[header->src]);
-				logMessage(INFO, "RX: %02d (%02d) src: %02d hops: %d msg: %s total: %02d\n", header->prev, header->RSSI, header->src, hopCountTable[header->src], seqId, ++total[header->src]);
+				logMessage(DEBUG, "Buffer: %s\n", buffer);
+				fflush(stdout);
+			}
+
+			if (sscanf(buffer, "%[^_]_%[^_]_%[^_]_%s", addr, seqId, timestamp, filler) >= 3)
+			{
+				uint8_t src = (uint8_t)atoi(addr);
+				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d\n", count++ == 0 ? startTimeMs : currentTimeMs, self, src, seqId, timestamp, currentTimeMs, hopCountTable[src]);
+				logMessage(INFO, "RX: %02d (%02d) src:%02d (%02d) hops:%d seqId:%s total:%02d\n", header->prev, header->RSSI, header->src, src, hopCountTable[src], seqId, ++total[src]);
 				fflush(stdout);
 			}
 			else
@@ -435,7 +585,7 @@ static void initOutputDir()
 static void *sendMsg_func(void *args)
 {
 	Routing_Header *header = (Routing_Header *)args;
-	unsigned int total, numLine;
+	int total, numLine;
 	unsigned long prevSleep, waitIdle;
 	char filePath[100];
 	sprintf(filePath, "../benchmark/%s", inputFile);
@@ -454,18 +604,18 @@ static void *sendMsg_func(void *args)
 		{
 			break; // End of file reached
 		}
-		if (++numLine == 1)
+		if (numLine++ == 0)
 		{
 			continue; // Skip header line
 		}
 
-		if (loglevel == DEBUG)
+		// if (loglevel == DEBUG)
 		{
 			logMessage(DEBUG, "Line: %s\n", line);
 		}
 
 		char sleep[10];
-		char nodes[25];
+		char nodes[100];
 		char dest[2];
 		char size[3];
 
@@ -481,12 +631,8 @@ static void *sendMsg_func(void *args)
 		unsigned short payloadSize = atoi(size);
 		uint8_t dest_addr = atoi(dest);
 
-		// List of nodes for which the config applies
-		// * for all nodes, !xx|yy|zz to exclude node xx, yy & zz and xx|yy|zz for nodes node xx, yy & zz
-		// Skip till nodes is * or does not contain self in !xx|yy|zz or xx|yy|zz
-		if (nodes[0] == '*')
+		if (searchNodesExpr(nodes, self))
 		{
-			// Include all nodes, no filtering needed
 			if (sendTime > waitIdle)
 			{
 				waitIdle = sendTime;
@@ -500,27 +646,14 @@ static void *sendMsg_func(void *args)
 		}
 		else
 		{
-			int include = (nodes[0] != '!');
-			char *token = strtok(include ? nodes : nodes + 1, "|");
-			int match = 0;
-			while (token != NULL)
+			if (loglevel >= DEBUG)
 			{
-				if (atoi(token) == self)
-				{
-					match = 1;
-					break;
-				}
-				token = strtok(NULL, "|");
+				logMessage(DEBUG, "Line %d: node %02d excluded.\n", numLine, self);
+				fflush(stdout);
 			}
-			if ((include && !match) || (!include && match))
-			{
-				if (loglevel >= DEBUG)
-				{
-					logMessage(DEBUG, "Line %d: node %02d excluded.\n", numLine, self);
-					fflush(stdout);
-				}
-				continue; // Skip the current line based on inclusion or exclusion logic
-			}
+
+			// Skip the line, continue
+			continue;
 		}
 
 		if (loglevel == DEBUG)
@@ -537,7 +670,15 @@ static void *sendMsg_func(void *args)
 			fflush(stdout);
 		}
 
-		char buffer[20];
+		if ((time(NULL) - startTime) >= runtTimeS)
+		{
+			fclose(file);
+			return NULL;
+		}
+
+		usleep(sleepMs * 1000);
+
+		char buffer[240];
 		if (payloadSize > minPayloadSize)
 		{
 			// Generate a random string of size payloadSize - 1 (excluding _ separator)
@@ -548,7 +689,7 @@ static void *sendMsg_func(void *args)
 				memset(additionalBytes + 1, 'a' + ((payloadSize - minPayloadSize) % 26), payloadSize - minPayloadSize - 1);
 			}
 
-			sprintf(buffer, "%03d_%lld%s", ++total, getEpochMs(), additionalBytes);
+			sprintf(buffer, "%02d_%03d_%lld%s", self, ++total, getEpochMs(), additionalBytes);
 		}
 		else
 		{
@@ -557,29 +698,26 @@ static void *sendMsg_func(void *args)
 				logMessage(DEBUG, "Payload size %d < minimum %d.Sending default.\n", payloadSize, minPayloadSize);
 				fflush(stdout);
 			}
-			sprintf(buffer, "%03d_%lld", ++total, getEpochMs());
+			sprintf(buffer, "%02d_%03d_%lld", self, ++total, getEpochMs());
 		}
 
-		if ((time(NULL) - startTime) >= runtTimeS)
-		{
-			fclose(file);
-			return NULL;
-		}
-
-		usleep(sleepMs * 1000);
 		if (Routing_sendMsg(dest_addr, buffer, strlen(buffer)))
 		{
 			logMessage(INFO, "TX: %02d msg: %s total: %02d\n", dest_addr, buffer, total);
-			fflush(stdout);
 		}
+		else
+		{
+			logMessage(ERROR, "Failed sending packet to Pi %02d\n", dest_addr);
+		}
+		fflush(stdout);
 	}
 	fclose(file);
 	unsigned long idleTime = runtTimeS - (time(NULL) - startTime);
 	if (idleTime > 0)
 	{
 		logMessage(INFO, "Waiting %d seconds for forwarding\n", idleTime);
+		fflush(stdout);
 		sleep(idleTime); // Sleep for the remaining time
 	}
-	fflush(stdout);
 	return NULL;
 }
