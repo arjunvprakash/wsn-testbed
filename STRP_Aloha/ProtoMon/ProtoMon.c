@@ -20,7 +20,8 @@ typedef enum
     CTRL_MSG = '\x71',
     CTRL_TAB = '\x72',
     CTRL_MAC = '\x73',
-    CTRL_ROU = '\x78'
+    CTRL_ROU = '\x78',
+    CTRL_MET = '\x79'
 } CTRL;
 
 #define ROUTING_OVERHEAD_SIZE (sizeof(uint8_t) + sizeof(uint8_t) + sizeof(time_t)) // ctrl, numHops, timestamp
@@ -81,6 +82,8 @@ static int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int le
 static int ProtoMon_Routing_recvMsg(Routing_Header *h, uint8_t *data);
 static int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
 
+static int ProtoMon_Routing_timedRecvMsgV2(Routing_Header *header, uint8_t *data, unsigned int timeout);
+
 static int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned int len);
 static int ProtoMon_MAC_recv(MAC *h, unsigned char *data);
 static int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout);
@@ -90,7 +93,6 @@ static void installDependencies();
 static void initOutputFiles();
 static void generateGraph();
 static void createHttpServer(int port);
-static void *recvRoutingTable_func(void *args);
 static void *sendMetrics_func(void *args);
 static int writeBufferToFile(const uint8_t *fileName, uint8_t *temp);
 static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl);
@@ -268,6 +270,24 @@ static void createHttpServer(int port)
     }
 }
 
+static int sendMetricsToSinkV2(uint8_t *buffer, uint16_t len, uint8_t metricsCount)
+{
+    const unsigned int extLen = len + sizeof(uint8_t) + sizeof(uint16_t);
+    uint8_t extBuffer[extLen];
+
+    // Set control flag: MET
+    uint8_t *temp = extBuffer;
+    uint8_t ctrlFlag = CTRL_MET;
+    memcpy(temp, &ctrlFlag, sizeof(ctrlFlag));
+    temp += sizeof(ctrlFlag);
+
+    memcpy(temp, &metricsCount, sizeof(metricsCount));
+    temp += sizeof(metricsCount);
+
+    memcpy(temp, buffer, len);
+    return Original_Routing_sendMsg(ADDR_SINK, extBuffer, extLen);
+}
+
 static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl)
 {
     const unsigned int extLen = len + sizeof(uint8_t);
@@ -280,6 +300,169 @@ static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl)
     temp += sizeof(ctrlFlag);
     memcpy(temp, buffer, len);
     return Original_Routing_sendMsg(ADDR_SINK, extBuffer, extLen);
+}
+
+static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t *metricsCount)
+{
+    uint16_t usedSize = 0;
+    *metricsCount = 0;
+    uint8_t metricsPayloadHeader = sizeof(uint8_t) + sizeof(uint16_t);
+
+    if (config.monitoredLevels | PROTOMON_LEVEL_MAC)
+    {
+        uint16_t offset = metricsPayloadHeader;
+        MACMetrics metrics = macMetrics;
+
+        // Reset metrics
+        resetMacMetrics();
+        time_t timestamp = time(NULL);
+
+        for (uint8_t i = metrics.minAddr; i <= metrics.maxAddr; i++)
+        {
+            // Generate CSV row for each non zero node
+            const MAC_Data data = metrics.data[i];
+            if (data.sent > 0 || data.recv > 0)
+            {
+                uint8_t row[150];
+                memset(row, 0, sizeof(row));
+                uint8_t extra[50];
+                memset(extra, 0, sizeof(extra));
+                int extraLen = MAC_getMetricsData(extra, i);
+                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.recv > 0 ? (unsigned long)(data.latency / data.recv) : 0);
+                if (extraLen)
+                {
+                    rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), ",%s", extra);
+                }
+                rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), "\n");
+
+                // clearing the timestamp to save packet size
+                timestamp = 0L;
+
+                if (rowLen < (bufferSize - (usedSize + offset)))
+                {
+                    memcpy(buffer + (usedSize + offset), row, rowLen);
+                    offset += rowLen;
+                }
+                else
+                {
+                    // if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(ERROR, "MAC metrics buffer overflow\n");
+                        fflush(stdout);
+                        exit(EXIT_FAILURE);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (offset > metricsPayloadHeader)
+        {
+            buffer[usedSize] = CTRL_MAC;
+            usedSize++;
+            offset -= (metricsPayloadHeader);
+            memcpy(buffer + usedSize, &offset, sizeof(offset));
+            usedSize += offset + sizeof(offset);
+            *metricsCount += 1;
+        }
+    }
+
+    if (config.monitoredLevels | PROTOMON_LEVEL_ROUTING)
+    {
+        uint16_t offset = metricsPayloadHeader;
+        RoutingMetrics metrics = routingMetrics;
+
+        // Reset metrics
+        resetRoutingMetrics();
+        time_t timestamp = time(NULL);
+
+        for (uint8_t i = metrics.minAddr; i <= metrics.maxAddr; i++)
+        {
+            const Routing_Data data = metrics.data[i];
+            // Generate CSV row for each non zero node
+            if (data.sent > 0 || data.recv > 0)
+            {
+                uint8_t row[150];
+                memset(row, 0, sizeof(row));
+                uint8_t extra[50];
+                memset(extra, 0, sizeof(extra));
+                int extraLen = Routing_getMetricsData(extra, i);
+                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (unsigned long)(data.totalLatency / data.recv) : 0);
+                if (extraLen)
+                {
+                    rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), ",%s", extra);
+                }
+                uint8_t path[MAX_PAYLOAD_SIZE];
+                if (strlen(data.path))
+                {
+                    strcpy(path, data.path);
+                }
+                else
+                {
+                    strcpy(path, "");
+                }
+                rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), ",%s", strlen(data.path) ? data.path : (uint8_t *)"");
+                rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), "\n");
+
+                // clearing the timestamp to save packet size
+                timestamp = 0L;
+
+                if (rowLen < (bufferSize - (usedSize + offset)))
+                {
+                    memcpy(buffer + (usedSize + offset), row, rowLen);
+                    offset += rowLen;
+                }
+                else
+                {
+                    // if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(ERROR, "Routing metrics buffer overflow\n");
+                        fflush(stdout);
+                        exit(EXIT_FAILURE);
+                    }
+                    break;
+                }
+            }
+        }
+
+        if (offset > metricsPayloadHeader)
+        {
+            buffer[usedSize] = CTRL_ROU;
+            usedSize++;
+            offset -= (metricsPayloadHeader);
+            memcpy(buffer + usedSize, &offset, sizeof(offset));
+            usedSize += offset + sizeof(offset);
+            *metricsCount += 1;
+        }
+    }
+
+    if (config.monitoredLevels | PROTOMON_LEVEL_TOPO)
+    {
+        uint16_t offset = metricsPayloadHeader;
+
+        offset += Routing_getTopologyData(buffer + (usedSize + offset), bufferSize - (usedSize + offset));
+
+        if (offset > metricsPayloadHeader)
+        {
+            buffer[usedSize] = CTRL_TAB;
+            usedSize++;
+            offset -= (metricsPayloadHeader);
+            memcpy(buffer + usedSize, &offset, sizeof(offset));
+            usedSize += offset + sizeof(offset);
+            *metricsCount += 1;
+        }
+    }
+
+    if (config.loglevel > DEBUG && usedSize > 1)
+    {
+        logMessage(DEBUG, "Metrics (%d):\n", usedSize);
+        for (int i = 0; i < usedSize; i++)
+        {
+            printf("%02X ", buffer[i]);
+        }
+        printf("\n");
+    }
+    return usedSize > 1 ? usedSize : 0;
 }
 
 static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
@@ -305,10 +488,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = MAC_getMetricsData(extra, i);
-                if (!extraLen){
-                    continue;
-                }
-                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, (data.sent + metrics.data[0].broadcast), data.recv, data.recv > 0 ? (data.latency / data.recv) : 0);
+                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.recv > 0 ? (unsigned long)(data.latency / data.recv) : 0);
                 if (extraLen)
                 {
                     rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), ",%s", extra);
@@ -352,10 +532,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 uint8_t extra[50];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = Routing_getMetricsData(extra, i);
-                if (!extraLen){
-                    continue;
-                }
-                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%d", (long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (data.totalLatency / data.recv) : 0);
+                int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (unsigned long)(data.totalLatency / data.recv) : 0);
                 if (extraLen)
                 {
                     rowLen += snprintf(row + strlen(row), sizeof(row) - strlen(row), ",%s", extra);
@@ -404,6 +581,42 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         printf("# %s: %d\n%s\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_ROU ? "Routing" : "Table"), usedSize, buffer);
     }
     return usedSize > 1 ? usedSize : 0;
+}
+
+static void *sendMetrics_funcV2(void *args)
+{
+    sleep(config.initialSendWaitS + config.sendIntervalS);
+    uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead() + sizeof(uint8_t) + sizeof(uint16_t));
+
+    while (1)
+    {
+        uint8_t *buffer = (uint8_t *)malloc(bufferSize);
+        if (buffer == NULL)
+        {
+            logMessage(ERROR, "Error allocating memory for routing metrics buffer\n");
+            fflush(stdout);
+            exit(EXIT_FAILURE);
+        }
+
+        uint8_t metricsCount;
+        uint16_t bufLen = getMetricsBufferV2(buffer, bufferSize, &metricsCount);
+        if (bufLen)
+        {
+            if (!sendMetricsToSinkV2(buffer, bufLen, metricsCount))
+            {
+                logMessage(ERROR, "Failed to send metrics to sink\n");
+                fflush(stdout);
+            }
+            else
+            {
+                logMessage(INFO, "Sent metrics to %02d\n", ADDR_SINK);
+            }
+        }
+        free(buffer);
+
+        sleep(config.sendIntervalS);
+    }
+    return NULL;
 }
 
 static void *sendMetrics_func(void *args)
@@ -550,7 +763,8 @@ void ProtoMon_init(ProtoMon_Config c)
         // Must always override Routing layer functions to capture monitoring data
         Routing_sendMsg = &ProtoMon_Routing_sendMsg;
         Routing_recvMsg = &ProtoMon_Routing_recvMsg;
-        Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsg;
+        // Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsg;
+        Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsgV2;
 
         // Must always override MAC functions to increment numHops
         MAC_send = &ProtoMon_MAC_send;
@@ -593,7 +807,7 @@ void ProtoMon_init(ProtoMon_Config c)
         if (config.self != ADDR_SINK)
         {
             pthread_t sendMetricsT;
-            if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
+            if (pthread_create(&sendMetricsT, NULL, sendMetrics_funcV2, NULL) != 0)
             {
                 logMessage(ERROR, "Failed to create sendMetrics thread\n");
                 exit(EXIT_FAILURE);
@@ -978,6 +1192,156 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
     return 0;
 }
 
+int ProtoMon_Routing_timedRecvMsgV2(Routing_Header *header, uint8_t *data, unsigned int timeout)
+{
+    time_t start = time(NULL);
+    uint16_t overhead = getRoutingOverhead();
+    uint8_t extendedData[MAX_PAYLOAD_SIZE];
+    if (extendedData == NULL)
+    {
+        logMessage(ERROR, "%s Error allocating memory for extendedData buffer\n", __func__);
+        fflush(stdout);
+        exit(EXIT_FAILURE);
+    }
+    int len = Original_Routing_timedRecvMsg(header, extendedData, timeout);
+    if (len <= 0)
+    {
+        return len;
+    }
+    uint8_t *temp = extendedData;
+    uint8_t ctrl = *temp;
+    uint16_t extLen = len - overhead;
+
+    if (config.loglevel >= TRACE)
+    {
+        logMessage(TRACE, "%s: ", __func__);
+        for (int i = 0; i < overhead; i++)
+            printf("%02X ", extendedData[i]);
+        printf("|");
+        for (int i = overhead; i < len; i++)
+            printf(" %02X", extendedData[i]);
+        printf("\n");
+    }
+
+    if (ctrl == CTRL_MSG)
+    {
+        uint8_t src = header->src;
+        extendedData[len] = '\0';
+
+        // Extract routing monitoring fields
+        uint8_t numHops;
+        time_t ts;
+        temp += sizeof(ctrl);
+        memcpy(&numHops, temp, sizeof(numHops));
+        temp += sizeof(numHops);
+        memcpy(&ts, temp, sizeof(ts));
+        temp += sizeof(ts);
+
+        strcpy(data, temp);
+        uint16_t dataLen = strlen(data);
+        temp += dataLen + 1;
+
+        uint16_t latency = (time(NULL) - ts);
+        if (config.loglevel >= DEBUG)
+        {
+            logMessage(DEBUG, "ProtoMon : %s hops: %d delay: %d s\n", data, numHops, latency);
+            logMessage(DEBUG, "Path: %s\n", lastPath);
+        }
+
+        // Capture metrics
+        sem_wait(&routingMetrics.mutex);
+        if (src > routingMetrics.maxAddr)
+        {
+            routingMetrics.maxAddr = src;
+        }
+        if (src < routingMetrics.minAddr)
+        {
+            routingMetrics.minAddr = src;
+        }
+        routingMetrics.data[src].recv++;
+        routingMetrics.data[src].totalLatency += latency;
+        routingMetrics.data[src].numHops = numHops;
+        memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
+        strcpy(routingMetrics.data[src].path, lastPath);
+        sem_post(&routingMetrics.mutex);
+
+        return extLen;
+    }
+    else if (ctrl == CTRL_MET)
+    {
+        if (config.self == ADDR_SINK)
+        {
+            uint8_t metricsCount;
+            memcpy(&metricsCount, ++temp, sizeof(metricsCount));
+            temp += sizeof(metricsCount);
+
+            logMessage(INFO, "Received %d metrics from Node %02d\n", metricsCount, header->src);
+
+            for (uint8_t i = 0; i < metricsCount; i++)
+            {
+                uint8_t metricCtrl = *(temp++);
+                uint16_t bufferLen;
+                memcpy(&bufferLen, temp, sizeof(bufferLen));
+                temp += sizeof(bufferLen);
+
+                uint8_t *metricBuffer = (uint8_t *)malloc(bufferLen + 1);
+                if (!metricBuffer)
+                {
+                    logMessage(ERROR, "%s: malloc failed\n", __func__);
+                    fflush(stdout);
+                    exit(EXIT_FAILURE);
+                }
+                memcpy(metricBuffer, temp, bufferLen);
+                temp += bufferLen;
+                metricBuffer[bufferLen] = '\0';
+
+                const char *fileName = (metricCtrl == CTRL_MAC) ? macCSV : (metricCtrl == CTRL_TAB ? networkCSV : routingCSV);
+                int writeLen = writeBufferToFile(fileName, metricBuffer);
+                if (writeLen <= 0)
+                {
+                    logMessage(ERROR, "Error writing to %s file!\n", fileName);
+                    fflush(stdout);
+                    exit(EXIT_FAILURE);
+                }
+                free(metricBuffer);
+
+                // Write corresponding sink metrics to file
+                time_t *lastWrite = (metricCtrl == CTRL_MAC) ? &lastMacWrite : (metricCtrl == CTRL_TAB ? &lastNeighborWrite : &lastRoutingWrite);
+                if (time(NULL) - *lastWrite > config.sendIntervalS)
+                {
+                    uint16_t bufferSize = MAX_PAYLOAD_SIZE;
+                    uint8_t buffer[bufferSize];
+                    if (buffer == NULL)
+                    {
+                        logMessage(ERROR, "Error allocating memory for %s data buffer!\n", metricCtrl == CTRL_MAC ? "MAC" : (metricCtrl == CTRL_TAB ? "Neigbour" : "Routing"));
+                        fflush(stdout);
+                        exit(EXIT_FAILURE);
+                    }
+                    uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, metricCtrl);
+                    if (bufLen)
+                    {
+                        if (writeBufferToFile(fileName, buffer) <= 0)
+                        {
+                            logMessage(ERROR, "Error writing to %s file!\n", fileName);
+                            fflush(stdout);
+                            exit(EXIT_FAILURE);
+                        }
+                        *lastWrite = time(NULL);
+                    }
+                }
+            }
+        }
+    }
+    uint16_t delay = lastVizTime == 0 ? config.initialSendWaitS : 0;
+    if (config.self == ADDR_SINK && time(NULL) - lastVizTime > (delay + config.vizIntervalS))
+    {
+        generateGraph();
+        lastVizTime = time(NULL);
+    }
+
+    return 0;
+}
+
 int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned int len)
 {
     uint16_t overhead = getMACOverhead();
@@ -1099,7 +1463,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
             time_t mac_ts;
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
-            unsigned int latency = (time(NULL) - mac_ts);
+            uint16_t latency = (time(NULL) - mac_ts);
             if (config.loglevel >= DEBUG)
             {
                 logMessage(DEBUG, "ProtoMon : hop src:%02d latency:%ds\n", src, latency);
@@ -1215,7 +1579,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
             time_t mac_ts;
             memcpy(&mac_ts, temp, sizeof(mac_ts));
             temp += sizeof(mac_ts);
-            unsigned int latency = (time(NULL) - mac_ts);
+            uint16_t latency = (time(NULL) - mac_ts);
             if (config.loglevel >= DEBUG)
             {
                 printf("ProtoMon : hop src:%02d latency:%ds\n", src, latency);

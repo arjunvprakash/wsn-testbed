@@ -124,10 +124,10 @@ int main(int argc, char *argv[])
 
 	protomon.vizIntervalS = 60;
 	protomon.loglevel = INFO;
-	protomon.sendIntervalS = 15;
+	protomon.sendIntervalS = 30;
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
-	protomon.initialSendWaitS = config.maxSyncSleepS;
+	protomon.initialSendWaitS = 0;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);

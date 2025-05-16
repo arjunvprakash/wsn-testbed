@@ -1276,11 +1276,10 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
             uint8_t row[100];
             int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
 
-            // Clear timestamp to avoid duplicate
+            // Clear timestamp to avoid unnecessary redundancy
             timestamp = 0L;
 
-            // if (offset + rowlen < size)
-            if (1)
+            if (offset + rowlen < size)
             {
                 memcpy(buffer + offset, row, rowlen);
                 offset += rowlen;
