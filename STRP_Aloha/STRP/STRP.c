@@ -33,6 +33,7 @@ typedef struct DataPacket
     uint8_t src;
     uint16_t len;
     uint8_t *data;
+    Routing_Header metadata;
 } DataPacket;
 
 typedef struct PacketQueue
@@ -96,10 +97,12 @@ typedef struct Metrics
 static Metrics metrics;
 
 static PacketQueue sendQ, recvQ;
+static uint16_t sendSeq[MAX_ACTIVE_NODES] = {0};
+static uint16_t recvSeq[MAX_ACTIVE_NODES] = {0};
 static pthread_t recvT;
 static pthread_t sendT;
 static MAC mac;
-static const unsigned short headerSize = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t); // [ ctrl | dest | src | len[2] ]
+static const unsigned short headerSize = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seqId[2] | len[2] ]
 static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
@@ -121,8 +124,6 @@ static DataPacket deserializePacket(uint8_t *pkt);
 static void *sendPackets_func(void *args);
 static int serializePacket(DataPacket msg, uint8_t **routePkt);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
-static void *sendBeaconHandler(void *args);
-static void *receiveBeaconHandler(void *args);
 static void senseNeighbours();
 static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parentRSSI);
 static void changeParent();
@@ -150,7 +151,7 @@ int STRP_init(STRP_Config c)
         return 1;
     }
 
-    if (c.strategy == FIXED && c.self != ADDR_SINK && (c.parentTable == NULL || *(c.parentTable + c.self) == 0))
+    if (c.strategy == FIXED && c.self != ADDR_SINK && (c.parentTable == NULL || c.parentTable[c.self] == 0))
     {
         logMessage(ERROR, "STRP: parentTable not provided with FIXED strategy.");
         exit(EXIT_FAILURE);
@@ -160,14 +161,13 @@ int STRP_init(STRP_Config c)
     setConfigDefaults(&c);
     config = c;
     srand(config.self * time(NULL));
-    mac.debug = 0;
+    ALOHA_init(&mac, config.self);
     if (config.loglevel > INFO)
     {
         mac.debug = 1;
     }
     mac.recvTimeout = config.recvTimeoutMs;
-    mac.maxtrials = 2;
-    ALOHA_init(&mac, config.self);
+    // mac.maxtrials = 2;
     sendQ_init();
     recvQ_init();
     initNeighbours();
@@ -205,7 +205,7 @@ int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     DataPacket msg;
     msg.ctrl = CTRL_PKT;
     msg.dest = dest;
-    msg.src = mac.addr;
+    msg.src = config.self;
     msg.len = len;
     msg.data = (uint8_t *)malloc(len);
     if (msg.data)
@@ -224,10 +224,13 @@ int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 int STRP_recvMsg(Routing_Header *header, uint8_t *data)
 {
     DataPacket msg = recvMsgQ_dequeue();
-    header->dst = msg.dest;
-    header->RSSI = mac.RSSI;
+
+    // Populate header with message metadata
+    header->dst = msg.metadata.dst;
+    header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
-    header->prev = mac.recvH.src_addr;
+    header->prev = msg.metadata.prev;
+
     if (msg.data)
     {
         memcpy(data, msg.data, msg.len);
@@ -256,11 +259,11 @@ int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
         return result;
     }
 
-    // Populate header with message details
-    header->dst = msg.dest;
-    header->RSSI = mac.RSSI;
+    // Populate header with message metadata
+    header->dst = msg.metadata.dst;
+    header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
-    header->prev = mac.recvH.src_addr;
+    header->prev = msg.metadata.prev;
 
     if (msg.data != NULL)
     {
@@ -415,7 +418,6 @@ static DataPacket recvMsgQ_dequeue()
 static void *recvPackets_func(void *args)
 {
     unsigned int total[MAX_ACTIVE_NODES] = {0};
-    MAC *macTemp = (MAC *)args;
     time_t start = time(NULL);
     time_t current;
     while (1)
@@ -425,18 +427,25 @@ static void *recvPackets_func(void *args)
         {
             continue;
         }
+
+        MAC mac1 = mac;
+        MAC *macTemp = &mac1;
         int pktSize = MAC_timedRecv(macTemp, pkt, 1);
         if (pktSize == 0)
         {
             free(pkt);
             continue;
         }
+        Routing_Header metadata;
+        metadata.prev = macTemp->recvH.src_addr;
+        metadata.RSSI = macTemp->RSSI;
+
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT)
         {
             uint8_t dest = *(pkt + sizeof(ctrl));
             uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, ADDR_BROADCAST, MIN_RSSI);
+            updateActiveNodes(metadata.prev, metadata.RSSI, ADDR_BROADCAST, MIN_RSSI);
 
             if (config.loglevel >= TRACE)
             {
@@ -449,23 +458,26 @@ static void *recvPackets_func(void *args)
                 printf("\n");
             }
 
-            if (dest == macTemp->addr)
+            if (dest == config.self)
             {
                 DataPacket msg = deserializePacket(pkt);
                 // Keep
                 if (msg.len > 0 && msg.data != NULL)
                 {
+                    metadata.dst = msg.dest;
+                    metadata.src = msg.src;
+                    msg.metadata = metadata;
                     recvQ_enqueue(msg);
                 }
             }
             else // Forward
             {
                 // Loop detection logic
-                if ((src == mac.addr || src == parentAddr) && mac.recvH.src_addr != loopyParent)
+                if ((src == config.self || src == parentAddr) && metadata.prev != loopyParent)
                 {
-                    loopyParent = (src == mac.addr) ? mac.recvH.src_addr : parentAddr; // To skip duplicate loop detection
+                    loopyParent = (src == config.self) ? metadata.prev : parentAddr; // To skip duplicate loop detection
                     printf("%s - Loop detected %02d\n", timestamp(), loopyParent);
-                    // if (mac.addr > mac.recvH.src_addr) // To avoid both nodes changing parents
+                    // if (config.self > metadata.prev) // To avoid both nodes changing parents
                     if (1) // Always change parent
                     {
                         changeParent();
@@ -493,10 +505,10 @@ static void *recvPackets_func(void *args)
             Beacon *beacon = (Beacon *)pkt;
             if (config.loglevel >= DEBUG)
             {
-                printf("# %s - Beacon src: %02d (%d) parent: %02d(%d)\n", timestamp(), mac.recvH.src_addr, mac.RSSI, beacon->parent, beacon->parentRSSI);
+                printf("# %s - Beacon src: %02d (%d) parent: %02d(%d)\n", timestamp(), metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
             }
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI, beacon->parent, beacon->parentRSSI);
-            metrics.data[mac.recvH.src_addr].beaconsRecv++;
+            updateActiveNodes(metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
+            metrics.data[metadata.prev].beaconsRecv++;
         }
         else
         {
@@ -523,6 +535,19 @@ static DataPacket deserializePacket(uint8_t *pkt)
 
     msg.src = *pkt;
     pkt += sizeof(msg.src);
+
+    // Extract Sequence id
+    uint16_t seqId;
+    memcpy(&seqId, pkt, sizeof(seqId));
+    pkt += sizeof(seqId);
+
+    if (seqId <= recvSeq[msg.src] && recvSeq[msg.src] != 0)
+    {
+        msg.len = 0;
+        msg.data = NULL;
+        return msg;
+    }
+    recvSeq[msg.src] = seqId;
 
     memcpy(&msg.len, pkt, sizeof(msg.len));
     pkt += sizeof(msg.len);
@@ -556,8 +581,13 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
     p += sizeof(msg.dest);
 
     // Set source as config.self
-    *p = mac.addr;
-    p += sizeof(mac.addr);
+    *p = config.self;
+    p += sizeof(config.self);
+
+    // Set Sequence id
+    sendSeq[msg.dest]++;
+    memcpy(p, &sendSeq[msg.dest], sizeof(sendSeq[msg.dest]));
+    p += sizeof(sendSeq[msg.dest]);
 
     // Set actual msg length
     memcpy(p, &msg.len, sizeof(msg.len));
@@ -572,7 +602,6 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
 
 static void *sendPackets_func(void *args)
 {
-    MAC *macTemp = (MAC *)args;
     while (1)
     {
         DataPacket msg = sendQ_dequeue();
@@ -586,6 +615,10 @@ static void *sendPackets_func(void *args)
         {
             continue;
         }
+
+        MAC mac1 = mac;
+        MAC *macTemp = &mac1;
+
         time_t start = time(NULL);
         if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
         {
@@ -602,10 +635,11 @@ static void *sendPackets_func(void *args)
                 for (int i = headerSize; i < pktSize; i++)
                     printf(" %02X", pkt[i]);
                 printf("\n");
+                fflush(stdout);
             }
         }
         free(pkt);
-        usleep(1000000); // Sleep 1s
+        usleep(randInRange(500000, 1200000)); // Sleep 1s
     }
     return NULL;
 }
@@ -628,8 +662,13 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt)
     p += sizeof(msg.dest);
 
     // Set source as config.self
-    *p = mac.addr;
-    p += sizeof(mac.addr);
+    *p = config.self;
+    p += sizeof(config.self);
+
+    // Set Sequence id
+    sendSeq[msg.dest]++;
+    memcpy(p, &sendSeq[msg.dest], sizeof(sendSeq[msg.dest]));
+    p += sizeof(sendSeq[msg.dest]);
 
     // Set actual msg length
     memcpy(p, &msg.len, sizeof(msg.len));
@@ -641,75 +680,13 @@ static int serializePacket(DataPacket msg, uint8_t **routePkt)
     return routePktSize;
 }
 
-static void *sendBeaconHandler(void *args)
-{
-
-    MAC *m = (MAC *)args;
-    int count = 0;
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Sending beacons...\n", timestamp());
-        fflush(stdout);
-    }
-
-    time_t start = time(NULL);
-    do
-    {
-        sendBeacon();
-        count++;
-        usleep(randInRange(500000, 1200000));
-    } while (time(NULL) - start < config.senseDurationS);
-
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Sent %d beacons...\n", timestamp(), count);
-        fflush(stdout);
-    }
-    return NULL;
-}
-
-static void *receiveBeaconHandler(void *args)
-{
-    MAC *m = (MAC *)args;
-    int trials = 0;
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Listening for beacons...\n", timestamp());
-    }
-    time_t start = time(NULL);
-    time_t current;
-    do
-    {
-        unsigned char data[sizeof(Beacon)];
-        int len = MAC_timedRecv(m, (unsigned char *)&data, 1);
-        if (len > 0)
-        {
-            Beacon *beacon = (Beacon *)data;
-            if (beacon->ctrl == CTRL_BCN)
-            {
-                uint8_t addr = m->recvH.src_addr;
-                int rssi = m->RSSI;
-                updateActiveNodes(addr, rssi, beacon->parent, beacon->parentRSSI);
-                trials++;
-            }
-        }
-        usleep(rand() % 1000);
-        current = time(NULL);
-    } while (current - start <= config.senseDurationS);
-    if (config.loglevel >= DEBUG)
-    {
-        printf("# %s - Received %d beacons...\n", timestamp(), trials);
-    }
-    return NULL;
-}
-
 static void senseNeighbours()
 {
     if (config.strategy != FIXED)
     {
         parentAddr = INITIAL_PARENT;
+        neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
     }
-    neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
 
     do
     {
@@ -740,13 +717,13 @@ static void senseNeighbours()
             {
                 printf("%s - No neighbors detected.Trying again...\n", timestamp());
             }
-            // else if (neighbours.nodes[parentAddr].RSSI == MIN_RSSI)
-            // {
-            //     // Strategy = FIXED
-            //     // Exit if assigned parent node not a neighbor
-            //     logMessage(ERROR, "STRP: Parent node %d not a neighbor\n");
-            //     exit(EXIT_FAILURE);
-            // }
+            else if (neighbours.nodes[parentAddr].RSSI == MIN_RSSI)
+            {
+                // // Strategy = FIXED
+                // Exit if assigned parent node not a neighbor
+                // logMessage(ERROR, "STRP: Parent node %02d not a neighbor\n", parentAddr);
+                // exit(EXIT_FAILURE);
+            }
             else
             {
                 break;
@@ -800,7 +777,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     {
         nodePtr->link = OUTBOUND;
     }
-    else if (parent == mac.addr)
+    else if (parent == config.self)
     {
         nodePtr->link = INBOUND;
         child = true;
@@ -817,7 +794,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
     nodePtr->RSSI = RSSI;
     nodePtr->lastSeen = time(NULL);
     sem_post(&neighbours.mutex);
-    if (child && parentAddr == addr && addr < mac.addr)
+    if (child && parentAddr == addr && addr < config.self)
     {
         printf("%s - Direct loop with %02d..\n", timestamp(), addr);
         // loopyParent = addr;
@@ -833,11 +810,11 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
         }
 
         // change parent if new neighbour fits
-        if (config.strategy != FIXED && mac.addr != ADDR_SINK && !child && addr != parentAddr)
+        if (config.strategy != FIXED && config.self != ADDR_SINK && !child && addr != parentAddr)
         {
             bool changed = false;
             uint8_t prevParentAddr = parentAddr;
-            if (config.strategy == NEXT_LOWER && addr > parentAddr && addr < mac.addr)
+            if (config.strategy == NEXT_LOWER && addr > parentAddr && addr < config.self)
             {
                 parentAddr = addr;
                 changed = true;
@@ -847,7 +824,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
                 parentAddr = addr;
                 changed = true;
             }
-            if (config.strategy == RANDOM_LOWER && addr < mac.addr && (rand() % 101) < 50)
+            if (config.strategy == RANDOM_LOWER && addr < config.self && (rand() % 101) < 50)
             {
                 parentAddr = addr;
                 changed = true;
@@ -857,7 +834,7 @@ static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parent
                 parentAddr = addr;
                 changed = true;
             }
-            if (config.strategy == CLOSEST_LOWER && RSSI > neighbours.nodes[parentAddr].RSSI && addr < mac.addr)
+            if (config.strategy == CLOSEST_LOWER && RSSI > neighbours.nodes[parentAddr].RSSI && addr < config.self)
             {
                 parentAddr = addr;
                 changed = true;
@@ -925,7 +902,7 @@ void selectClosestLowerNeighbour()
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
         {
-            if (node.link != INBOUND && node.RSSI >= newParentRSSI && node.addr < mac.addr && node.addr != parentAddr)
+            if (node.link != INBOUND && node.RSSI >= newParentRSSI && node.addr < config.self && node.addr != parentAddr)
             {
                 if (config.loglevel >= DEBUG)
                 {
@@ -982,7 +959,7 @@ static void selectNextLowerNeighbour()
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
 
-    for (uint8_t i = activeNodes.minAddr; i < mac.addr; i++)
+    for (uint8_t i = activeNodes.minAddr; i < config.self; i++)
     {
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
@@ -1108,7 +1085,7 @@ static void changeParent()
         selectClosestLowerNeighbour();
         break;
     case FIXED:
-        parentAddr = *(config.parentTable + config.self);
+        parentAddr = config.parentTable[config.self];
         break;
     default:
         selectNextLowerNeighbour();
@@ -1345,7 +1322,7 @@ void setConfigDefaults(STRP_Config *config)
     }
     if (config->strategy == FIXED)
     {
-        parentAddr = *(config->parentTable + config->self);
+        parentAddr = config->parentTable[config->self];
     }
 }
 

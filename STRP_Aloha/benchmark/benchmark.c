@@ -25,229 +25,54 @@ static const char *outputFile = "recv.csv";
 static const char *inputFile = "send.csv";
 static const char *resultsDir = "results";
 
-static uint8_t self;
+typedef struct Benchmark_Config
+{
+	uint8_t self;
+	bool monitoringEnabled;
+	unsigned int runtTimeS;
+	unsigned short maxSyncSleepS;
+	unsigned short senseDurationS;
+	uint8_t parentTable[MAX_ACTIVE_NODES], nodeCount;
+	uint8_t hopCountTable[MAX_ACTIVE_NODES], minHopCount, maxHopCount;
+	uint8_t pktCountTable[MAX_ACTIVE_NODES], minPktCount, maxPktCount;
+} Benchmark_Config;
+
 static unsigned int startTime;
 static unsigned long long startTimeMs;
-static char configStr[300];
+static char configStr[350];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
 
 static pthread_t recvT;
 static pthread_t sendT;
 
-ProtoMon_Config config;
+Benchmark_Config config;
+ProtoMon_Config protomon;
 STRP_Config strp;
-static uint8_t parentTable[MAX_ACTIVE_NODES], hopCountTable[MAX_ACTIVE_NODES], pktCountTable[MAX_ACTIVE_NODES];
-
-static bool monitoringEnabled = false;
-static unsigned int runtTimeS = 120;
-static unsigned short maxSyncSleepS = 10;
-static unsigned short senseDurationS = 5;
 
 static void initParentTable()
 {
-	// parentTable[1] = 5;
-	// parentTable[4] = 5;
-	// parentTable[5] = 7;
-	// parentTable[6] = 7;
-	parentTable[7] = 13;
-	parentTable[8] = 13;
-	// parentTable[9] = ADDR_SINK;
-	// parentTable[12] = 15;
-	parentTable[13] = ADDR_SINK;
-	// parentTable[14] = 0; // Sink
-	// parentTable[15] = 16;
-	// parentTable[16] = 19;
-	parentTable[18] = ADDR_SINK;
-	// parentTable[19] = ADDR_SINK;
-	parentTable[20] = 18;
-	// parentTable[21] = 23;
-	parentTable[22] = 18;
-	// // parentTable[23] = 25;
-	parentTable[24] = 22;
-	// parentTable[25] = 28;
-	parentTable[27] = 22;
-	// parentTable[28] = ADDR_SINK;
-}
-
-static unsigned short getHopCount(uint8_t node)
-{
-	uint8_t parent = parentTable[node];
-	if (node == ADDR_SINK || parent == 0)
-	{
-		return 0;
-	}
-	if (parent == ADDR_SINK)
-	{
-		return 1;
-	}
-	else
-	{
-		if (hopCountTable[parent] == 0)
-		{
-			hopCountTable[parent] = getHopCount(parent);
-		}
-
-		return 1 + hopCountTable[parent];
-	}
-}
-
-static void initHopCountTable()
-{
-	if (loglevel >= DEBUG)
-	{
-		logMessage(DEBUG, "------\n");
-		logMessage(DEBUG, "HopCount:\n");
-	}
-	for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
-	{
-		if (parentTable[i] > 0)
-		{
-			hopCountTable[i] = getHopCount(i);
-			if (loglevel >= DEBUG)
-			{
-				logMessage(DEBUG, "%02d: %d\n", i, hopCountTable[i]);
-			}
-		}
-	}
-	if (loglevel >= DEBUG)
-	{
-		logMessage(DEBUG, "------");
-	}
-}
-
-static void initPktCountTable()
-{
-	int numLine;
-	char filePath[100];
-	sprintf(filePath, "../../benchmark/%s", inputFile);
-	// Read from config.txt
-	FILE *file = fopen(filePath, "r");
-	if (file == NULL)
-	{
-		logMessage(ERROR, "Failed to open %s\n", filePath);
-		fflush(stdout);
-		exit(EXIT_FAILURE);
-	}
-	char line[256];
-	while (fgets(line, sizeof(line), file) != NULL)
-	{
-		if (numLine++ == 0)
-		{
-			continue; // Skip header line
-		}
-
-		char sleep[10];
-		char nodes[100];
-		char dest[2];
-		char size[3];
-
-		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
-		{
-			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
-			fflush(stdout);
-			// exit(EXIT_FAILURE);
-			continue;
-		}
-
-		if (loglevel >= TRACE)
-		{
-			logMessage(TRACE, "Nodes Expr: %s\n", nodes);
-		}
-
-		if (nodes[0] == '*')
-		{
-			// Include all nodes, no filtering needed
-			pktCountTable[0]++;
-		}
-		else
-		{
-			int include = (nodes[0] != '!');
-			if (!include && nodes[1] == '*')
-			{
-				continue;
-			}
-
-			char *token = strtok(include ? nodes : nodes + 1, "|");
-			int match = 0;
-			while (token != NULL)
-			{
-				uint8_t addr = atoi(token);
-				if (include)
-				{
-					pktCountTable[addr]++;
-				}
-				else
-				{
-					pktCountTable[addr]--;
-				}
-				if (loglevel >= TRACE)
-				{
-					logMessage(TRACE, "%02d: %d\n", addr, pktCountTable[addr]);
-				}
-				token = strtok(NULL, "|");
-			}
-		}
-	}
-	fclose(file);
-	if (loglevel >= DEBUG)
-	{
-		logMessage(DEBUG, "------\n");
-		logMessage(DEBUG, "Packet Count:\n");
-	}
-	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
-	{
-
-		if (parentTable[i] > 0)
-		{
-			pktCountTable[i] += pktCountTable[0];
-			if (loglevel >= DEBUG)
-			{
-				logMessage(DEBUG, "%02d: %d\n", i, pktCountTable[i]);
-			}
-		}
-	}
-	if (loglevel >= DEBUG)
-	{
-		logMessage(DEBUG, "------\n");
-	}
-}
-
-// List of nodes for which the config applies
-// * to include all nodes
-//  !xx|yy|zz to exclude node xx, yy & zz and
-//  xx|yy|zz to include nodes xx, yy & zz
-static int searchNodesExpr(char *nodes, uint8_t addr)
-{
-	if (nodes[0] == '*')
-	{
-		// Include all nodes, no filtering needed
-		return 1;
-	}
-	else
-	{
-		int include = (nodes[0] != '!');
-		if (!include && nodes[1] == '*')
-		{
-			return 0;
-		}
-
-		char *token = strtok(include ? nodes : nodes + 1, "|");
-		int match = 0;
-		while (token != NULL)
-		{
-			if (atoi(token) == addr)
-			{
-				match = 1;
-				break;
-			}
-			token = strtok(NULL, "|");
-		}
-		if ((include && !match) || (!include && match))
-		{
-			return 0; // addr is not included
-		}
-		return 1;
-	}
+	// config.parentTable[1] = 12;
+	// config.parentTable[4] = 6;
+	// config.parentTable[5] = 6;
+	// config.parentTable[6] = 12;
+	config.parentTable[7] = ADDR_SINK;
+	config.parentTable[8] = ADDR_SINK;
+	// config.parentTable[9] = ADDR_SINK;
+	// config.parentTable[12] = ADDR_SINK;
+	config.parentTable[13] = ADDR_SINK;
+	// // config.parentTable[14] = 0; // Sink
+	// config.parentTable[15] = 16;
+	// config.parentTable[16] = 19;
+	config.parentTable[18] = ADDR_SINK;
+	// config.parentTable[19] = ADDR_SINK;
+	config.parentTable[20] = ADDR_SINK;
+	// config.parentTable[21] = 23;
+	config.parentTable[22] = ADDR_SINK;
+	// config.parentTable[23] = 25;
+	config.parentTable[24] = ADDR_SINK;
+	// config.parentTable[25] = ADDR_SINK;
+	config.parentTable[27] = ADDR_SINK;
+	// config.parentTable[28] = ADDR_SINK;
 }
 
 static void *sendMsg_func(void *args);
@@ -260,68 +85,74 @@ static void syncTime(unsigned int n);
 static void installDependencies();
 static void startHttpServer(int port);
 static void initOutputDir();
+static unsigned short getHopCount(uint8_t node);
+static int searchNodesExpr(char *nodes, uint8_t addr);
+static void initPktCountTable();
+static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
-	logMessage(INFO, "Node: %02d\n", self);
-	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
-	if (self != ADDR_SINK)
+	config.self = (uint8_t)atoi(argv[1]);
+	config.monitoringEnabled = true;
+	config.runtTimeS = 180;
+	config.maxSyncSleepS = 30;
+	config.senseDurationS = 15;
+
+	logMessage(INFO, "Node: %02d\n", config.self);
+	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
+	if (config.self != ADDR_SINK)
 	{
 		logMessage(INFO, "ADDR_SINK : %02d\n", ADDR_SINK);
 	}
-	srand(self * time(NULL));
+	srand(config.self * time(NULL));
 
 	fflush(stdout);
 
 	initParentTable();
-	if (self == ADDR_SINK)
-	{
-		initHopCountTable();
-	}
+	initHopCountTable();
+	initPktCountTable();
 
 	strp.beaconIntervalS = 32;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 63;
 	strp.recvTimeoutMs = 1000;
-	strp.self = self;
-	strp.senseDurationS = senseDurationS;
+	strp.self = config.self;
+	strp.senseDurationS = config.senseDurationS;
 	strp.strategy = FIXED;
-	strp.parentTable = parentTable;
+	strp.parentTable = config.parentTable;
 	STRP_init(strp);
 
-	config.vizIntervalS = 60;
-	config.loglevel = INFO;
-	config.sendIntervalS = 30;
-	config.self = self;
-	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = maxSyncSleepS;
-	if (monitoringEnabled)
+	protomon.vizIntervalS = 60;
+	protomon.loglevel = INFO;
+	protomon.sendIntervalS = 15;
+	protomon.self = config.self;
+	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
+	protomon.initialSendWaitS = config.maxSyncSleepS;
+	if (config.monitoringEnabled)
 	{
-		ProtoMon_init(config);
+		ProtoMon_init(protomon);
 	}
 
-	if (self == ADDR_SINK)
+	if (config.self == ADDR_SINK)
 	{
 		initOutputDir();
-		initPktCountTable();
 		installDependencies();
-		if (!monitoringEnabled)
+		if (!config.monitoringEnabled)
 		{
 			stopProcessOnPort(HTTP_PORT);
 			startHttpServer(HTTP_PORT);
 		}
 	}
-	syncTime(maxSyncSleepS);
+	syncTime(config.maxSyncSleepS);
 
 	startTime = time(NULL);
 	startTimeMs = getEpochMs();
 
-	getConfigStr(configStr, config, strp);
+	getConfigStr(configStr, protomon, strp);
 	logMessage(INFO, "Config:\n%s\n", configStr);
 	fflush(stdout);
 
-	if (self != ADDR_SINK)
+	if (config.self != ADDR_SINK)
 	{
 		Routing_Header header;
 		if (pthread_create(&sendT, NULL, sendMsg_func, &header) != 0)
@@ -371,8 +202,8 @@ static void syncTime(unsigned int n)
 // Generate a string with the experiment configuration
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
 {
-	sprintf(configStr, "Application: self=%d,runtTimeS=%d\n", self, runtTimeS);
-	if (monitoringEnabled)
+	sprintf(configStr, "Application: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d]\n", config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount);
+	if (config.monitoringEnabled)
 	{
 		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
 				protomon.vizIntervalS, protomon.sendIntervalS, protomon.monitoredLevels, protomon.initialSendWaitS);
@@ -429,7 +260,7 @@ static void exitHandler(int signum)
 	{
 		{
 			stopProcessOnPort(HTTP_PORT);
-			// if (loglevel >= DEBUG)
+			if (loglevel >= DEBUG)
 			{
 				logMessage(DEBUG, "Stopped HTTP server on port %d\n", HTTP_PORT);
 			}
@@ -485,15 +316,16 @@ static void generateGraph()
 static void *recvMsg_func(void *args)
 {
 	unsigned int total[MAX_ACTIVE_NODES] = {0};
-	Routing_Header *header = (Routing_Header *)args;
 	unsigned int count = 0;
 
 	char filePath[100];
 	sprintf(filePath, "%s/%s", outputDir, outputFile);
 	FILE *file = fopen(filePath, "a");
 
-	while (time(NULL) - startTime < runtTimeS)
+	while (time(NULL) - startTime < config.runtTimeS)
 	{
+		Routing_Header h;
+		Routing_Header *header = &h;
 		unsigned char buffer[240];
 		int msgLen = Routing_timedRecvMsg(header, buffer, 1);
 		if (msgLen > 0)
@@ -505,17 +337,17 @@ static void *recvMsg_func(void *args)
 			char timestamp[14];
 			char filler[25];
 			char addr[3];
-			// if (loglevel >= DEBUG)
+			if (loglevel >= DEBUG)
 			{
-				logMessage(DEBUG, "Buffer: %s\n", buffer);
-				fflush(stdout);
+				logMessage(DEBUG, "RX buffer: %s\n", buffer);
 			}
 
 			if (sscanf(buffer, "%[^_]_%[^_]_%[^_]_%s", addr, seqId, timestamp, filler) >= 3)
 			{
 				uint8_t src = (uint8_t)atoi(addr);
-				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d\n", count++ == 0 ? startTimeMs : currentTimeMs, self, src, seqId, timestamp, currentTimeMs, hopCountTable[src]);
-				logMessage(INFO, "RX: %02d (%02d) src:%02d (%02d) hops:%d seqId:%s total:%02d\n", header->prev, header->RSSI, header->src, src, hopCountTable[src], seqId, ++total[src]);
+				++total[src];
+				fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d,%d,%d\n", count++ == 0 ? startTimeMs : currentTimeMs, config.self, src, seqId, timestamp, currentTimeMs, config.hopCountTable[src], config.pktCountTable[src], total[src]);
+				logMessage(INFO, "RX: %02d (%02d) src:%02d hops:%d seqId:%s total:%d/%d\n", header->prev, header->RSSI, src, config.hopCountTable[src], seqId, total[src], config.pktCountTable[src]);
 				fflush(stdout);
 			}
 			else
@@ -525,6 +357,14 @@ static void *recvMsg_func(void *args)
 		}
 		usleep((rand() % 200000) + 1000000); // Sleep 1-1.2s to prevent busy waiting
 	}
+	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
+	{
+		if (config.parentTable[i] > 0)
+		{
+			fprintf(file, "%lld,%02d,%02d,%s,%s,%lld,%d,%d,%d\n", getEpochMs(), config.self, i, "", "", getEpochMs(), config.hopCountTable[i], config.pktCountTable[i], total[i]);
+		}
+	}
+
 	fflush(file);
 	fclose(file);
 
@@ -542,7 +382,7 @@ static void initOutputDir()
 	// char cwd[1024];
 	// getcwd(cwd, sizeof(cwd));
 	// if (strstr(cwd, resultsDir) == NULL)
-	if (!monitoringEnabled)
+	if (!config.monitoringEnabled)
 	{
 		// Create results dir
 		sprintf(cmd, "[ -d '%s' ] || mkdir -p '%s'", resultsDir, resultsDir);
@@ -568,12 +408,12 @@ static void initOutputDir()
 
 	char filePath[100];
 	sprintf(filePath, "%s/%s", outputDir, outputFile);
-	const char *cols = "Timestamp,Source,Address,SeqId,SentTimestamp,RecvTimestamp,HopCount";
+	const char *cols = "Timestamp,Source,Address,SeqId,SentTimestamp,RecvTimestamp,HopCount,TotalCount,RecvCount";
 
 	FILE *file = fopen(filePath, "w");
 	if (file == NULL)
 	{
-		logMessage(ERROR, "Failed to open %s\n", filePath);
+		logMessage(ERROR, "%s: Failed to open %s\n", __func__, filePath);
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
@@ -584,8 +424,7 @@ static void initOutputDir()
 
 static void *sendMsg_func(void *args)
 {
-	Routing_Header *header = (Routing_Header *)args;
-	int total, numLine;
+	int total;
 	unsigned long prevSleep, waitIdle;
 	char filePath[100];
 	sprintf(filePath, "../benchmark/%s", inputFile);
@@ -593,25 +432,29 @@ static void *sendMsg_func(void *args)
 	FILE *file = fopen(filePath, "r");
 	if (file == NULL)
 	{
-		logMessage(ERROR, "Failed to open %s\n", filePath);
+		logMessage(ERROR, "%s: Failed to open %s\n", __func__, filePath);
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
-	char line[256];
-	while ((time(NULL) - startTime) < runtTimeS)
+
+	int numLine = 0;
+	while ((time(NULL) - startTime) < config.runtTimeS)
 	{
+		char line[256];
 		if (fgets(line, sizeof(line), file) == NULL)
 		{
 			break; // End of file reached
 		}
-		if (numLine++ == 0)
+
+		++numLine;
+		if (numLine == 1)
 		{
 			continue; // Skip header line
 		}
 
-		// if (loglevel == DEBUG)
+		if (loglevel == DEBUG)
 		{
-			logMessage(DEBUG, "Line: %s\n", line);
+			logMessage(DEBUG, "Line #%d: %s\n", numLine, line);
 		}
 
 		char sleep[10];
@@ -631,7 +474,7 @@ static void *sendMsg_func(void *args)
 		unsigned short payloadSize = atoi(size);
 		uint8_t dest_addr = atoi(dest);
 
-		if (searchNodesExpr(nodes, self))
+		if (searchNodesExpr(nodes, config.self))
 		{
 			if (sendTime > waitIdle)
 			{
@@ -639,7 +482,7 @@ static void *sendMsg_func(void *args)
 			}
 			else
 			{
-				logMessage(ERROR, "Line %d : Delta to SendTime negative on Node %02d.\n", numLine, self);
+				logMessage(ERROR, "Line %d : Delta to SendTime negative on Node %02d.\n", numLine, config.self);
 				fflush(stdout);
 				exit(EXIT_FAILURE);
 			}
@@ -648,7 +491,7 @@ static void *sendMsg_func(void *args)
 		{
 			if (loglevel >= DEBUG)
 			{
-				logMessage(DEBUG, "Line %d: node %02d excluded.\n", numLine, self);
+				logMessage(DEBUG, "Line %d: node %02d excluded.\n", numLine, config.self);
 				fflush(stdout);
 			}
 
@@ -670,7 +513,7 @@ static void *sendMsg_func(void *args)
 			fflush(stdout);
 		}
 
-		if ((time(NULL) - startTime) >= runtTimeS)
+		if ((time(NULL) - startTime) >= config.runtTimeS)
 		{
 			fclose(file);
 			return NULL;
@@ -689,7 +532,7 @@ static void *sendMsg_func(void *args)
 				memset(additionalBytes + 1, 'a' + ((payloadSize - minPayloadSize) % 26), payloadSize - minPayloadSize - 1);
 			}
 
-			sprintf(buffer, "%02d_%03d_%lld%s", self, ++total, getEpochMs(), additionalBytes);
+			sprintf(buffer, "%02d_%03d_%lld%s", config.self, ++total, getEpochMs(), additionalBytes);
 		}
 		else
 		{
@@ -698,12 +541,12 @@ static void *sendMsg_func(void *args)
 				logMessage(DEBUG, "Payload size %d < minimum %d.Sending default.\n", payloadSize, minPayloadSize);
 				fflush(stdout);
 			}
-			sprintf(buffer, "%02d_%03d_%lld", self, ++total, getEpochMs());
+			sprintf(buffer, "%02d_%03d_%lld", config.self, ++total, getEpochMs());
 		}
 
 		if (Routing_sendMsg(dest_addr, buffer, strlen(buffer)))
 		{
-			logMessage(INFO, "TX: %02d msg: %s total: %02d\n", dest_addr, buffer, total);
+			logMessage(INFO, "TX: %02d msg: %s total: %d/%d\n", dest_addr, buffer, total, config.pktCountTable[config.self]);
 		}
 		else
 		{
@@ -712,7 +555,7 @@ static void *sendMsg_func(void *args)
 		fflush(stdout);
 	}
 	fclose(file);
-	unsigned long idleTime = runtTimeS - (time(NULL) - startTime);
+	unsigned long idleTime = config.runtTimeS - (time(NULL) - startTime);
 	if (idleTime > 0)
 	{
 		logMessage(INFO, "Waiting %d seconds for forwarding\n", idleTime);
@@ -720,4 +563,222 @@ static void *sendMsg_func(void *args)
 		sleep(idleTime); // Sleep for the remaining time
 	}
 	return NULL;
+}
+
+static unsigned short getHopCount(uint8_t node)
+{
+	uint8_t parent = config.parentTable[node];
+	if (node == ADDR_SINK || parent == 0)
+	{
+		return 0;
+	}
+	if (parent == ADDR_SINK)
+	{
+		return 1;
+	}
+	else
+	{
+		if (config.hopCountTable[parent] == 0)
+		{
+			config.hopCountTable[parent] = getHopCount(parent);
+		}
+
+		return 1 + config.hopCountTable[parent];
+	}
+}
+
+static void initHopCountTable()
+{
+	config.minHopCount = 99;
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------\n");
+		logMessage(DEBUG, "HopCount:\n");
+	}
+	for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
+	{
+		if (config.parentTable[i] > 0)
+		{
+			config.hopCountTable[i] = getHopCount(i);
+			config.nodeCount++;
+
+			if (config.hopCountTable[i] > config.maxHopCount)
+			{
+				config.maxHopCount = config.hopCountTable[i];
+			}
+			else if (config.hopCountTable[i] < config.minHopCount)
+			{
+				config.minHopCount = config.hopCountTable[i];
+			}
+
+			if (loglevel >= DEBUG)
+			{
+				logMessage(DEBUG, "%02d: %d\n", i, config.hopCountTable[i]);
+			}
+		}
+	}
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------");
+	}
+}
+
+static void initPktCountTable()
+{
+	config.minPktCount = 99;
+	char filePath[100];
+	sprintf(filePath, "../benchmark/%s", inputFile);
+	// Read from config.txt
+	FILE *file = fopen(filePath, "r");
+	if (file == NULL)
+	{
+		logMessage(ERROR, "%s: Failed to open %s\n", __func__, filePath);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+
+	int numLine = 0;
+	while (true)
+	{
+		char line[256];
+		if (fgets(line, sizeof(line), file) == NULL)
+		{
+			break;
+		}
+		numLine++;
+
+		if (numLine == 1)
+		{
+			continue; // Skip header line
+		}
+
+		char sleep[10];
+		char nodes[100];
+		char dest[2];
+		char size[3];
+
+		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
+		{
+			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
+			fflush(stdout);
+			// exit(EXIT_FAILURE);
+			continue;
+		}
+
+		if (loglevel >= TRACE)
+		{
+			logMessage(TRACE, "Nodes Expr: %s\n", nodes);
+		}
+
+		unsigned long sendTime = atoll(sleep);
+		if (sendTime >= (config.runtTimeS * 1000))
+		{
+			// Beyond the runtimeS
+			continue;
+		}
+
+		if (nodes[0] == '*')
+		{
+			// Include all nodes, no filtering needed
+			config.pktCountTable[0]++;
+		}
+		else
+		{
+			int include = (nodes[0] != '!');
+			if (!include && nodes[1] == '*')
+			{
+				continue;
+			}
+
+			char *token = strtok(include ? nodes : nodes + 1, "|");
+			int match = 0;
+			while (token != NULL)
+			{
+				uint8_t addr = atoi(token);
+				if (include)
+				{
+					config.pktCountTable[addr]++;
+				}
+				else
+				{
+					config.pktCountTable[addr]--;
+				}
+				if (loglevel >= TRACE)
+				{
+					logMessage(TRACE, "%02d: %d\n", addr, config.pktCountTable[addr]);
+				}
+				token = strtok(NULL, "|");
+			}
+		}
+	}
+	fclose(file);
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "------\n");
+		logMessage(DEBUG, "Packet Count:\n");
+	}
+	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
+	{
+
+		if (config.parentTable[i] > 0)
+		{
+			config.pktCountTable[i] += config.pktCountTable[0];
+			if (config.pktCountTable[i] > config.maxPktCount)
+			{
+				config.maxPktCount = config.pktCountTable[i];
+			}
+			else if (config.pktCountTable[i] < config.minPktCount)
+			{
+				config.minPktCount = config.pktCountTable[i];
+			}
+
+			if (loglevel >= DEBUG)
+			{
+				logMessage(DEBUG, "%02d: %d\n", i, config.pktCountTable[i]);
+			}
+		}
+	}
+	if (loglevel >= DEBUG)
+	{
+		logMessage(DEBUG, "%02d: %d\n", 0, config.pktCountTable[0]);
+		logMessage(DEBUG, "------\n");
+	}
+}
+
+// List of nodes for which the config applies
+// * to include all nodes
+//  !xx|yy|zz to exclude node xx, yy & zz and
+//  xx|yy|zz to include nodes xx, yy & zz
+static int searchNodesExpr(char *nodes, uint8_t addr)
+{
+	if (nodes[0] == '*')
+	{
+		// Include all nodes, no filtering needed
+		return 1;
+	}
+	else
+	{
+		int include = (nodes[0] != '!');
+		if (!include && nodes[1] == '*')
+		{
+			return 0;
+		}
+
+		char *token = strtok(include ? nodes : nodes + 1, "|");
+		int match = 0;
+		while (token != NULL)
+		{
+			if (atoi(token) == addr)
+			{
+				match = 1;
+				break;
+			}
+			token = strtok(NULL, "|");
+		}
+		if ((include && !match) || (!include && match))
+		{
+			return 0; // addr is not included
+		}
+		return 1;
+	}
 }

@@ -719,7 +719,7 @@ static void *sendMsg_func(void *args)
 			*/			
 
 			// Sleep for a short random duration 
-			msleep(100 + rand() % 101);
+			msleep(100 + rand() % 501);
 			SX1262_send(buffer, MAC_Header_len + msg.len);
 
 			// Update metrics

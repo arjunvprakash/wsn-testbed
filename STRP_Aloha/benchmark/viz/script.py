@@ -15,9 +15,11 @@ def calculateRelativeTime(df, timestamp_col='Timestamp', relative_time_col='Rela
         
     df[relative_time_col] = (df[timestamp_col] - min_timestamp).dt.total_seconds()
     
-    df['Delay'] = (df['RecvTimestamp'] - df['SentTimestamp']).dt.total_seconds()   
     df['RelativeRecvTime'] = (df['RecvTimestamp'] - min_timestamp).dt.total_seconds()
     df['RelativeSentTime'] = (df['SentTimestamp'] - min_timestamp).dt.total_seconds()   
+
+    df['Delay'] = (df['RecvTimestamp'] - df['SentTimestamp']).dt.total_seconds()
+    df["Node"] = df["Address"].astype(str)
 
     return df.sort_values(by=relative_time_col)
 
@@ -40,11 +42,15 @@ timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
 
 df = pd.read_csv(recv_csv)
 df = calculateRelativeTime(df)
-
+df_lost = df[['Timestamp','Source', 'Address','Node', 'HopCount','TotalCount','RecvCount']]
+df_lost = df_lost.sort_values(by='Timestamp', ascending=False).drop_duplicates(subset='Address', keep='first')
+df_lost['LostCount'] = (df_lost['TotalCount'] - df_lost['RecvCount']).astype(int)
+df_lost['LossRate'] = (df_lost['LostCount'] / df_lost['TotalCount']).astype(float) * 100
+df_lost = df_lost.sort_values(by='Address', ascending=True)
+df = df.dropna()
 
 df['key'] = df.apply(lambda row: tuple([row['Source'], row['Address']]), axis=1)
 df = df.sort_values(by='key')
-df["Node"] = df["Address"].astype(str)
 
 plotList = [
             ['Node', 'AggDelay'],
@@ -53,6 +59,10 @@ plotList = [
             ['Node', 'BarDelay'],
             ['SeqId','DelayFreq'],  
             ['SeqId','NodeDelay'], 
+            ['HopCount', 'LostCount'],
+            ['Node', 'LostCount'],
+            ['HopCount', 'LossRate'],
+            ['Node', 'LossRate'], 
             # ['SeqId','Delay'],
             # ['SeqId','RelativeRecv'],
             # ['SeqId','RelativeSent']
@@ -60,7 +70,7 @@ plotList = [
 
 
 num_metrics = len(plotList)
-num_cols = min(2, num_metrics)  # Limit to 2 columns per row
+num_cols = min(3, num_metrics)
 num_rows = math.ceil(num_metrics / num_cols)
 
 fig, axes = plt.subplots(num_rows, num_cols, figsize=(5 * num_cols, 4 * num_rows))
@@ -110,6 +120,42 @@ for i, (x,y) in enumerate(plotList):
         pivot_df.plot(kind='bar', stacked=True, ax=ax)
         ax.legend(title='SeqId', bbox_to_anchor=(1.05, 1), loc='upper left', framealpha=0.5)
         ax.grid(True, zorder=0)
+    elif ('HopCount', 'LostCount') == (x,y):            
+        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8)
+        ax.set_title("Lost Packets v/s HopCount")
+        ax.set_xlabel(x)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("# of packets lost")
+        ax.grid(True)
+        totalLost = df_lost['LostCount'].sum()
+        stats_text = f'Total = {totalLost}'
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
+                verticalalignment='center', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='lightgrey'))
+    elif ('Node', 'LostCount') == (x,y):       
+        sns.barplot(x=x, y=y, data=df_lost, ax=ax)
+        ax.set_title("Lost Packets v/s Node")
+        ax.set_xlabel(x)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("# of packets lost")
+        ax.grid(True)
+    elif ('Node', 'LossRate') == (x,y):       
+        sns.barplot(x=x, y=y, data=df_lost, ax=ax)
+        ax.set_title("Lost Rate v/s Node")
+        ax.set_xlabel(x)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("% of packets lost")
+        ax.grid(True)
+    elif ('HopCount', 'LossRate') == (x,y):            
+        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8)
+        ax.set_title("Loss Rate v/s HopCount")
+        ax.set_xlabel(x)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("% of packets lost")
+        ax.grid(True)
+        totalLost = (df_lost['LostCount'].sum()/df_lost['TotalCount'].sum()).astype(float) * 100
+        stats_text = f'Total = {totalLost:.2f} %'
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
+                verticalalignment='center', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='lightgrey'))
     elif ('Node', 'AggDelay') == (x,y):
         # df['Delay'].plot(kind='box',ax=ax)
         sns.boxplot(y = 'Delay', data = df, ax=ax)
