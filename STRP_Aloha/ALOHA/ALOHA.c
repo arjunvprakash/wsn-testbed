@@ -836,7 +836,7 @@ void ALOHA_init(MAC *mac, unsigned char addr)
 	sem_init(&sem_ack, 0, 0);
 
 	// Zufallsgenerator initialisieren
-	srand(addr * time(NULL));
+	srand(addr);
 
 	// Threads starten, bei Fehler Programm beenden
 	if (pthread_create(&recvT, NULL, &recvMsg_func, mac) != 0)

@@ -35,12 +35,14 @@ typedef struct Benchmark_Config
 	uint8_t parentTable[MAX_ACTIVE_NODES], nodeCount;
 	uint8_t hopCountTable[MAX_ACTIVE_NODES], minHopCount, maxHopCount;
 	uint8_t pktCountTable[MAX_ACTIVE_NODES], minPktCount, maxPktCount;
+	char *name;
 } Benchmark_Config;
 
 static unsigned int startTime;
 static unsigned long long startTimeMs;
-static char configStr[350];
+static char configStr[1024];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
+static const short minSendIntervalS = 25;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -51,26 +53,26 @@ STRP_Config strp;
 
 static void initParentTable()
 {
-	// config.parentTable[1] = 12;
-	// config.parentTable[4] = 6;
-	// config.parentTable[5] = 6;
-	// config.parentTable[6] = 12;
+	config.parentTable[1] = 16;
+	config.parentTable[4] = 9;
+	config.parentTable[5] = 16;
+	config.parentTable[6] = 16;
 	config.parentTable[7] = ADDR_SINK;
 	config.parentTable[8] = ADDR_SINK;
-	// config.parentTable[9] = ADDR_SINK;
-	// config.parentTable[12] = ADDR_SINK;
+	config.parentTable[9] = 24;
+	config.parentTable[12] = 21;
 	config.parentTable[13] = ADDR_SINK;
-	// // config.parentTable[14] = 0; // Sink
-	// config.parentTable[15] = 16;
-	// config.parentTable[16] = 19;
-	config.parentTable[18] = ADDR_SINK;
+	// // config.parentTable[14] = ADDR_SINK; // Sink
+	// config.parentTable[15] = ADDR_SINK;
+	config.parentTable[16] = 9;
+	config.parentTable[18] = 22;
 	// config.parentTable[19] = ADDR_SINK;
 	config.parentTable[20] = ADDR_SINK;
-	// config.parentTable[21] = 23;
+	config.parentTable[21] = 9;
 	config.parentTable[22] = ADDR_SINK;
-	// config.parentTable[23] = 25;
+	// config.parentTable[23] = ADDR_SINK;
 	config.parentTable[24] = ADDR_SINK;
-	// config.parentTable[25] = ADDR_SINK;
+	config.parentTable[25] = 9;
 	config.parentTable[27] = ADDR_SINK;
 	// config.parentTable[28] = ADDR_SINK;
 }
@@ -92,11 +94,14 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
+	// config.name = "Monitored: 1 data + 3 metric per minute";
+	config.name = "Equivalent: (1 data + 3 metric summing 350 B) per minute";
+
 	config.self = (uint8_t)atoi(argv[1]);
 	config.monitoringEnabled = true;
 	config.runtTimeS = 180;
 	config.maxSyncSleepS = 30;
-	config.senseDurationS = 15;
+	config.senseDurationS = 30;
 
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
@@ -104,7 +109,7 @@ int main(int argc, char *argv[])
 	{
 		logMessage(INFO, "ADDR_SINK : %02d\n", ADDR_SINK);
 	}
-	srand(config.self * time(NULL));
+	srand(config.self);
 
 	fflush(stdout);
 
@@ -112,22 +117,25 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	strp.beaconIntervalS = 32;
+	strp.beaconIntervalS = 65;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 63;
+	strp.nodeTimeoutS = 200;
 	strp.recvTimeoutMs = 1000;
 	strp.self = config.self;
 	strp.senseDurationS = config.senseDurationS;
 	strp.strategy = FIXED;
-	strp.parentTable = config.parentTable;
+	strp.parentAddr = config.parentTable[config.self];
 	STRP_init(strp);
+
+	syncTime(config.maxSyncSleepS);
 
 	protomon.vizIntervalS = 60;
 	protomon.loglevel = INFO;
-	protomon.sendIntervalS = 30;
+	// protomon.sendIntervalS = minSendIntervalS + ((config.self * 3 * config.hopCountTable[config.self]) % 60);
+	protomon.sendIntervalS = 60;
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
-	protomon.initialSendWaitS = 0;
+	protomon.initialSendWaitS = 15;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -143,7 +151,6 @@ int main(int argc, char *argv[])
 			startHttpServer(HTTP_PORT);
 		}
 	}
-	syncTime(config.maxSyncSleepS);
 
 	startTime = time(NULL);
 	startTimeMs = getEpochMs();
@@ -202,7 +209,7 @@ static void syncTime(unsigned int n)
 // Generate a string with the experiment configuration
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
 {
-	sprintf(configStr, "Application: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d]\n", config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount);
+	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d]\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount);
 	if (config.monitoringEnabled)
 	{
 		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
@@ -335,7 +342,7 @@ static void *recvMsg_func(void *args)
 
 			char seqId[4];
 			char timestamp[14];
-			char filler[25];
+			char filler[MAX_PAYLOAD_SIZE];
 			char addr[3];
 			if (loglevel >= DEBUG)
 			{
@@ -619,7 +626,7 @@ static void initHopCountTable()
 	}
 	if (loglevel >= DEBUG)
 	{
-		logMessage(DEBUG, "------");
+		logMessage(DEBUG, "------\n");
 	}
 }
 

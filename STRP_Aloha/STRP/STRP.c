@@ -151,16 +151,15 @@ int STRP_init(STRP_Config c)
         return 1;
     }
 
-    if (c.strategy == FIXED && c.self != ADDR_SINK && (c.parentTable == NULL || c.parentTable[c.self] == 0))
+    if (c.strategy == FIXED && c.self != ADDR_SINK && c.parentAddr == 0)
     {
-        logMessage(ERROR, "STRP: parentTable not provided with FIXED strategy.");
+        logMessage(ERROR, "STRP: parentAddr not provided with FIXED strategy.");
         exit(EXIT_FAILURE);
     }
 
     pthread_t sendBeaconT;
     setConfigDefaults(&c);
     config = c;
-    srand(config.self * time(NULL));
     ALOHA_init(&mac, config.self);
     if (config.loglevel > INFO)
     {
@@ -518,6 +517,7 @@ static void *recvPackets_func(void *args)
             }
         }
         free(pkt);
+        fflush(stdout);
         usleep((rand() % 100000) + 700000); // Sleep 100ms + 1s to avoid busy waiting
     }
     return NULL;
@@ -702,7 +702,7 @@ static void senseNeighbours()
         {
             sendBeacon();
             count++;
-            usleep(randInRange(800000, 1200000));
+            usleep(randInRange(500000, 1200000));
         } while (time(NULL) - start < config.senseDurationS);
 
         if (config.loglevel >= DEBUG)
@@ -720,9 +720,9 @@ static void senseNeighbours()
             else if (neighbours.nodes[parentAddr].RSSI == MIN_RSSI)
             {
                 // // Strategy = FIXED
-                // Exit if assigned parent node not a neighbor
-                // logMessage(ERROR, "STRP: Parent node %02d not a neighbor\n", parentAddr);
-                // exit(EXIT_FAILURE);
+                // // Exit if assigned parent node not a neighbor
+                logMessage(ERROR, "STRP: Parent node %02d not a neighbor\n", parentAddr);
+                exit(EXIT_FAILURE);
             }
             else
             {
@@ -739,6 +739,21 @@ static void senseNeighbours()
     if (config.self != ADDR_SINK)
     {
         printf("%s - Parent: %02d (%02d)\n", timestamp(), parentAddr, neighbours.nodes[parentAddr].RSSI);
+    }
+    // if (config.loglevel >= DEBUG)
+    {
+        logMessage(DEBUG, "-------------\n");
+        logMessage(DEBUG, "Active neighbors: %d\n", neighbours.numActive);
+        for (uint8_t i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
+        {
+            NodeInfo node = neighbours.nodes[i];
+            if (node.state != UNKNOWN)
+            {
+                logMessage(DEBUG, " %02d (%d)\n", i, node.RSSI);
+            }
+        }
+        logMessage(DEBUG, "-------------\n");
+        fflush(stdout);
     }
 }
 
@@ -1085,7 +1100,7 @@ static void changeParent()
         selectClosestLowerNeighbour();
         break;
     case FIXED:
-        parentAddr = config.parentTable[config.self];
+        parentAddr = config.parentAddr;
         break;
     default:
         selectNextLowerNeighbour();
@@ -1321,7 +1336,7 @@ void setConfigDefaults(STRP_Config *config)
     }
     if (config->strategy == FIXED)
     {
-        parentAddr = config->parentTable[config->self];
+        parentAddr = config->parentAddr;
     }
 }
 

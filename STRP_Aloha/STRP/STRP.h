@@ -60,7 +60,7 @@ typedef struct STRP_Config
     unsigned int recvTimeoutMs;
 
     // Pointer to parent array of size MAX_ACTIVE_NODES indexed by node address
-    uint8_t *parentTable;
+    uint8_t parentAddr;
 
 } STRP_Config;
 

@@ -59,6 +59,7 @@ plotList = [
             ['Node', 'BarDelay'],
             ['SeqId','DelayFreq'],  
             ['SeqId','NodeDelay'], 
+            ['Node','HopCount'],
             ['HopCount', 'LostCount'],
             ['Node', 'LostCount'],
             ['HopCount', 'LossRate'],
@@ -110,6 +111,13 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("Delay(s)")
         ax.set_title("Delay Variation v/s HopCount")
         ax.grid(True, zorder=0)
+    elif ('Node','HopCount') == (x,y):
+        sns.barplot(x=x, y=y, data=df_lost.sort_values(by=y), ax=ax)
+        ax.set_title("HopCount v/s Node")
+        ax.set_xlabel(x)
+        ax.tick_params(axis='x', labelrotation=90)
+        ax.set_ylabel("# of hops")
+        ax.grid(True)
     elif ('SeqId', 'NodeDelay') == (x,y):        
         ax.set_title("Nodewise Delay per SeqId")
         ax.set_xlabel("Node")
@@ -128,9 +136,9 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("# of packets lost")
         ax.grid(True)
         totalLost = df_lost['LostCount'].sum()
-        stats_text = f'Total = {totalLost}'
-        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
-                verticalalignment='center', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='lightgrey'))
+        # stats_text = f'Total = {totalLost}'
+        stats_text = f'Total = {totalLost}\nMean={df_lost["LostCount"].mean():.2f}'
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
     elif ('Node', 'LostCount') == (x,y):       
         sns.barplot(x=x, y=y, data=df_lost, ax=ax)
         ax.set_title("Lost Packets v/s Node")
@@ -153,12 +161,11 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("% of packets lost")
         ax.grid(True)
         totalLost = (df_lost['LostCount'].sum()/df_lost['TotalCount'].sum()).astype(float) * 100
-        stats_text = f'Total = {totalLost:.2f} %'
-        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
-                verticalalignment='center', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='lightgrey'))
+        stats_text = f'Total = {totalLost:.2f}%\nMean={totalLost/df_lost["Address"].count():0.2f}%'
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
     elif ('Node', 'AggDelay') == (x,y):
         # df['Delay'].plot(kind='box',ax=ax)
-        sns.boxplot(y = 'Delay', data = df, ax=ax)
+        sns.boxplot(y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8)
         ax.set_title("Variation in Aggregate Delay")
         ax.set_ylabel("Delay(s)")
         ax.set_xlabel("Aggregate")
@@ -179,8 +186,7 @@ for i, (x,y) in enumerate(plotList):
         )
         
         # Position the text on the plot
-        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10,
-                verticalalignment='center', bbox=dict(boxstyle='round,pad=0.3', edgecolor='black', facecolor='lightgrey'))
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
     # else:
     #     for (src, addr), grp in df.groupby(['Source', 'Address']):
     #         plt.title(f'{x} vs {y}')

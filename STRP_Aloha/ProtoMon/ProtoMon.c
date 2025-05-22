@@ -599,22 +599,26 @@ static void *sendMetrics_funcV2(void *args)
         }
 
         uint8_t metricsCount;
+        unsigned int randDelay;
         uint16_t bufLen = getMetricsBufferV2(buffer, bufferSize, &metricsCount);
         if (bufLen)
         {
+            randDelay = (unsigned int)randInRange(1000000, 5000000);
+            usleep(randDelay);
             if (!sendMetricsToSinkV2(buffer, bufLen, metricsCount))
             {
                 logMessage(ERROR, "Failed to send metrics to sink\n");
-                fflush(stdout);
             }
             else
             {
-                logMessage(INFO, "Sent metrics to %02d\n", ADDR_SINK);
+                logMessage(INFO, "Sent metrics to %02d : %d B\n", ADDR_SINK, bufLen);
             }
         }
         free(buffer);
 
-        sleep(config.sendIntervalS);
+        fflush(stdout);
+
+        sleep(config.sendIntervalS - (unsigned int)(randDelay / 1000000));
     }
     return NULL;
 }
@@ -645,7 +649,7 @@ static void *sendMetrics_func(void *args)
                 }
                 else
                 {
-                    logMessage(INFO, "Sent Routing metrics to sink\n");
+                    logMessage(INFO, "Sent Routing metrics to sink: %d B\n", bufLen);
                 }
             }
             free(buffer);
@@ -670,7 +674,7 @@ static void *sendMetrics_func(void *args)
                 }
                 else
                 {
-                    logMessage(INFO, "Sent neighbour data to sink\n");
+                    logMessage(INFO, "Sent neighbour data to sink: %d B\n", bufLen);
                 }
             }
             free(buffer);
@@ -696,7 +700,7 @@ static void *sendMetrics_func(void *args)
                 }
                 else
                 {
-                    logMessage(INFO, "Sent MAC metrics to sink\n");
+                    logMessage(INFO, "Sent MAC metrics to sink: %d B\n", bufLen);
                 }
             }
         }
@@ -735,10 +739,6 @@ void setConfigDefaults(ProtoMon_Config *c)
     {
         c->vizIntervalS = 60;
     }
-    if (c->initialSendWaitS == 0)
-    {
-        c->initialSendWaitS = 30;
-    }
 }
 
 void ProtoMon_init(ProtoMon_Config c)
@@ -763,8 +763,8 @@ void ProtoMon_init(ProtoMon_Config c)
         // Must always override Routing layer functions to capture monitoring data
         Routing_sendMsg = &ProtoMon_Routing_sendMsg;
         Routing_recvMsg = &ProtoMon_Routing_recvMsg;
-        // Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsg;
-        Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsgV2;
+        Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsg;
+        // Routing_timedRecvMsg = &ProtoMon_Routing_timedRecvMsgV2;
 
         // Must always override MAC functions to increment numHops
         MAC_send = &ProtoMon_MAC_send;
@@ -807,7 +807,7 @@ void ProtoMon_init(ProtoMon_Config c)
         if (config.self != ADDR_SINK)
         {
             pthread_t sendMetricsT;
-            if (pthread_create(&sendMetricsT, NULL, sendMetrics_funcV2, NULL) != 0)
+            if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
             {
                 logMessage(ERROR, "Failed to create sendMetrics thread\n");
                 exit(EXIT_FAILURE);
@@ -1331,6 +1331,10 @@ int ProtoMon_Routing_timedRecvMsgV2(Routing_Header *header, uint8_t *data, unsig
                 }
             }
         }
+    }
+    else
+    {
+        logMessage(ERROR, "ProtoMon: ctrl : %02X unknown\n", ctrl);
     }
     uint16_t delay = lastVizTime == 0 ? config.initialSendWaitS : 0;
     if (config.self == ADDR_SINK && time(NULL) - lastVizTime > (delay + config.vizIntervalS))
