@@ -56,5 +56,4 @@ typedef enum ProtoMon_Level
  */
 void ProtoMon_init(ProtoMon_Config config);
 
-
 #endif // STRP_H
