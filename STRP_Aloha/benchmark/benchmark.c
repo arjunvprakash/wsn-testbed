@@ -32,6 +32,7 @@ typedef struct Benchmark_Config
 	unsigned int runtTimeS;
 	unsigned short maxSyncSleepS;
 	unsigned short senseDurationS;
+	unsigned int sendOffsetMs;
 	uint8_t parentTable[MAX_ACTIVE_NODES], nodeCount;
 	uint8_t hopCountTable[MAX_ACTIVE_NODES], minHopCount, maxHopCount;
 	uint8_t pktCountTable[MAX_ACTIVE_NODES], minPktCount, maxPktCount;
@@ -42,7 +43,7 @@ static unsigned int startTime;
 static unsigned long long startTimeMs;
 static char configStr[1024];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
-static const short minSendIntervalS = 60;
+static const short minSendIntervalS = 120;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -94,16 +95,16 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	// config.name = "Baseline: data@60-70"; //, routing metric@70-110";
-	// config.name = "Equivalent: data@60-70, 40B@70-80";
-	config.name = "Baseline: data@60-70, 40B metric@71-110 (based on hopcount)";
+	// config.name = "Baseline: data@[120-130]s"; //, routing metric@70-110";
+	// config.name = "Equivalent: data@[120-150]s, 30B@[120-150]s - hopcount";
+	config.name = "ProtoMon: data@[120-150]s, 3 metric@[120-150]s - hopcount";
 
 	config.self = (uint8_t)atoi(argv[1]);
-	config.monitoringEnabled = false;
-	config.runtTimeS = 350;
+	config.runtTimeS = 1200;
+	config.monitoringEnabled = true;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
-
+	
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
 	if (config.self != ADDR_SINK)
@@ -118,7 +119,11 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	strp.beaconIntervalS = 65;
+	unsigned int offsetS = (config.hopCountTable[config.self] * 5) + (config.self % 4);
+
+	config.sendOffsetMs =  offsetS * 1000;	
+
+	strp.beaconIntervalS = 180;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 200;
 	strp.recvTimeoutMs = 1000;
@@ -130,13 +135,13 @@ int main(int argc, char *argv[])
 
 	syncTime(config.maxSyncSleepS);
 
-	protomon.vizIntervalS = 60;
+	protomon.vizIntervalS = 180;
 	protomon.loglevel = INFO;
-	protomon.sendIntervalS = minSendIntervalS + 10 + (config.hopCountTable[config.self] * 5) + (config.self % 5);
-	// protomon.sendIntervalS = 60;
+	// protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
+	protomon.sendIntervalS = minSendIntervalS;
 	protomon.self = config.self;
-	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING;
-	protomon.initialSendWaitS = 15;
+	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
+	protomon.initialSendWaitS = 45 + offsetS;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -210,7 +215,7 @@ static void syncTime(unsigned int n)
 // Generate a string with the experiment configuration
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
 {
-	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d]\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount);
+	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d],sendOffsetMs=%d\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount,config.sendOffsetMs);
 	if (config.monitoringEnabled)
 	{
 		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
@@ -527,8 +532,8 @@ static void *sendMsg_func(void *args)
 			return NULL;
 		}
 
-		unsigned int sleepOffsetMs = (config.self % 10) * 1000;
-		usleep((sleepMs + sleepOffsetMs) * 1000);
+		usleep((sleepMs + config.sendOffsetMs) * 1000);
+		// usleep(sleepMs * 1000);
 
 		char buffer[MAX_PAYLOAD_SIZE];
 		if (payloadSize > minPayloadSize)

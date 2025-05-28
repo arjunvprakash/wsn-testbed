@@ -585,7 +585,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
 
 static void *sendMetrics_funcV2(void *args)
 {
-    sleep(config.initialSendWaitS + config.sendIntervalS);
+    sleep(config.initialSendWaitS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead() + sizeof(uint8_t) + sizeof(uint16_t));
 
     while (1)
@@ -626,7 +626,7 @@ static void *sendMetrics_funcV2(void *args)
 
 static void *sendMetrics_func(void *args)
 {
-    sleep(config.initialSendWaitS + config.sendIntervalS);
+    sleep(config.initialSendWaitS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {
@@ -644,9 +644,9 @@ static void *sendMetrics_func(void *args)
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_ROU);
             if (bufLen)
             {
-                unsigned int randDelay = randInRange(300000, 1000000);
-                totalDelay += randDelay;
-                usleep(randDelay);
+                // unsigned int randDelay = randInRange(300000, 1000000);
+                // totalDelay += randDelay;
+                // usleep(randDelay);
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_ROU))
                 {
                     logMessage(ERROR, "Failed to send Routing metrics to sink\n");
@@ -672,9 +672,9 @@ static void *sendMetrics_func(void *args)
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {
-                unsigned int randDelay = randInRange(300000, 1000000);
-                totalDelay += randDelay;
-                usleep(randDelay);
+                // unsigned int randDelay = randInRange(300000, 1000000);
+                // totalDelay += randDelay;
+                // usleep(randDelay);
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_TAB))
                 {
                     logMessage(ERROR, "Failed to send neighbour metrics to sink\n");
@@ -691,9 +691,9 @@ static void *sendMetrics_func(void *args)
         // Send MAC metrics to sink
         if (config.monitoredLevels & PROTOMON_LEVEL_MAC)
         {
-            unsigned int randDelay = randInRange(300000, 1000000);
-            totalDelay += randDelay;
-            usleep(randDelay);
+            // unsigned int randDelay = randInRange(300000, 1000000);
+            // totalDelay += randDelay;
+            // usleep(randDelay);
             uint8_t buffer[bufferSize];
             if (buffer == NULL)
             {
@@ -716,7 +716,8 @@ static void *sendMetrics_func(void *args)
             }
         }
 
-        sleep(config.sendIntervalS - (unsigned int)(totalDelay / 1000000));
+        // sleep(config.sendIntervalS - (unsigned int)(totalDelay / 1000000));
+        sleep(config.sendIntervalS);
     }
     return NULL;
 }

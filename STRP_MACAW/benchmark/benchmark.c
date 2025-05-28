@@ -42,7 +42,7 @@ static unsigned int startTime;
 static unsigned long long startTimeMs;
 static char configStr[1024];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
-static const short minSendIntervalS = 60;
+static const short minSendIntervalS = 120;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -96,11 +96,11 @@ int main(int argc, char *argv[])
 {
 	// config.name = "Baseline: data@60-70"; //, routing metric@70-110";
 	// config.name = "Equivalent: data@60-70, 40B@70-80";
-	config.name = "Baseline: data@60-70, 40B metric@71-110 (based on hopcount)";
+	config.name = "ProtoMon: data@120s, 1 metric@[120-180]s";
 
 	config.self = (uint8_t)atoi(argv[1]);
-	config.monitoringEnabled = false;
-	config.runtTimeS = 350;
+	config.monitoringEnabled = true;
+	config.runtTimeS = 1200;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
 
@@ -130,13 +130,12 @@ int main(int argc, char *argv[])
 
 	syncTime(config.maxSyncSleepS);
 
-	protomon.vizIntervalS = 60;
+	protomon.vizIntervalS = 180;
 	protomon.loglevel = INFO;
-	protomon.sendIntervalS = minSendIntervalS + 10 + (config.hopCountTable[config.self] * 5) + (config.self % 5);
-	// protomon.sendIntervalS = 60;
+	protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING;
-	protomon.initialSendWaitS = 15;
+	protomon.initialSendWaitS = 45;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -528,7 +527,8 @@ static void *sendMsg_func(void *args)
 		}
 
 		unsigned int sleepOffsetMs = (config.self % 10) * 1000;
-		usleep((sleepMs + sleepOffsetMs) * 1000);
+		// usleep((sleepMs + sleepOffsetMs) * 1000);
+		usleep(sleepMs * 1000);
 
 		char buffer[MAX_PAYLOAD_SIZE];
 		if (payloadSize > minPayloadSize)
