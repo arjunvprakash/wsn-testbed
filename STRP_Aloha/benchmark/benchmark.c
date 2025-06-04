@@ -104,7 +104,7 @@ int main(int argc, char *argv[])
 	config.monitoringEnabled = true;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
-	
+
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
 	if (config.self != ADDR_SINK)
@@ -119,13 +119,13 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	unsigned int offsetS = (config.hopCountTable[config.self] * 5) + (config.self % 4);
+	unsigned int offsetS = ((config.hopCountTable[config.self] - 1) * 15); //+ (config.self % 4);
 
-	config.sendOffsetMs =  offsetS * 1000;	
+	config.sendOffsetMs = offsetS * 1000;
 
 	strp.beaconIntervalS = 180;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 200;
+	strp.nodeTimeoutS = 360;
 	strp.recvTimeoutMs = 1000;
 	strp.self = config.self;
 	strp.senseDurationS = config.senseDurationS;
@@ -142,6 +142,7 @@ int main(int argc, char *argv[])
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
 	protomon.initialSendWaitS = 45 + offsetS;
+	// protomon.sendDelayS = 5;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -215,7 +216,7 @@ static void syncTime(unsigned int n)
 // Generate a string with the experiment configuration
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
 {
-	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d],sendOffsetMs=%d\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount,config.sendOffsetMs);
+	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d],sendOffsetMs=%d\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount, config.sendOffsetMs);
 	if (config.monitoringEnabled)
 	{
 		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
@@ -418,6 +419,8 @@ static void initOutputDir()
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
+	sprintf(cmd, "cp '../../benchmark/send.csv' '%s/send.csv'", outputDir);
+	system(cmd);
 
 	char filePath[100];
 	sprintf(filePath, "%s/%s", outputDir, outputFile);
