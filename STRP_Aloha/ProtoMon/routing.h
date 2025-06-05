@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "metric.h"
+
 /**
  * @brief Header information from the received message.
  * @note Must contain fields
@@ -107,5 +109,7 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
  * @note Dependency with ProtoMon
  */
 int Routing_getTopologyData(char *buffer, uint16_t size);
+
+
 
 #endif // ROUTING_H

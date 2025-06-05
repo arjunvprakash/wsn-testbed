@@ -34,6 +34,10 @@ typedef struct ProtoMon_Config
     // Could be used to wait for lower layers to initialize.
     // Default 30s
     uint16_t initialSendWaitS;
+
+    // Delay between sending individual metric packets.
+    // Default 1s
+    uint16_t sendDelayS;
 } ProtoMon_Config;
 
 /**

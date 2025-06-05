@@ -102,8 +102,8 @@ int main(int argc, char *argv[])
 	config.self = (uint8_t)atoi(argv[1]);
 	config.runtTimeS = 1200;
 	config.monitoringEnabled = true;
-	config.maxSyncSleepS = 30;
-	config.senseDurationS = 10;
+	config.maxSyncSleepS = 5;
+	config.senseDurationS = 5;
 
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");

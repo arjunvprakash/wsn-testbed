@@ -1,4 +1,6 @@
 Address,SendTimeMs,Destination,PayloadSize
+*,5000,14,0
+*,1000,14,0
 *,15000,14,0
 !*,45000,14,0
 *,135000,14,0
