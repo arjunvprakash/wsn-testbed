@@ -34,6 +34,12 @@ typedef struct MAC
 
 	/* Sonstige */
 	int debug; // Gibt an, ob Debug-Ausgaben erstellt werden sollen
+
+	// Enable ambient noise monitoring
+	int ambient;
+
+	// Backoff time in ms if noise too high
+	int noiseBackoffMs;
 } MAC;
 
 void ALOHA_init(MAC *, unsigned char);

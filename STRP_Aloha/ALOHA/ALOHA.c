@@ -52,7 +52,7 @@ typedef struct recvMessage
 } recvMessage;
 
 // Struktur für die Empfangs-Warteschlange
-#define recvMsgQ_size 16
+#define recvMsgQ_size 32
 typedef struct recvMsgQueue
 {
 	recvMessage msg[recvMsgQ_size]; // Nachrichten der Warteschlange
@@ -73,7 +73,7 @@ typedef struct sendMessage
 } sendMessage;
 
 // Struktur für die Sende-Warteschlange
-#define sendMsgQ_size 16
+#define sendMsgQ_size 32
 typedef struct sendMsgQueue
 {
 	sendMessage msg[sendMsgQ_size]; // Nachrichten der Warteschlange
@@ -681,11 +681,12 @@ static void *sendMsg_func(void *args)
 		{
 			// Wenn Noise zu hoch
 			// ### Disable to prevent nodes getting stuck after a while
-			/*
-			if (ambientNoise(mac) <= mac->noiseThreshold)
+
+			if (mac->ambient && ambientNoise(mac) <= mac->noiseThreshold)
 			{
 				// if (mac->debug)
-					printf("Noise is too high.\n");
+					printf("### Noise is too high.\n");
+					fflush(stdout);
 
 				if (msg.addr != ADDR_BROADCAST)
 				{
@@ -706,7 +707,7 @@ static void *sendMsg_func(void *args)
 					break;
 				}
 
-				msleep(100 + rand() % 101);
+				msleep(mac->noiseBackoffMs + rand() % 101);
 
 				// 5 bis 10 Sekunden warten
 				// msleep(5000 + rand() % 5001);
@@ -716,7 +717,7 @@ static void *sendMsg_func(void *args)
 
 				continue;
 			}
-			*/			
+						
 
 			// Sleep for a short random duration 
 			msleep(100 + rand() % 501);
@@ -759,7 +760,8 @@ static void *sendMsg_func(void *args)
 					sem_wait(&metrics.mutex);
 					metrics.data[msg.addr].retryExceed++;
 					sem_post(&metrics.mutex);
-
+					printf("### Packet to %02d dropped\n",msg.addr);
+					fflush(stdout);
 					break;
 				}
 
@@ -823,6 +825,10 @@ void ALOHA_init(MAC *mac, unsigned char addr)
 
 	// Standardmäßig keine Debug Ausgaben erstellen
 	mac->debug = 0;
+
+	// Ambient noise monitoring
+	mac->ambient = 1;
+	mac->noiseBackoffMs = 500;
 
 	// untere Schicht initialisieren
 	SX1262_init(868, SX1262_Transmission);

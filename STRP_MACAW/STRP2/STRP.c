@@ -23,7 +23,7 @@ typedef struct Beacon
 {
     uint8_t ctrl;
     uint8_t parent;
-    int8_t parentRSSI;
+    int parentRSSI;
 } Beacon;
 
 typedef struct DataPacket
@@ -46,13 +46,13 @@ typedef struct PacketQueue
 typedef struct
 {
     uint8_t addr;
-    int8_t RSSI;
+    int RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
     Routing_LinkType link;
     uint8_t parent;
     Routing_NodeState state;
-    int8_t parentRSSI;
+    int parentRSSI;
 } NodeInfo;
 
 typedef struct
@@ -125,7 +125,7 @@ static void *sendPackets_func(void *args);
 static int serializePacket(DataPacket msg, uint8_t **routePkt);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void senseNeighbours();
-static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t parentRSSI);
+static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parentRSSI);
 static void changeParent();
 static void initNeighbours();
 static void cleanupInactiveNodes();
@@ -160,7 +160,7 @@ int STRP_init(STRP_Config c)
     pthread_t sendBeaconT;
     setConfigDefaults(&c);
     config = c;
-    ALOHA_init(&mac, config.self);
+    MACAW_init(&mac, config.self);
     if (config.loglevel > INFO)
     {
         mac.debug = 1;
@@ -757,7 +757,7 @@ static void senseNeighbours()
     }
 }
 
-static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t parentRSSI)
+static void updateActiveNodes(uint8_t addr, int RSSI, uint8_t parent, int parentRSSI)
 {
     sem_wait(&neighbours.mutex);
     NodeInfo *nodePtr = &neighbours.nodes[addr];

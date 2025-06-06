@@ -6,6 +6,9 @@
 #include "../common.h"
 #include "../ProtoMon/routing.h"
 
+
+typedef struct MAC MAC;
+
 /**
  * @brief Supported parent selection strategies
  *
@@ -57,7 +60,9 @@ typedef struct STRP_Config
 
     // Receive timeout for MAC layer (milliseconds)
     // Default 1000ms
-    unsigned int recvTimeoutMs;
+    // unsigned int recvTimeoutMs;
+    
+    MAC *mac;
 
     // Pointer to parent array of size MAX_ACTIVE_NODES indexed by node address
     uint8_t parentAddr;

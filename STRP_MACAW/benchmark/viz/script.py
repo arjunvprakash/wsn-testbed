@@ -6,6 +6,7 @@ import argparse
 import os
 import math
 import seaborn as sns
+import networkx as nx
 
 def calculateRelativeTime(df, timestamp_col='Timestamp', relative_time_col='RelativeTime'):
     df[timestamp_col] = pd.to_datetime(df[timestamp_col], unit='ms')
@@ -37,8 +38,25 @@ configStr = args.config
 
 saveDir = "benchmark"
 recv_csv = f'{saveDir}/recv.csv'
+node_csv = f'{saveDir}/nodes.csv'
 dt = datetime.now() 
 timestamp = dt.strftime("%Y-%m-%d %H:%M:%S")
+
+# plot topology tree
+# df_nodes = pd.read_csv(node_csv)
+# G = nx.DiGraph()
+
+# for child, parent in df_nodes[['Address', 'Parent']].values:
+#     G.add_edge(parent, child)
+
+# pos = nx.circular_layout(G)
+
+# #topfig = plt.figure(figsize=(10, 8))
+# topfig = plt.figure()
+# nx.draw(G, pos, with_labels=True, arrows=True, node_size=1500)
+# plt.title(f"Benchmark Topology: {timestamp}")
+# plt.tight_layout()
+# topfig.savefig(f'{saveDir}/nodes.png')
 
 df = pd.read_csv(recv_csv)
 df = calculateRelativeTime(df)
@@ -56,9 +74,9 @@ plotList = [
             ['Node', 'AggDelay'],
             ['HopCount','BoxDelay'],
             ['Node', 'BoxDelay'],
-            ['Node', 'BarDelay'],
-            ['SeqId','DelayFreq'],  
-            ['SeqId','NodeDelay'], 
+            # ['Node', 'BarDelay'],
+            # ['SeqId','DelayFreq'],  
+            # ['SeqId','NodeDelay'], 
             ['Node','HopCount'],
             ['HopCount', 'LostCount'],
             ['Node', 'LostCount'],
@@ -161,7 +179,7 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("% of packets lost")
         ax.grid(True)
         totalLost = (df_lost['LostCount'].sum()/df_lost['TotalCount'].sum()).astype(float) * 100
-        stats_text = f'Total = {totalLost:.2f}%\nMean={totalLost/df_lost["Address"].count():0.2f}%'
+        stats_text = f'Total = {totalLost:.2f}%'
         ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
     elif ('Node', 'AggDelay') == (x,y):
         # df['Delay'].plot(kind='box',ax=ax)
