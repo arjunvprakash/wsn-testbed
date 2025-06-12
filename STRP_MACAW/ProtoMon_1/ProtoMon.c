@@ -95,7 +95,7 @@ static void *recvRoutingTable_func(void *args);
 static void *sendMetrics_func(void *args);
 static int writeBufferToFile(const uint8_t *fileName, uint8_t *temp);
 static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl);
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
 static uint16_t getRoutingOverhead();
 static uint16_t getMACOverhead();
 static void initMetrics();
@@ -283,7 +283,7 @@ static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl)
     return Original_Routing_sendMsg(ADDR_SINK, extBuffer, extLen);
 }
 
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
 {
     uint16_t usedSize = 0;
     time_t timestamp = time(NULL);
@@ -417,7 +417,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_ROU);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_ROU);
             if (bufLen)
             {
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_ROU))
@@ -442,7 +442,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_TAB))
@@ -468,7 +468,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_MAC);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_MAC);
             if (bufLen)
             {
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_MAC))
@@ -822,7 +822,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+                uint16_t bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)
@@ -949,7 +949,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+                uint16_t bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)

@@ -4,3 +4,4 @@ pandas
 Flask
 matplotlib
 seaborn
+networkx

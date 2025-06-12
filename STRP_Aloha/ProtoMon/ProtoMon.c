@@ -15,6 +15,7 @@
 #include "metric.h"
 
 #define HTTP_PORT 8000
+#define SINK_MAX_BUFFER 1024
 
 typedef enum
 {
@@ -54,12 +55,25 @@ typedef enum
     PATH
 } RoutingParamIndex;
 
-Parameter routingParams[MAX_ROUTING_PARAMS] = {{.name = "NumHops", .type = TYPE_UINT8},
-                                               {.name = "TotalSent", .type = TYPE_UINT16},
-                                               {.name = "TotalRecv", .type = TYPE_UINT16},
-                                               {.name = "AvgLatency", .type = TYPE_UINT16},
-                                               {.name = "Path", .type = TYPE_UINT8}};
-Metric routing[MAX_ACTIVE_NODES];
+Parameter routingParams[] = {
+    {.name = "NumHops", .type = TYPE_UINT8},     // Number of hops
+    {.name = "TotalSent", .type = TYPE_UINT16},  // Total packets sent
+    {.name = "TotalRecv", .type = TYPE_UINT16},  // Total packets received
+    {.name = "AvgLatency", .type = TYPE_UINT16}, // Average latency
+    {.name = "Path", .type = TYPE_UINT8}         // Path information
+};
+
+uint8_t numRoutingParams = sizeof(routingParams) / sizeof(Parameter);
+
+Parameter macParams[] = {
+    {.name = "TotalSent", .type = TYPE_UINT16}, // Total packets sent
+    {.name = "TotalRecv", .type = TYPE_UINT16}, // Total packets received
+    {.name = "AvgLatency", .type = TYPE_UINT16} // Average latency
+};
+uint8_t numMacParams = sizeof(macParams) / sizeof(Parameter);
+
+Metric routingValues[MAX_ACTIVE_NODES];
+Metric macValues[MAX_ACTIVE_NODES];
 
 typedef struct Routing_Data
 {
@@ -81,7 +95,7 @@ void initRoutingMetricsV2()
 {
     for (int i = 0; i < MAX_ACTIVE_NODES; i++)
     {
-        Metric_init(&routing[i], i, routingParams, MAX_ROUTING_PARAMS);
+        Metric_init(&routingValues[i], i, routingParams, numRoutingParams);
     }
 }
 
@@ -123,13 +137,14 @@ static void createHttpServer(int port);
 static void *sendMetrics_func(void *args);
 static int writeBufferToFile(const uint8_t *fileName, uint8_t *temp);
 static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl);
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
 static uint16_t getRoutingOverhead();
 static uint16_t getMACOverhead();
 static void initMetrics();
 static void resetMacMetrics();
 static void resetRoutingMetrics();
 static void signalHandler(int signum);
+void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CTRL ctrl);
 
 // static void initOutputFilesV2()
 // {
@@ -570,6 +585,7 @@ static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t
     uint16_t usedSize = 0;
     *metricsCount = 0;
     uint8_t metricsPayloadHeader = sizeof(uint8_t) + sizeof(uint16_t);
+    const uint16_t rowLen = (uint16_t)MAX_PAYLOAD_SIZE / 2;
 
     if (config.monitoredLevels | PROTOMON_LEVEL_MAC)
     {
@@ -586,9 +602,9 @@ static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t
             const MAC_Data data = metrics.data[i];
             if (data.sent > 0 || data.recv > 0)
             {
-                uint8_t row[150];
+                uint8_t row[rowLen];
                 memset(row, 0, sizeof(row));
-                uint8_t extra[50];
+                uint8_t extra[rowLen];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = MAC_getMetricsData(extra, i);
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.recv > 0 ? (unsigned long)(data.latency / data.recv) : 0);
@@ -645,9 +661,9 @@ static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t
             // Generate CSV row for each non zero node
             if (data.sent > 0 || data.recv > 0)
             {
-                uint8_t row[150];
+                uint8_t row[rowLen];
                 memset(row, 0, sizeof(row));
-                uint8_t extra[50];
+                uint8_t extra[rowLen];
                 memset(extra, 0, sizeof(extra));
                 int extraLen = Routing_getMetricsData(extra, i);
                 int rowLen = snprintf(row + strlen(row), sizeof(row) - strlen(row), "%ld,%d,%d,%d,%d,%d,%ld", (unsigned long)timestamp, config.self, i, data.sent, data.recv, data.numHops, data.recv > 0 ? (unsigned long)(data.totalLatency / data.recv) : 0);
@@ -728,7 +744,297 @@ static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t
     return usedSize > 1 ? usedSize : 0;
 }
 
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
+void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CTRL ctrl)
+{
+    if (bufferSize < sizeof(uint8_t) + sizeof(uint16_t))
+    {
+        logMessage(ERROR, "Buffer size too small for deserialization\n");
+        return;
+    }
+
+    uint8_t *p = buffer;
+
+    uint8_t ctrlFlag;
+    memcpy(&ctrlFlag, p, sizeof(ctrlFlag));
+    p += sizeof(ctrlFlag);
+    if (ctrlFlag != ctrl)
+    {
+        logMessage(ERROR, "Control flag mismatch: expected %d, got %d\n", ctrl, ctrlFlag);
+        return;
+    }
+
+    if (config.loglevel >= TRACE)
+    {
+        printf("# ");
+        for (int i = 0; i < bufferSize - sizeof(ctrlFlag); i++)
+        {
+            printf("%02X ", p[i]);
+        }
+        printf("\n");
+    }
+
+    uint8_t numRows;
+    memcpy(&numRows, p, sizeof(numRows));
+    p += sizeof(numRows);
+
+    time_t timestamp;
+    memcpy(&timestamp, p, sizeof(timestamp));
+    p += sizeof(timestamp);
+
+    if (numRows == 0)
+    {
+        logMessage(ERROR, "No rows in %s packet\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_ROU ? "Routing" : "Topology"));
+        return;
+    }
+
+    const uint8_t *fileName = ctrl == CTRL_MAC ? macCSV : (ctrl == CTRL_ROU ? routingCSV : networkCSV);
+
+    if (ctrl == CTRL_ROU)
+    {
+        for (int i = 0; i < numRows; i++)
+        {
+            uint8_t csvRow[SINK_MAX_BUFFER];
+            uint8_t addr;
+            memcpy(&addr, p, sizeof(addr));
+            p += sizeof(addr);
+            int rowLen = snprintf(csvRow, SINK_MAX_BUFFER, "%ld,%d,%d", (long)timestamp, src, addr);
+
+            for (int j = 0; j < routingValues[0].numParams; j++)
+            {
+                Param_Type type = routingValues[0].params[j].type;
+                if (j == PATH)
+                {
+                    // Handle path separately
+                    uint8_t *path = p;
+                    size_t pathLen = strlen(path);
+                    if (pathLen > 0)
+                    {
+                        rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%s", path);
+                    }
+                    p += pathLen + 1; // move past null terminator
+                    continue;
+                }
+
+                switch (type)
+                {
+                case TYPE_UINT8:
+                {
+                    uint8_t value;
+                    memcpy(&value, p, sizeof(value));
+                    p += sizeof(value);
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                    break;
+                }
+                case TYPE_UINT16:
+                {
+                    uint16_t value;
+                    memcpy(&value, p, sizeof(value));
+                    p += sizeof(value);
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                    break;
+                }
+                case TYPE_INT16:
+                {
+                    int16_t value;
+                    memcpy(&value, p, sizeof(value));
+                    p += sizeof(value);
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                    break;
+                }
+                case TYPE_INT8:
+                {
+                    int8_t value;
+                    memcpy(&value, p, sizeof(value));
+                    p += sizeof(value);
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                    break;
+                }
+                case TYPE_FLOAT:
+                {
+                    float value;
+                    memcpy(&value, p, sizeof(value));
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%.2f", value);
+                    p += sizeof(value);
+                    break;
+                }
+                case TYPE_INT:
+                {
+                    int value;
+                    memcpy(&value, p, sizeof(value));
+                    p += sizeof(value);
+                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                    break;
+                }
+                default:
+                    logMessage(ERROR, "Unknown parameter type: %d\n", type);
+                }
+            }
+            csvRow[rowLen++] = '\n'; // newline
+            csvRow[rowLen] = '\0';   // null terminatior
+            logMessage(DEBUG, "%s", csvRow);
+            writeBufferToFile(fileName, csvRow);
+        }
+    }
+}
+
+static uint16_t getMetricsSerialized(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
+{
+    uint16_t usedSize = 0;
+    time_t timestamp = time(NULL);
+
+    if (ctrl == CTRL_ROU)
+    {
+        int metricSize = Metric_getSize(routingValues[0]);
+
+        // reserve space for numMetrics
+        uint8_t numMetrics = 0;
+        uint8_t *nuMetricsPtr = (uint8_t *)(buffer + usedSize);
+        usedSize += sizeof(numMetrics);
+
+        // reserve space for timestamp
+        uint8_t *timestampPtr = (uint8_t *)(buffer + usedSize);
+        usedSize += sizeof(timestamp);
+
+        for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
+        {
+            Metric metric = routingValues[i];
+            if (metric.params == NULL || metric.numParams == 0)
+            {
+                continue;
+            }
+            if (usedSize + metricSize >= bufferSize)
+            {
+                if (config.loglevel >= DEBUG)
+                {
+                    logMessage(DEBUG, "Routing metrics buffer overflow\n");
+                }
+                break;
+            }
+            if (metric.params[SENT].value != NULL || metric.params[RECV].value != NULL)
+            {
+                numMetrics++;
+                memcpy(buffer + usedSize, &metric.addr, sizeof(metric.addr));
+                usedSize += sizeof(metric.addr);
+
+                // Ensure order of parameters is same as in definition
+
+                uint8_t numHops = metric.params[NUMHOPS].value ? *(uint8_t *)metric.params[NUMHOPS].value : 0;
+                memcpy(buffer + usedSize, &numHops, sizeof(numHops));
+                usedSize += sizeof(numHops);
+
+                uint16_t sent = metric.params[SENT].value ? *(uint16_t *)metric.params[SENT].value : 0;
+                memcpy(buffer + usedSize, &sent, sizeof(sent));
+                usedSize += sizeof(sent);
+
+                uint16_t recv = metric.params[RECV].value ? *(uint16_t *)metric.params[RECV].value : 0;
+                memcpy(buffer + usedSize, &recv, sizeof(recv));
+                usedSize += sizeof(recv);
+
+                uint16_t latency = metric.params[LATENCY].value ? *(uint16_t *)metric.params[LATENCY].value : 0;
+                memcpy(buffer + usedSize, &latency, sizeof(latency));
+                usedSize += sizeof(latency);
+
+                uint8_t *path = metric.params[PATH].value ? (uint8_t *)metric.params[PATH].value : (uint8_t *)"";
+                size_t pathLen = strlen((char *)path);
+                if (pathLen > 0)
+                {
+                    memcpy(buffer + usedSize, path, pathLen);
+                    usedSize += pathLen;
+                }
+
+                buffer[usedSize++] = '\0'; // null-terminate path
+
+                // reset routing metrics
+                Metric_reset(&metric);
+            }
+        }
+        if (numMetrics > 0)
+        {
+            memcpy(nuMetricsPtr, &numMetrics, sizeof(numMetrics));
+            memcpy(timestampPtr, &timestamp, sizeof(timestamp));
+        }
+        else
+        {
+            // No metrics to send, reset usedSize
+            usedSize = 0;
+        }
+    }
+    printf("%s buffer size: %d B\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_ROU ? "Routing" : "Topology"), usedSize);
+    for (int i = 0; i < usedSize; i++)
+    {
+        // if (config.loglevel > DEBUG)
+        {
+            printf("%02X ", buffer[i]);
+        }
+    }
+    printf("\n");
+    return usedSize > 1 ? usedSize : 0;
+}
+
+uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
+{
+    uint16_t usedSize = 0;
+    time_t timestamp = time(NULL);
+    if (ctrl == CTRL_ROU)
+    {
+        for (uint8_t i = 1; i < MAX_ACTIVE_NODES / 4; i++)
+        {
+            Metric metric = routingValues[i];
+            if (metric.params == NULL || metric.numParams == 0)
+            {
+                continue;
+            }
+            if (usedSize >= bufferSize)
+            {
+                if (config.loglevel >= DEBUG)
+                {
+                    logMessage(DEBUG, "Routing metrics buffer overflow\n");
+                }
+                break;
+            }
+            if (metric.params[SENT].value != NULL || metric.params[RECV].value != NULL)
+            {
+                usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, "%ld,%d,%d", (long)timestamp, config.self, metric.addr);
+
+                // Ensure order of parameters is same as in definition
+
+                uint8_t numHops = metric.params[NUMHOPS].value ? *(uint8_t *)metric.params[NUMHOPS].value : 0;
+                usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", numHops);
+
+                uint16_t sent = metric.params[SENT].value ? *(uint16_t *)metric.params[SENT].value : 0;
+                snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", sent);
+                usedSize += strlen(buffer + usedSize);
+
+                uint16_t recv = metric.params[RECV].value ? *(uint16_t *)metric.params[RECV].value : 0;
+                snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", recv);
+                usedSize += strlen(buffer + usedSize);
+
+                uint16_t latency = metric.params[LATENCY].value ? *(uint16_t *)metric.params[LATENCY].value : 0;
+                usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", latency);
+
+                uint8_t *path = metric.params[PATH].value ? (uint8_t *)metric.params[PATH].value : (uint8_t *)"";
+                size_t pathLen = strlen((char *)path);
+                if (pathLen > 0)
+                {
+                    snprintf(buffer + usedSize, bufferSize - usedSize, ",%s", path);
+                    usedSize += pathLen;
+                }
+
+                buffer[usedSize++] = '\n'; // newline
+
+                // reset metrics
+                Metric_reset(&metric);
+            }
+        }
+    }
+    if (config.loglevel >= DEBUG)
+    {
+        logMessage(DEBUG, "Sink %s metrics CSV : %d B\n%s", ctrl == CTRL_ROU ? "Routing" : (ctrl == CTRL_MAC ? "MAC" : "Topology"), usedSize, buffer);
+    }
+    return usedSize;
+}
+
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
 {
     uint16_t usedSize = 0;
     time_t timestamp = time(NULL);
@@ -768,7 +1074,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 }
                 else
                 {
-                    if (config.loglevel >= DEBUG)
+                    // if (config.loglevel >= DEBUG)
                     {
                         logMessage(DEBUG, "MAC metrics buffer overflow\n");
                     }
@@ -785,6 +1091,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         resetRoutingMetrics();
 
         for (uint8_t i = metrics.minAddr; i <= metrics.maxAddr; i++)
+        // for (uint8_t i = 0; i < MAX_ACTIVE_NODES; i++)
         {
             const Routing_Data data = metrics.data[i];
             // Generate CSV row for each non zero node
@@ -822,7 +1129,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
                 }
                 else
                 {
-                    if (config.loglevel >= DEBUG)
+                    // if (config.loglevel >= DEBUG)
                     {
                         logMessage(DEBUG, "Routing metrics buffer overflow\n");
                     }
@@ -839,7 +1146,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
     buffer[usedSize] = '\0';
     usedSize++;
 
-    if (config.loglevel > DEBUG && usedSize > 1)
+    // if (config.loglevel > DEBUG && usedSize > 1)
     {
         printf("# %s: %d\n%s\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_ROU ? "Routing" : "Table"), usedSize, buffer);
     }
@@ -898,14 +1205,24 @@ static void *sendMetrics_func(void *args)
         // Send routing metrics to sink
         if (config.monitoredLevels & PROTOMON_LEVEL_ROUTING)
         {
+
             uint8_t *buffer = (uint8_t *)malloc(bufferSize);
+            uint16_t bufLen;
             if (buffer == NULL)
             {
-                logMessage(ERROR, "Error allocating memory for routing metrics buffer\n");
+                logMessage(ERROR, "Error allocating memory for metrics buffer\n");
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_ROU);
+            if (1)
+            {
+
+                bufLen = getMetricsSerialized(buffer, bufferSize, CTRL_ROU);
+            }
+            else
+            {
+                bufLen = getMetricsCSV(buffer, bufferSize, CTRL_ROU);
+            }
             if (bufLen)
             {
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_ROU))
@@ -928,21 +1245,22 @@ static void *sendMetrics_func(void *args)
             uint8_t *buffer = (uint8_t *)malloc(bufferSize);
             if (buffer == NULL)
             {
-                logMessage(ERROR, "Error allocating memory for neighbor info buffer\n");
+                logMessage(ERROR, "Error allocating memory for topology data buffer\n");
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {
-                if (delayNext--)
+                if (delayNext)
                 {
+                    delayNext--;
                     sleep(config.sendDelayS);
                     totalDelayS += config.sendDelayS;
                 }
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_TAB))
                 {
-                    logMessage(ERROR, "Failed to send neighbour metrics to sink\n");
+                    logMessage(ERROR, "Failed to send Topology data to sink\n");
                     fflush(stdout);
                 }
                 else
@@ -964,11 +1282,12 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_MAC);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_MAC);
             if (bufLen)
             {
-                if (delayNext--)
+                if (delayNext)
                 {
+                    delayNext--;
                     sleep(config.sendDelayS);
                     totalDelayS += config.sendDelayS;
                 }
@@ -1092,6 +1411,7 @@ void ProtoMon_init(ProtoMon_Config c)
     {
         if (config.self != ADDR_SINK)
         {
+
             pthread_t sendMetricsT;
             if (pthread_create(&sendMetricsT, NULL, sendMetrics_func, NULL) != 0)
             {
@@ -1209,17 +1529,28 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     int ret = Original_Routing_sendMsg(dest, extData, extLen);
 
     // Capture metrics
-    sem_wait(&routingMetrics.mutex);
-    if (dest > routingMetrics.maxAddr)
+
+    // TODO: Set condition based on config.serializedMetrics
+    if (1)
     {
-        routingMetrics.maxAddr = dest;
+        uint16_t increment = 1;
+        Metric_updateParamVal(&routingValues[dest], SENT, (void *)&increment);
     }
-    if (dest < routingMetrics.minAddr)
+    else
     {
-        routingMetrics.minAddr = dest;
+
+        sem_wait(&routingMetrics.mutex);
+        if (dest > routingMetrics.maxAddr)
+        {
+            routingMetrics.maxAddr = dest;
+        }
+        if (dest < routingMetrics.minAddr)
+        {
+            routingMetrics.minAddr = dest;
+        }
+        routingMetrics.data[dest].sent++;
+        sem_post(&routingMetrics.mutex);
     }
-    routingMetrics.data[dest].sent++;
-    sem_post(&routingMetrics.mutex);
 
     return ret;
 }
@@ -1280,26 +1611,37 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
         }
 
         // Capture metrics
-        sem_wait(&routingMetrics.mutex);
-        if (src > routingMetrics.maxAddr)
+        // TODO: Set condition based on config.serializedMetrics
+        if (1)
         {
-            routingMetrics.maxAddr = src;
+            uint16_t increment = 1;
+            Metric_updateParamVal(&routingValues[src], RECV, (void *)&increment);
+            Metric_setParamVal(&routingValues[src], NUMHOPS, (void *)&numHops);
+            Metric_setParamVal(&routingValues[src], LATENCY, (void *)&latency);
+            Metric_setParamVal(&routingValues[src], RECV, (void *)&routingMetrics.data[src].recv);
         }
-        if (src < routingMetrics.minAddr)
+        else
         {
-            routingMetrics.minAddr = src;
+
+            sem_wait(&routingMetrics.mutex);
+            if (src > routingMetrics.maxAddr)
+            {
+                routingMetrics.maxAddr = src;
+            }
+            if (src < routingMetrics.minAddr)
+            {
+                routingMetrics.minAddr = src;
+            }
+            routingMetrics.data[src].recv++;
+            routingMetrics.data[src].totalLatency += latency;
+            routingMetrics.data[src].numHops = numHops;
+
+            logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[NUMHOPS].value);
+
+            memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
+            strcpy(routingMetrics.data[src].path, lastPath);
+            sem_post(&routingMetrics.mutex);
         }
-        routingMetrics.data[src].recv++;
-        routingMetrics.data[src].totalLatency += latency;
-        routingMetrics.data[src].numHops = numHops;
-
-        Metric_setParamVal(&routing[src], NUMHOPS, (void *)&numHops);
-
-        logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routing[src].params[NUMHOPS].value);
-
-        memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
-        strcpy(routingMetrics.data[src].path, lastPath);
-        sem_post(&routingMetrics.mutex);
 
         return len - overhead;
     }
@@ -1307,33 +1649,55 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
     {
         if (config.self == ADDR_SINK)
         {
+            uint8_t src = header->src;
             const char *fileName = (ctrl == CTRL_MAC) ? macCSV : (ctrl == CTRL_TAB ? networkCSV : routingCSV);
-            temp += sizeof(ctrl);
-            int writeLen = writeBufferToFile(fileName, temp);
-            if (writeLen <= 0)
+
+            // TODO: Set condition based on config.serialize
+            if (1)
             {
-                logMessage(ERROR, "Error writing to %s file!\n", fileName);
-                fflush(stdout);
-                exit(EXIT_FAILURE);
+                logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"), src, len);
+                deserializeMetricsPkt(extendedData, len, src, ctrl);
             }
             else
             {
-                logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"), header->src, writeLen);
+                temp += sizeof(ctrl);
+                int writeLen = writeBufferToFile(fileName, temp);
+                if (writeLen <= 0)
+                {
+                    logMessage(ERROR, "Error writing to %s file!\n", fileName);
+                    fflush(stdout);
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"), header->src, writeLen);
+                }
             }
 
             // Write corresponding sink metrics to file
             time_t *lastWrite = (ctrl == CTRL_MAC) ? &lastMacWrite : (ctrl == CTRL_TAB ? &lastNeighborWrite : &lastRoutingWrite);
             if (time(NULL) - *lastWrite > config.sendIntervalS)
             {
-                uint16_t bufferSize = MAX_PAYLOAD_SIZE;
+                uint16_t bufferSize = SINK_MAX_BUFFER;
                 uint8_t buffer[bufferSize];
                 if (buffer == NULL)
                 {
-                    logMessage(ERROR, "Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"));
+                    logMessage(ERROR, "Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"));
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+
+                uint16_t bufLen;
+                // TODO: Set condition based on config.serialize
+                if (1)
+                {
+                    bufLen = getMetricsCSV2(buffer, bufferSize, ctrl);
+                }
+                else
+                {
+                    bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
+                }
+
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)
@@ -1412,21 +1776,37 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
         }
 
         // Capture metrics
-        sem_wait(&routingMetrics.mutex);
-        if (src > routingMetrics.maxAddr)
+        // TODO: Set condition based on config.serializedMetrics
+        if (1)
         {
-            routingMetrics.maxAddr = src;
+            uint16_t increment = 1;
+            Metric_updateParamVal(&routingValues[src], RECV, (void *)&increment);
+            Metric_setParamVal(&routingValues[src], NUMHOPS, (void *)&numHops);
+            Metric_setParamVal(&routingValues[src], LATENCY, (void *)&latency);
+            Metric_setParamVal(&routingValues[src], RECV, (void *)&routingMetrics.data[src].recv);
         }
-        if (src < routingMetrics.minAddr)
+        else
         {
-            routingMetrics.minAddr = src;
+
+            sem_wait(&routingMetrics.mutex);
+            if (src > routingMetrics.maxAddr)
+            {
+                routingMetrics.maxAddr = src;
+            }
+            if (src < routingMetrics.minAddr)
+            {
+                routingMetrics.minAddr = src;
+            }
+            routingMetrics.data[src].recv++;
+            routingMetrics.data[src].totalLatency += latency;
+            routingMetrics.data[src].numHops = numHops;
+
+            logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[NUMHOPS].value);
+
+            memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
+            strcpy(routingMetrics.data[src].path, lastPath);
+            sem_post(&routingMetrics.mutex);
         }
-        routingMetrics.data[src].recv++;
-        routingMetrics.data[src].totalLatency += latency;
-        routingMetrics.data[src].numHops = numHops;
-        memset(routingMetrics.data[src].path, 0, sizeof(routingMetrics.data[src].path));
-        strcpy(routingMetrics.data[src].path, lastPath);
-        sem_post(&routingMetrics.mutex);
 
         return extLen;
     }
@@ -1434,33 +1814,55 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
     {
         if (config.self == ADDR_SINK)
         {
+            uint8_t src = header->src;
             const char *fileName = (ctrl == CTRL_MAC) ? macCSV : (ctrl == CTRL_TAB ? networkCSV : routingCSV);
-            temp += sizeof(ctrl);
-            int writeLen = writeBufferToFile(fileName, temp);
-            if (writeLen <= 0)
+
+            // TODO: Set condition based on config.serialize
+            if (1)
             {
-                logMessage(ERROR, "Error writing to %s file!\n", fileName);
-                fflush(stdout);
-                exit(EXIT_FAILURE);
+                logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"), src, len);
+                deserializeMetricsPkt(extendedData, len, src, ctrl);
             }
             else
             {
-                logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"), header->src, writeLen);
+                temp += sizeof(ctrl);
+                int writeLen = writeBufferToFile(fileName, temp);
+                if (writeLen <= 0)
+                {
+                    logMessage(ERROR, "Error writing to %s file!\n", fileName);
+                    fflush(stdout);
+                    exit(EXIT_FAILURE);
+                }
+                else
+                {
+                    logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"), header->src, writeLen);
+                }
             }
 
             // Write corresponding sink metrics to file
             time_t *lastWrite = (ctrl == CTRL_MAC) ? &lastMacWrite : (ctrl == CTRL_TAB ? &lastNeighborWrite : &lastRoutingWrite);
             if (time(NULL) - *lastWrite > config.sendIntervalS)
             {
-                uint16_t bufferSize = MAX_PAYLOAD_SIZE;
+                uint16_t bufferSize = SINK_MAX_BUFFER;
                 uint8_t buffer[bufferSize];
                 if (buffer == NULL)
                 {
-                    logMessage(ERROR, "Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "Neigbour" : "Routing"));
+                    logMessage(ERROR, "Error allocating memory for %s data buffer!\n", ctrl == CTRL_MAC ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"));
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+
+                uint16_t bufLen;
+                // TODO: Set condition based on config.serialize
+                if (1)
+                {
+                    bufLen = getMetricsCSV2(buffer, bufferSize, ctrl);
+                }
+                else
+                {
+                    bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
+                }
+
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)
@@ -1605,11 +2007,11 @@ int ProtoMon_Routing_timedRecvMsgV2(Routing_Header *header, uint8_t *data, unsig
                     uint8_t buffer[bufferSize];
                     if (buffer == NULL)
                     {
-                        logMessage(ERROR, "Error allocating memory for %s data buffer!\n", metricCtrl == CTRL_MAC ? "MAC" : (metricCtrl == CTRL_TAB ? "Neigbour" : "Routing"));
+                        logMessage(ERROR, "Error allocating memory for %s data buffer!\n", metricCtrl == CTRL_MAC ? "MAC" : (metricCtrl == CTRL_TAB ? "Topology" : "Routing"));
                         fflush(stdout);
                         exit(EXIT_FAILURE);
                     }
-                    uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, metricCtrl);
+                    uint16_t bufLen = getMetricsCSV(buffer, bufferSize, metricCtrl);
                     if (bufLen)
                     {
                         if (writeBufferToFile(fileName, buffer) <= 0)

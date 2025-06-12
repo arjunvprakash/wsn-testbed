@@ -54,27 +54,27 @@ STRP_Config strp;
 
 static void initParentTable()
 {
-	config.parentTable[1] = 16;
-	config.parentTable[4] = 9;
-	config.parentTable[5] = 16;
-	config.parentTable[6] = 16;
-	config.parentTable[7] = 13;
-	config.parentTable[8] = 13;
-	config.parentTable[9] = 24;
-	config.parentTable[12] = 21;
+	// config.parentTable[1] = ADDR_SINK;
+	// config.parentTable[4] = 6;
+	// config.parentTable[5] = 6;
+	// config.parentTable[6] = 16;
+	config.parentTable[7] = ADDR_SINK;
+	config.parentTable[8] = 7;
+	config.parentTable[9] = ADDR_SINK;
+	// config.parentTable[12] = 6;
 	config.parentTable[13] = ADDR_SINK;
 	// // config.parentTable[14] = ADDR_SINK; // Sink
-	// config.parentTable[15] = ADDR_SINK;
+	config.parentTable[15] = 9;
 	config.parentTable[16] = 9;
-	config.parentTable[18] = 22;
+	config.parentTable[18] = ADDR_SINK;
 	// config.parentTable[19] = ADDR_SINK;
-	config.parentTable[20] = 22;
+	config.parentTable[20] = 18;
 	config.parentTable[21] = 9;
-	config.parentTable[22] = ADDR_SINK;
-	// config.parentTable[23] = ADDR_SINK;
-	config.parentTable[24] = ADDR_SINK;
-	config.parentTable[25] = 9;
-	config.parentTable[27] = 22;
+	config.parentTable[22] = 20;
+	config.parentTable[23] = 15;
+	config.parentTable[24] = 22;
+	// config.parentTable[25] = 6;
+	config.parentTable[27] = 20;
 	// config.parentTable[28] = ADDR_SINK;
 }
 
@@ -95,15 +95,13 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	// config.name = "Baseline: data@[120-130]s"; //, routing metric@70-110";
-	// config.name = "Equivalent: data@[120-150]s, 30B@[120-150]s - hopcount";
-	config.name = "ProtoMon: data@[120-150]s, 3 metric@[120-150]s - hopcount";
+	config.name = "Experiment 11_serialized";
 
 	config.self = (uint8_t)atoi(argv[1]);
-	config.runtTimeS = 1200;
+	config.runtTimeS = 600;
 	config.monitoringEnabled = true;
-	config.maxSyncSleepS = 5;
-	config.senseDurationS = 5;
+	config.maxSyncSleepS = 30;
+	config.senseDurationS = 30;
 
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
@@ -119,19 +117,23 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	unsigned int offsetS = ((config.hopCountTable[config.self] - 1) * 15); //+ (config.self % 4);
+	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 15); //+ (config.self % 4);
+	unsigned int offsetS = 0;
 
-	config.sendOffsetMs = offsetS * 1000;
+	config.sendOffsetMs = 0;
 
 	strp.beaconIntervalS = 180;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 360;
-	strp.recvTimeoutMs = 1000;
+	// strp.recvTimeoutMs = 1000;
 	strp.self = config.self;
 	strp.senseDurationS = config.senseDurationS;
 	strp.strategy = FIXED;
 	strp.parentAddr = config.parentTable[config.self];
+	MAC mac;
+	strp.mac = &mac;
 	STRP_init(strp);
+	mac.ambient = 0;
 
 	syncTime(config.maxSyncSleepS);
 
@@ -140,8 +142,9 @@ int main(int argc, char *argv[])
 	// protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
 	protomon.sendIntervalS = minSendIntervalS;
 	protomon.self = config.self;
-	protomon.monitoredLevels = PROTOMON_LEVEL_ALL;
+	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING;
 	protomon.initialSendWaitS = 45 + offsetS;
+	// protomon.initialSendWaitS = 35;
 	// protomon.sendDelayS = 5;
 	if (config.monitoringEnabled)
 	{
@@ -227,7 +230,7 @@ static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config 
 		sprintf(configStr + strlen(configStr), "ProtoMon: disabled\n");
 	}
 	sprintf(configStr + strlen(configStr), "STRP: beaconIntervalS=%d,nodeTimeoutS=%d,recvTimeoutMs=%d,senseDurationS=%d,strategy=%d\n",
-			strp.beaconIntervalS, strp.nodeTimeoutS, strp.recvTimeoutMs, strp.senseDurationS, strp.strategy);
+			strp.beaconIntervalS, strp.nodeTimeoutS, 1000, strp.senseDurationS, strp.strategy);
 }
 
 static void installDependencies()
@@ -382,6 +385,26 @@ static void *recvMsg_func(void *args)
 	fflush(file);
 	fclose(file);
 
+	sprintf(filePath, "%s/%s", outputDir, "nodes.csv");
+	file = fopen(filePath, "a");
+	if (file == NULL)
+	{
+		logMessage(ERROR, "%s: Failed to open %s\n", __func__, filePath);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+	for (uint i = 0; i < MAX_ACTIVE_NODES; i++)
+	{
+		uint8_t parent = config.parentTable[i];
+		if (parent)
+		{
+			fprintf(file, "%d,%d\n", i, parent);
+		}
+	}
+
+	fflush(file);
+	fclose(file);
+
 	return NULL;
 }
 
@@ -434,6 +457,19 @@ static void initOutputDir()
 		exit(EXIT_FAILURE);
 	}
 	fprintf(file, "%s\n", cols);
+	fflush(file);
+	fclose(file);
+
+	sprintf(filePath, "%s/%s", outputDir, "nodes.csv");
+	file = fopen(filePath, "w");
+	if (file == NULL)
+	{
+		logMessage(ERROR, "%s: Failed to open %s\n", __func__, filePath);
+		fflush(stdout);
+		exit(EXIT_FAILURE);
+	}
+	const char *nodeCols = "Address,Parent";
+	fprintf(file, "%s\n", nodeCols);
 	fflush(file);
 	fclose(file);
 }
@@ -536,7 +572,6 @@ static void *sendMsg_func(void *args)
 		}
 
 		usleep((sleepMs + config.sendOffsetMs) * 1000);
-		// usleep(sleepMs * 1000);
 
 		char buffer[MAX_PAYLOAD_SIZE];
 		if (payloadSize > minPayloadSize)
@@ -553,11 +588,11 @@ static void *sendMsg_func(void *args)
 		}
 		else
 		{
-			if (payloadSize < minPayloadSize)
-			{
-				logMessage(DEBUG, "Payload size %d < minimum %d.Sending default.\n", payloadSize, minPayloadSize);
-				fflush(stdout);
-			}
+			// if (payloadSize < minPayloadSize)
+			// {
+			// 	logMessage(DEBUG, "Payload size %d < minimum %d.Sending default.\n", payloadSize, minPayloadSize);
+			// 	fflush(stdout);
+			// }
 			sprintf(buffer, "%02d_%03d_%lld", config.self, ++total, getEpochMs());
 		}
 
@@ -572,7 +607,7 @@ static void *sendMsg_func(void *args)
 		fflush(stdout);
 	}
 	fclose(file);
-	unsigned long idleTime = config.runtTimeS - (time(NULL) - startTime);
+	long idleTime = config.runtTimeS - (time(NULL) - startTime);
 	if (idleTime > 0)
 	{
 		logMessage(INFO, "Waiting %d seconds for forwarding\n", idleTime);

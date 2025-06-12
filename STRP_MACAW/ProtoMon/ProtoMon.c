@@ -96,7 +96,7 @@ static void createHttpServer(int port);
 static void *sendMetrics_func(void *args);
 static int writeBufferToFile(const uint8_t *fileName, uint8_t *temp);
 static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl);
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl);
 static uint16_t getRoutingOverhead();
 static uint16_t getMACOverhead();
 static void initMetrics();
@@ -465,7 +465,7 @@ static uint16_t getMetricsBufferV2(uint8_t *buffer, uint16_t bufferSize, uint8_t
     return usedSize > 1 ? usedSize : 0;
 }
 
-static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
+static uint16_t getMetricsCSV(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
 {
     uint16_t usedSize = 0;
     time_t timestamp = time(NULL);
@@ -641,7 +641,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_ROU);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_ROU);
             if (bufLen)
             {
                 // unsigned int randDelay = randInRange(300000, 1000000);
@@ -669,7 +669,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {
                 // unsigned int randDelay = randInRange(300000, 1000000);
@@ -701,7 +701,7 @@ static void *sendMetrics_func(void *args)
                 fflush(stdout);
                 exit(EXIT_FAILURE);
             }
-            uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_MAC);
+            uint16_t bufLen = getMetricsCSV(buffer, bufferSize, CTRL_MAC);
             if (bufLen)
             {
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_MAC))
@@ -1053,7 +1053,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+                uint16_t bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)
@@ -1180,7 +1180,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
                     fflush(stdout);
                     exit(EXIT_FAILURE);
                 }
-                uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, ctrl);
+                uint16_t bufLen = getMetricsCSV(buffer, bufferSize, ctrl);
                 if (bufLen)
                 {
                     if (writeBufferToFile(fileName, buffer) <= 0)
@@ -1329,7 +1329,7 @@ int ProtoMon_Routing_timedRecvMsgV2(Routing_Header *header, uint8_t *data, unsig
                         fflush(stdout);
                         exit(EXIT_FAILURE);
                     }
-                    uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, metricCtrl);
+                    uint16_t bufLen = getMetricsCSV(buffer, bufferSize, metricCtrl);
                     if (bufLen)
                     {
                         if (writeBufferToFile(fileName, buffer) <= 0)

@@ -25,7 +25,7 @@ typedef struct Routing_Header
     uint8_t src;  // Source of the packet
     uint8_t dst;  // Destination of the packet
     uint8_t prev; // Address of the previous hop
-    int8_t RSSI;     // RSSI of the previous hop address
+    int RSSI;     // RSSI of the previous hop address
 } Routing_Header;
 
 /**
