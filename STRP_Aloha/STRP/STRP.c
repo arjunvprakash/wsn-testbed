@@ -65,27 +65,29 @@ typedef struct
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
-typedef struct NodeRoutingTable
-{
-    char *timestamp;
-    uint8_t src;
-    uint8_t numNodes;
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-} NodeRoutingTable;
-
-typedef struct TableQueue
-{
-    NodeRoutingTable table[MAX_ACTIVE_NODES];
-    sem_t mutex, full, free;
-    unsigned int begin, end;
-} TableQueue;
-
 typedef struct STRP_Params
 {
     uint16_t parentChanges;
     uint16_t beaconsSent;
     uint16_t beaconsRecv;
 } STRP_Params;
+
+Parameter strpParams[] = {
+    {.name = "BeaconsRecv", .type = TYPE_UINT16}};
+uint8_t numStrpParams = sizeof(strpParams) / sizeof(Parameter);
+Metric strpValues[MAX_ACTIVE_NODES];
+
+void STRP_initParamsV2()
+{
+    Metric_initAll(strpValues, MAX_ACTIVE_NODES, strpParams, numStrpParams);
+}
+
+typedef enum strpParamIndex
+{
+    PARENT_CHANGES,
+    BEACONS_SENT,
+    BEACONS_RECV
+} strpParamIndex;
 
 typedef struct Metrics
 {
@@ -107,7 +109,6 @@ static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
-static TableQueue tableQ;
 
 int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;
@@ -171,6 +172,8 @@ int STRP_init(STRP_Config c)
     recvQ_init();
     initNeighbours();
     initMetrics();
+
+    STRP_initParamsV2();
 
     if (pthread_create(&recvT, NULL, recvPackets_func, NULL) != 0)
     {
@@ -505,6 +508,14 @@ static void *recvPackets_func(void *args)
                 printf("# %s - Beacon src: %02d (%d) parent: %02d(%d)\n", timestamp(), metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
             }
             updateActiveNodes(metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
+
+            if (1)
+            {
+                uint16_t increment = 1;
+                sem_wait(&strpValues[metadata.prev].mutex);
+                Metric_updateParamVal(&strpValues[metadata.prev], PARENT_CHANGES, (void *)&increment);
+                sem_post(&strpValues[metadata.prev].mutex);
+            }
             metrics.data[metadata.prev].beaconsRecv++;
         }
         else
@@ -1351,4 +1362,11 @@ void setConfigDefaults(STRP_Config *config)
 uint8_t *Routing_getTopologyHeader()
 {
     return "Timestamp,Source,Address,State,LinkType,RSSI,Parent,ParentRSSI";
+}
+
+Metric Routing_getMetricsDataV2(uint8_t addr)
+{
+    Metric metric = strpValues[addr];
+    Metric_reset(&strpValues[addr]);
+    return metric;
 }

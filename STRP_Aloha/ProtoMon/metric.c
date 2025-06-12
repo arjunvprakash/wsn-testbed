@@ -7,6 +7,7 @@
 static void *allocateMemoryForType(Param_Type type);
 static int updateValue(Parameter *param, void *value);
 static int setValue(Parameter *param, void *value);
+static void Metric_init(Metric *metric, uint8_t addr, Parameter *params, uint8_t numParams);
 
 int Metric_updateParamVal(Metric *metric, uint8_t index, void *value)
 {
@@ -52,7 +53,20 @@ int Metric_setParamVal(Metric *metric, uint8_t index, void *value)
     return result;
 }
 
-void Metric_init(Metric *metric, uint8_t addr, Parameter *params, uint8_t numParams)
+void Metric_initAll(Metric *metrics, uint8_t numMetrics, Parameter *params, uint8_t numParams)
+{
+    if (metrics == NULL || params == NULL || numMetrics == 0)
+    {
+        return;
+    }
+
+    for (uint8_t i = 0; i < numMetrics; i++)
+    {
+        Metric_init(&metrics[i], i, params, numParams);
+    }
+}
+
+static void Metric_init(Metric *metric, uint8_t addr, Parameter *params, uint8_t numParams)
 {
     if (metric == NULL || params == NULL)
     {
@@ -122,7 +136,7 @@ void Metric_reset(Metric *metric)
         return; // Uninitialzed
     }
 
-    // sem_wait(&metric->mutex);
+    sem_wait(&metric->mutex);
     for (uint8_t i = 0; i < metric->numParams; i++)
     {
         if (metric->params[i].value != NULL)
@@ -152,7 +166,7 @@ void Metric_reset(Metric *metric)
             }
         }
     }
-    // sem_post(&metric->mutex);
+    sem_post(&metric->mutex);
 }
 
 static void *allocateMemoryForType(Param_Type type)

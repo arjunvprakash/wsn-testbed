@@ -34,9 +34,9 @@ typedef struct Metric
 
 
 int Metric_setParamVal(Metric *metric, uint8_t index, void *value);
-void Metric_init(Metric *metric, uint8_t addr, Parameter *params, uint8_t numParams);
 int Metric_getSize(Metric metric);
 void Metric_reset(Metric *metric);
-int Metric_updateParamVal(Metric *metric, uint8_t index, void *value);
+int Metric_updateParamVal(Metric *metric, uint8_t index, void *increment);
+void Metric_initAll(Metric *metrics, uint8_t numMetrics, Parameter *params, uint8_t numParams);
 
 #endif // METRIC_H
