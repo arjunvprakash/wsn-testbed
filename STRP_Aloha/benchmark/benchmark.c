@@ -52,7 +52,6 @@ Benchmark_Config config;
 ProtoMon_Config protomon;
 STRP_Config strp;
 
-
 static void initParentTable()
 {
 	// config.parentTable[1] = ADDR_SINK;
@@ -95,12 +94,12 @@ static void initPktCountTable();
 static void initHopCountTable();
 
 int main(int argc, char *argv[])
-{	
-	config.name = "Experiment 20";
+{
+	config.name = "Experiment 101";
 
 	config.self = (uint8_t)atoi(argv[1]);
-	config.runtTimeS = 600;
-	config.monitoringEnabled = false;
+	config.runtTimeS = 40215000;
+	config.monitoringEnabled = true;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
 
@@ -118,14 +117,14 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); //+ (config.self % 4);
+	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); //+ (config.self % 4);
 	// unsigned int offsetS = 0;
 
 	config.sendOffsetMs = 0;
 
-	strp.beaconIntervalS = 180;
+	strp.beaconIntervalS = 1200 + offsetS;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 360;
+	strp.nodeTimeoutS = 3600;
 	// strp.recvTimeoutMs = 1000;
 	strp.self = config.self;
 	strp.senseDurationS = config.senseDurationS;
@@ -134,18 +133,18 @@ int main(int argc, char *argv[])
 	MAC mac;
 	strp.mac = &mac;
 	STRP_init(strp);
-	mac.ambient = 0; 
+	mac.ambient = 0;
 
 	syncTime(config.maxSyncSleepS);
 
 	protomon.vizIntervalS = 180;
 	protomon.loglevel = INFO;
 	// protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
-	protomon.sendIntervalS = 240;
+	protomon.sendIntervalS = 1200;
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC | PROTOMON_LEVEL_TOPO;
-	protomon.initialSendWaitS = 60 + offsetS;
-	protomon.sendDelayS = 60;
+	protomon.initialSendWaitS = 100 + offsetS;
+	protomon.sendDelayS = 400;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -649,7 +648,7 @@ static void initHopCountTable()
 	}
 	for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
 	{
-		if (config.parentTable[i] > 0)
+		if (i != ADDR_SINK && config.parentTable[i] > 0)
 		{
 			config.hopCountTable[i] = getHopCount(i);
 			config.nodeCount++;
@@ -772,7 +771,7 @@ static void initPktCountTable()
 	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
 	{
 
-		if (config.parentTable[i] > 0)
+		if (i != ADDR_SINK && config.parentTable[i] > 0)
 		{
 			config.pktCountTable[i] += config.pktCountTable[0];
 			if (config.pktCountTable[i] > config.maxPktCount)
