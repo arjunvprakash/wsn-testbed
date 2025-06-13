@@ -8,7 +8,8 @@
 #include <time.h>      // time
 #include <errno.h>     // errno
 #include <signal.h>    // signal
-#include <semaphore.h> // sem_init, sem_wait, sem_trywait, sem_timedwait
+#include <semaphore.h> // sem_init, sem_wait, sem_post
+#include <math.h>     // floor
 
 #include "../common.h"
 #include "../util.h"
@@ -78,6 +79,7 @@ static MACMetrics macMetrics;
 static RoutingMetrics routingMetrics;
 static time_t startTime, lastVizTime, lastMacWrite, lastNeighborWrite, lastRoutingWrite;
 static uint8_t lastPath[240];
+static uint8_t numLayers = 0; // Number of layers monitored
 
 static int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
 static int ProtoMon_Routing_recvMsg(Routing_Header *h, uint8_t *data);
@@ -632,6 +634,8 @@ static void *sendMetrics_func(void *args)
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {
+        uint16_t totalDelayS;
+        uint8_t delayNext;
         unsigned int totalDelay;
         // Send routing metrics to sink
         if (config.monitoredLevels & PROTOMON_LEVEL_ROUTING)
@@ -657,6 +661,7 @@ static void *sendMetrics_func(void *args)
                 else
                 {
                     logMessage(INFO, "Sent Routing metrics to sink: %d B\n", bufLen);
+                    delayNext++;
                 }
             }
             free(buffer);
@@ -674,9 +679,12 @@ static void *sendMetrics_func(void *args)
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {
-                // unsigned int randDelay = randInRange(300000, 1000000);
-                // totalDelay += randDelay;
-                // usleep(randDelay);
+                if (delayNext)
+                {
+                    delayNext--;
+                    sleep(config.sendDelayS);
+                    totalDelayS += config.sendDelayS;
+                }
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_TAB))
                 {
                     logMessage(ERROR, "Failed to send Topology data to sink\n");
@@ -685,6 +693,7 @@ static void *sendMetrics_func(void *args)
                 else
                 {
                     logMessage(INFO, "Sent Topology data to sink: %d B\n", bufLen);
+                    delayNext++;
                 }
             }
             free(buffer);
@@ -692,10 +701,7 @@ static void *sendMetrics_func(void *args)
 
         // Send MAC metrics to sink
         if (config.monitoredLevels & PROTOMON_LEVEL_MAC)
-        {
-            // unsigned int randDelay = randInRange(300000, 1000000);
-            // totalDelay += randDelay;
-            // usleep(randDelay);
+        {            
             uint8_t buffer[bufferSize];
             if (buffer == NULL)
             {
@@ -706,6 +712,12 @@ static void *sendMetrics_func(void *args)
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_MAC);
             if (bufLen)
             {
+                if (delayNext)
+                {
+                    delayNext--;
+                    sleep(config.sendDelayS);
+                    totalDelayS += config.sendDelayS;
+                }
                 if (!sendMetricsToSink(buffer, bufLen, CTRL_MAC))
                 {
                     logMessage(ERROR, "Failed to send MAC metrics to sink\n");
@@ -714,13 +726,13 @@ static void *sendMetrics_func(void *args)
                 else
                 {
                     logMessage(INFO, "Sent MAC metrics to sink: %d B\n", bufLen);
+                    delayNext++;
                 }
             }
         }
 
         fflush(stdout);
-        // sleep(config.sendIntervalS - (unsigned int)(totalDelay / 1000000));
-        sleep(config.sendIntervalS);
+        sleep(config.sendIntervalS - totalDelayS);
     }
     return NULL;
 }
@@ -753,6 +765,10 @@ void setConfigDefaults(ProtoMon_Config *c)
     if (c->vizIntervalS == 0)
     {
         c->vizIntervalS = 60;
+    }
+    if (c->initialSendWaitS == 0)
+    {
+        c->initialSendWaitS = floor(c->sendIntervalS / numLayers);
     }
 }
 
@@ -795,6 +811,7 @@ void ProtoMon_init(ProtoMon_Config c)
             exit(EXIT_FAILURE);
         }
         logMessage(INFO, "Monitoring enabled for Routing layer\n");
+        numLayers++;
         fflush(stdout);
     }
 
@@ -807,6 +824,14 @@ void ProtoMon_init(ProtoMon_Config c)
             exit(EXIT_FAILURE);
         }
         logMessage(INFO, "Monitoring enabled for MAC layer\n");
+        numLayers++;
+        fflush(stdout);
+    }
+
+    if (c.monitoredLevels & PROTOMON_LEVEL_TOPO)
+    {        
+        logMessage(INFO, "Monitoring enabled for Topology layer\n");
+        numLayers++;
         fflush(stdout);
     }
 

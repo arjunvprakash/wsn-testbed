@@ -29,7 +29,7 @@ typedef struct Benchmark_Config
 {
 	uint8_t self;
 	bool monitoringEnabled;
-	unsigned int runtTimeS;
+	unsigned long long runtTimeS;
 	unsigned short maxSyncSleepS;
 	unsigned short senseDurationS;
 	unsigned int sendOffsetMs;
@@ -43,7 +43,7 @@ static unsigned int startTime;
 static unsigned long long startTimeMs;
 static char configStr[1024];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
-static const short minSendIntervalS = 120;
+static const short minSendIntervalS = 800;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -96,11 +96,11 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {	
-	config.name = "Experiment 17";
+	config.name = "Experiment 20";
 
 	config.self = (uint8_t)atoi(argv[1]);
 	config.runtTimeS = 600;
-	config.monitoringEnabled = true;
+	config.monitoringEnabled = false;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
 
@@ -118,8 +118,8 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 15); //+ (config.self % 4);
-	unsigned int offsetS = 0;
+	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); //+ (config.self % 4);
+	// unsigned int offsetS = 0;
 
 	config.sendOffsetMs = 0;
 
@@ -141,11 +141,11 @@ int main(int argc, char *argv[])
 	protomon.vizIntervalS = 180;
 	protomon.loglevel = INFO;
 	// protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
-	protomon.sendIntervalS = minSendIntervalS;
+	protomon.sendIntervalS = 240;
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC | PROTOMON_LEVEL_TOPO;
-	protomon.initialSendWaitS = 45 + offsetS;
-	// protomon.sendDelayS = 5;
+	protomon.initialSendWaitS = 60 + offsetS;
+	protomon.sendDelayS = 60;
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -477,7 +477,7 @@ static void initOutputDir()
 static void *sendMsg_func(void *args)
 {
 	int total;
-	unsigned long prevSleep, waitIdle;
+	unsigned long long prevSleep, waitIdle;
 	char filePath[100];
 	sprintf(filePath, "../benchmark/%s", inputFile);
 	// Read from config.txt
@@ -509,7 +509,7 @@ static void *sendMsg_func(void *args)
 			logMessage(DEBUG, "Line #%d: %s\n", numLine, line);
 		}
 
-		char sleep[10];
+		char sleep[20];
 		char nodes[100];
 		char dest[2];
 		char size[3];
@@ -557,7 +557,7 @@ static void *sendMsg_func(void *args)
 			fflush(stdout);
 		}
 
-		long sleepMs = sendTime - prevSleep;
+		unsigned long long sleepMs = sendTime - prevSleep;
 		prevSleep = sendTime;
 		if (loglevel == DEBUG)
 		{
