@@ -303,20 +303,22 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                         valid_plots += 1
 
         else:
-            for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
-                if src_addr_df[metric].max() > 0:
-                    src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
-                    # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
-                    if metric.lower().startswith("total"):
-                        src_addr_df[metric] = src_addr_df[metric].cumsum()
-
+            if metric.lower().startswith("agg"):
+                for (src), src_addr_df in data.groupby(['Source']):
+                    src = src[0]
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy() 
+                        if metric.lower().split("agg")[1].startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+                        addr = src_addr_df['Address'].unique()[0]
                     if src_addr_df.shape[0] > 0:
                         # Create Bokeh ColumnDataSource
                         source = ColumnDataSource(src_addr_df)
 
-                        key = (src, addr)                        
+                        key = (src,addr) 
+                        #print(key)
                     
-                        labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                        labelStr = f'Node {src}'
                         p.line('RelativeTime', 
                                metric
                                ,source=source
@@ -332,6 +334,36 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                                ,size=2
                                )
                         valid_plots += 1
+            else:
+                for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
+                        # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
+                        if metric.lower().startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+
+                        if src_addr_df.shape[0] > 0:
+                            # Create Bokeh ColumnDataSource
+                            source = ColumnDataSource(src_addr_df)
+
+                            key = (src, addr)                        
+                        
+                            labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                            p.line('RelativeTime', 
+                                metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,line_width=2
+                                ,color=color_map[key]
+                                )
+                            p.scatter('RelativeTime'
+                                    ,metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,color=color_map[key]
+                                ,size=2
+                                )
+                            valid_plots += 1
         
         if valid_plots > 0:
             p.legend.background_fill_alpha = 0.2 

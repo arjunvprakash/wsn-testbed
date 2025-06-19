@@ -35,7 +35,8 @@ typedef struct Benchmark_Config
 	unsigned int sendOffsetMs;
 	uint8_t parentTable[MAX_ACTIVE_NODES], nodeCount;
 	uint8_t hopCountTable[MAX_ACTIVE_NODES], minHopCount, maxHopCount;
-	uint8_t pktCountTable[MAX_ACTIVE_NODES], minPktCount, maxPktCount;
+	uint8_t pktCountTable[MAX_ACTIVE_NODES];
+	uint16_t minPktCount, maxPktCount;
 	char *name;
 } Benchmark_Config;
 
@@ -43,7 +44,6 @@ static unsigned int startTime;
 static unsigned long long startTimeMs;
 static char configStr[1024];
 static const unsigned short minPayloadSize = 20; // self (2) + '_'(1) + seqId (3) + '_' (1) + timestamp_ms (13)
-static const short minSendIntervalS = 800;
 
 static pthread_t recvT;
 static pthread_t sendT;
@@ -52,6 +52,7 @@ Benchmark_Config config;
 ProtoMon_Config protomon;
 STRP_Config strp;
 
+// Make sure ADDR_SINK is not assigned a parent
 static void initParentTable()
 {
 	// config.parentTable[1] = ADDR_SINK;
@@ -62,8 +63,8 @@ static void initParentTable()
 	config.parentTable[8] = 7;
 	config.parentTable[9] = ADDR_SINK;
 	// config.parentTable[12] = 6;
-	config.parentTable[13] = ADDR_SINK;
-	// // config.parentTable[14] = ADDR_SINK; // Sink
+	// config.parentTable[13] = ADDR_SINK; // Sink
+	// // config.parentTable[14] = ADDR_SINK;
 	config.parentTable[15] = 9;
 	config.parentTable[16] = 9;
 	config.parentTable[18] = ADDR_SINK;
@@ -95,10 +96,14 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	config.name = "Experiment 101";
+	config.name = "Experiment 101"; // Experiment 101
+	config.runtTimeS = 40215;		// Experiment 101
+
+	// config.name = "Experiment 120"; // Experiment 120
+	// config.runtTimeS = 12895;		// Experiment 120
 
 	config.self = (uint8_t)atoi(argv[1]);
-	config.runtTimeS = 40215000;
+
 	config.monitoringEnabled = true;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
@@ -117,15 +122,16 @@ int main(int argc, char *argv[])
 	initHopCountTable();
 	initPktCountTable();
 
-	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); //+ (config.self % 4);
 	// unsigned int offsetS = 0;
+	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 101
+
+	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); // experiment 120
 
 	config.sendOffsetMs = 0;
 
 	strp.beaconIntervalS = 1200 + offsetS;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 3600;
-	// strp.recvTimeoutMs = 1000;
 	strp.self = config.self;
 	strp.senseDurationS = config.senseDurationS;
 	strp.strategy = FIXED;
@@ -137,14 +143,20 @@ int main(int argc, char *argv[])
 
 	syncTime(config.maxSyncSleepS);
 
-	protomon.vizIntervalS = 180;
 	protomon.loglevel = INFO;
-	// protomon.sendIntervalS = minSendIntervalS + ((config.hopCountTable[config.self] * config.self) % 60);
-	protomon.sendIntervalS = 1200;
+
+	protomon.sendIntervalS = 1200;			   // experiment 101
+	protomon.initialSendWaitS = 100 + offsetS; // experiment 101
+	protomon.sendDelayS = 400;				   // experiment 101
+	protomon.vizIntervalS = 1200;			   // experiment 101
+
+	// protomon.sendIntervalS = 360;			  // experiment 120
+	// protomon.vizIntervalS = 360;			  // experiment 120
+	// protomon.initialSendWaitS = 60 + offsetS; // experiment 120
+	// protomon.sendDelayS = 120;				  // experiment 120
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC | PROTOMON_LEVEL_TOPO;
-	protomon.initialSendWaitS = 100 + offsetS;
-	protomon.sendDelayS = 400;
+
 	if (config.monitoringEnabled)
 	{
 		ProtoMon_init(protomon);
@@ -218,18 +230,27 @@ static void syncTime(unsigned int n)
 // Generate a string with the experiment configuration
 static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config strp)
 {
-	sprintf(configStr, "%s\nApplication: self=%d,runtTimeS=%d,nodes=%d,hops=[%d to %d],pkt=[%d to %d],sendOffsetMs=%d\n", config.name, config.self, config.runtTimeS, config.nodeCount, config.minHopCount, config.maxHopCount, config.minPktCount, config.maxPktCount, config.sendOffsetMs);
+	sprintf(configStr + strlen(configStr), "%s\nApplication: self=%d,runtTimeS=%llu,nodes=%d,hops=[%d to %d],pkt=[%d to %d],sendOffsetMs=%d\n",
+			config.name, config.self, config.runtTimeS, config.nodeCount,
+			config.minHopCount, config.maxHopCount,
+			config.minPktCount, config.maxPktCount, config.sendOffsetMs);
 	if (config.monitoringEnabled)
 	{
-		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d\n",
-				protomon.vizIntervalS, protomon.sendIntervalS, protomon.monitoredLevels, protomon.initialSendWaitS);
+		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%ld,sendIntervalS=%ld,monitoredLevels=%d,initialSendWaitS=%ld,sendDelayS=%ld\n",
+				protomon.vizIntervalS, protomon.sendIntervalS, protomon.monitoredLevels, protomon.initialSendWaitS, protomon.sendDelayS);
 	}
 	else
 	{
 		sprintf(configStr + strlen(configStr), "ProtoMon: disabled\n");
 	}
-	sprintf(configStr + strlen(configStr), "STRP: beaconIntervalS=%d,nodeTimeoutS=%d,recvTimeoutMs=%d,senseDurationS=%d,strategy=%d\n",
-			strp.beaconIntervalS, strp.nodeTimeoutS, 1000, strp.senseDurationS, strp.strategy);
+	sprintf(configStr + strlen(configStr), "STRP: beaconIntervalS=%d,nodeTimeoutS=%d,senseDurationS=%d,strategy=%d",
+			strp.beaconIntervalS, strp.nodeTimeoutS, strp.senseDurationS, strp.strategy, strp.parentAddr);
+	if (config.self != ADDR_SINK)
+	{
+		sprintf(configStr + strlen(configStr), ",parentAddr=%d", strp.parentAddr);
+	}
+
+	sprintf(configStr + strlen(configStr), "\n");
 }
 
 static void installDependencies()
@@ -640,7 +661,9 @@ static unsigned short getHopCount(uint8_t node)
 
 static void initHopCountTable()
 {
-	config.minHopCount = 99;
+	config.minHopCount = UINT8_MAX;
+	config.maxHopCount = 0;
+
 	if (loglevel >= DEBUG)
 	{
 		logMessage(DEBUG, "------\n");
@@ -650,33 +673,47 @@ static void initHopCountTable()
 	{
 		if (i != ADDR_SINK && config.parentTable[i] > 0)
 		{
-			config.hopCountTable[i] = getHopCount(i);
+			uint8_t hops = getHopCount(i);
+			config.hopCountTable[i] = hops;
 			config.nodeCount++;
 
-			if (config.hopCountTable[i] > config.maxHopCount)
+			if (hops > config.maxHopCount)
 			{
-				config.maxHopCount = config.hopCountTable[i];
+				config.maxHopCount = hops;
 			}
-			else if (config.hopCountTable[i] < config.minHopCount)
+
+			if (hops > 0 && hops < config.minHopCount)
 			{
-				config.minHopCount = config.hopCountTable[i];
+				config.minHopCount = hops;
 			}
 
 			if (loglevel >= DEBUG)
 			{
-				logMessage(DEBUG, "%02d: %d\n", i, config.hopCountTable[i]);
+				logMessage(DEBUG, "%02d: %d\n", i, hops);
 			}
 		}
 	}
+
+	// Ensure minHopCount and maxHopCount are correctly set for getConfigStr
+	if (config.nodeCount == 0)
+	{
+		config.minHopCount = 0;
+		config.maxHopCount = 0;
+	}
+
 	if (loglevel >= DEBUG)
 	{
+		logMessage(DEBUG, "minHopCount = %d\n", config.minHopCount);
+		logMessage(DEBUG, "maxHopCount = %d\n", config.maxHopCount);
 		logMessage(DEBUG, "------\n");
 	}
 }
 
 static void initPktCountTable()
 {
-	config.minPktCount = 99;
+	config.minPktCount = UINT16_MAX;
+	config.maxPktCount = 0;
+
 	char filePath[100];
 	sprintf(filePath, "../benchmark/%s", inputFile);
 	// Read from config.txt
@@ -767,10 +804,10 @@ static void initPktCountTable()
 	{
 		logMessage(DEBUG, "------\n");
 		logMessage(DEBUG, "Packet Count:\n");
+		logMessage(DEBUG, "%02d: %d\n", 0, config.pktCountTable[0]);
 	}
 	for (int i = 1; i < MAX_ACTIVE_NODES; i++)
 	{
-
 		if (i != ADDR_SINK && config.parentTable[i] > 0)
 		{
 			config.pktCountTable[i] += config.pktCountTable[0];
@@ -778,7 +815,8 @@ static void initPktCountTable()
 			{
 				config.maxPktCount = config.pktCountTable[i];
 			}
-			else if (config.pktCountTable[i] < config.minPktCount)
+
+			if (config.pktCountTable[i] > 0 && config.pktCountTable[i] < config.minPktCount)
 			{
 				config.minPktCount = config.pktCountTable[i];
 			}
@@ -791,7 +829,9 @@ static void initPktCountTable()
 	}
 	if (loglevel >= DEBUG)
 	{
-		logMessage(DEBUG, "%02d: %d\n", 0, config.pktCountTable[0]);
+
+		logMessage(DEBUG, "minPktCount = %d\n", config.minPktCount);
+		logMessage(DEBUG, "maxPktCount = %d\n", config.maxPktCount);
 		logMessage(DEBUG, "------\n");
 	}
 }

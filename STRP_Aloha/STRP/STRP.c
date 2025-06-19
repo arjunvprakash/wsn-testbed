@@ -1192,7 +1192,9 @@ static void *sendBeaconPeriodic(void *args)
     sleep(config.beaconIntervalS);
     while (1)
     {
+        usleep(randInRange(500000, 1200000));
         sendBeacon();
+        logMessage(INFO,"Sent beacon\n");
         if ((time(NULL) - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
             cleanupInactiveNodes();
@@ -1256,7 +1258,7 @@ uint8_t Routing_isDataPkt(uint8_t ctrl)
 
 uint8_t *Routing_getMetricsHeader()
 {
-    return "TotalParentChanges,TotalBeaconsSent,TotalBeaconsRecv";
+    return "AggParentChanges,AggBeaconsSent,TotalBeaconsRecv";
 }
 
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
