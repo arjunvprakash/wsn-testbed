@@ -21,10 +21,10 @@
 typedef struct MAC_Data
 {
 	uint16_t frames;
-	uint16_t collisions;
+	uint16_t backoffs;
 	uint16_t failures;
 	uint16_t retries;
-	uint16_t retryExceed;
+	uint16_t drops;
 } MAC_Data;
 
 typedef struct MAC_Metrics
@@ -690,7 +690,7 @@ static void *sendMsg_func(void *args)
 				if (msg.addr != ADDR_BROADCAST)
 				{
 					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].collisions++;
+					metrics.data[msg.addr].backoffs++;
 					sem_post(&metrics.mutex);
 				}
 
@@ -700,7 +700,7 @@ static void *sendMsg_func(void *args)
 					if (msg.addr != ADDR_BROADCAST)
 					{
 						sem_wait(&metrics.mutex);
-						metrics.data[msg.addr].retryExceed++;
+						metrics.data[msg.addr].drops++;
 						sem_post(&metrics.mutex);
 					}
 					break;
@@ -756,7 +756,7 @@ static void *sendMsg_func(void *args)
 				if (numtrials >= mac->maxtrials)
 				{
 					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].retryExceed++;
+					metrics.data[msg.addr].drops++;
 					sem_post(&metrics.mutex);
 
 					break;
@@ -1013,13 +1013,13 @@ uint8_t MAC_getHeaderSize()
 
 uint8_t *MAC_getMetricsHeader()
 {
-	return "Collission,TotalFrames,TotalRetries,TotalFailures,PDR,RetryExceed";
+	return "Backffs,TotalFrames,TotalRetries,TotalFailures,PDR,TotalDrops";
 }
 
 int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.retryExceed) * 100) / data.frames)  : 0, data.retryExceed);
+	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.drops) * 100) / data.frames)  : 0, data.drops);
 	sem_wait(&metrics.mutex);
 	metrics.data[addr] = (MAC_Data){0};
 	sem_post(&metrics.mutex);

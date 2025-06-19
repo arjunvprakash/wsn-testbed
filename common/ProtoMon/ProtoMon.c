@@ -372,7 +372,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
 
 static void *sendMetrics_func(void *args)
 {
-    sleep(config.initialSendWaitS);
+    sleep(config.initialSendWaitS + config.sendIntervalS);
     uint16_t bufferSize = MAX_PAYLOAD_SIZE - (Routing_getHeaderSize() + MAC_getHeaderSize() + getMACOverhead());
     while (1)
     {
