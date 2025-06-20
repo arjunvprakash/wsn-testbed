@@ -336,6 +336,7 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 	// Acknowledgement versenden
 	SX1262_send(buffer, sizeof(buffer));
 	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
+	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
 
 static bool acknowledged(MAC *mac, uint8_t addr)
@@ -687,8 +688,8 @@ static void *sendMsg_func(void *args)
 			if (mac->ambient && ambientNoise(mac) <= mac->noiseThreshold)
 			{
 				// if (mac->debug)
-					printf("### Noise is too high.\n");
-					fflush(stdout);
+				printf("### Noise is too high.\n");
+				fflush(stdout);
 
 				if (msg.addr != ADDR_BROADCAST)
 				{
@@ -719,19 +720,21 @@ static void *sendMsg_func(void *args)
 
 				continue;
 			}
-						
 
-			// Sleep for a short random duration 
+			// Sleep for a short random duration
 			msleep(100 + rand() % 501);
-			SX1262_send(buffer, MAC_Header_len + msg.len);			
+			SX1262_send(buffer, MAC_Header_len + msg.len);
 			// Update metrics
-			if (msg.addr != ADDR_BROADCAST)
+			uint8_t txAddr = msg.addr;
+			if (msg.addr == ADDR_BROADCAST)
 			{
-				sem_wait(&metrics.mutex);
-				metrics.data[msg.addr].frames++;
-				metrics.data[msg.addr].bytes += MAC_Header_len + msg.len;
-				sem_post(&metrics.mutex);
+				txAddr = 0;
 			}
+			sem_wait(&metrics.mutex);
+			metrics.data[txAddr].frames++;
+			metrics.data[txAddr].bytes += MAC_Header_len + msg.len;
+			printf("## MAC_TX: %d B\n", MAC_Header_len + msg.len);
+			sem_post(&metrics.mutex);
 
 			if (mac->debug)
 			{
@@ -762,7 +765,7 @@ static void *sendMsg_func(void *args)
 					sem_wait(&metrics.mutex);
 					metrics.data[msg.addr].drops++;
 					sem_post(&metrics.mutex);
-					printf("### Packet to %02d dropped: %d B\n",msg.addr, msg.len);
+					printf("### Packet to %02d dropped: %d B\n", msg.addr, msg.len);
 					fflush(stdout);
 					break;
 				}
@@ -1029,8 +1032,9 @@ int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	sem_wait(&metrics.mutex);
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%ld,%ld,%ld,%ld,%ld,%ld,%ld", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.drops) * 100) / data.frames)  : 0, data.drops,data.bytes);
+	int rowlen = sprintf(buffer, "%ld,%ld,%ld,%ld,%ld,%ld,%ld", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.drops) * 100) / data.frames) : 0, data.drops, data.bytes + metrics.data[0].bytes);
 	metrics.data[addr] = (MAC_Data){0};
+	metrics.data[0].bytes = 0;
 	sem_post(&metrics.mutex);
 	return rowlen;
 }
