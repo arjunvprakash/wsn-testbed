@@ -100,7 +100,7 @@ int main(int argc, char *argv[])
 	config.name = "Experiment 400_3"; // Experiment 400
 	config.runtTimeS = 39715;		  // Experiment 400
 	config.sendCsv = "send_400.csv";  // Experiment 400
-	config.monitoringEnabled = true;  // Experiment 400
+	config.monitoringEnabled = false; // Experiment 400
 
 	// config.name = "Experiment 120_0"; // Experiment 120
 	// config.runtTimeS = 12895;		  // Experiment 120

@@ -38,6 +38,7 @@ typedef struct Benchmark_Config
 	uint8_t pktCountTable[MAX_ACTIVE_NODES];
 	uint16_t minPktCount, maxPktCount;
 	char *name;
+	char *sendCsv;
 } Benchmark_Config;
 
 static unsigned int startTime;
@@ -96,15 +97,23 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	// config.name = "Experiment 101"; // Experiment 101
-	// config.runtTimeS = 40215;		// Experiment 101
+	config.name = "Experiment 400_3"; // Experiment 400
+	config.runtTimeS = 39715;		  // Experiment 400
+	config.sendCsv = "send_400.csv";  // Experiment 400
+	config.monitoringEnabled = true;  // Experiment 400
 
-	config.name = "Experiment 120"; // Experiment 120
-	config.runtTimeS = 12895;		// Experiment 120
+	// config.name = "Experiment 120_0"; // Experiment 120
+	// config.runtTimeS = 12895;		  // Experiment 120
+	// config.sendCsv = "send_120.csv";  // Experiment 120
+	// config.monitoringEnabled = false; // Experiment 120
+
+	// config.name = "Experiment 240";	 // Experiment 240
+	// config.runtTimeS = 23875;		 // Experiment 240
+	// config.sendCsv = "send_240.csv"; // Experiment 240
+	// config.monitoringEnabled = true; // Experiment 240
 
 	config.self = (uint8_t)atoi(argv[1]);
 
-	config.monitoringEnabled = true;
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
 
@@ -123,9 +132,11 @@ int main(int argc, char *argv[])
 	initPktCountTable();
 
 	// unsigned int offsetS = 0;
-	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 101
+	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 400
 
-	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); // experiment 120
+	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); // experiment 120
+
+	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 240
 
 	config.sendOffsetMs = 0;
 
@@ -143,15 +154,23 @@ int main(int argc, char *argv[])
 
 	syncTime(config.maxSyncSleepS);
 
-	protomon.vizIntervalS = 1200;
 	protomon.loglevel = INFO;
-	// protomon.sendIntervalS = 1200;			   // experiment 101
-	// protomon.initialSendWaitS = 100 + offsetS; // experiment 101
-	// protomon.sendDelayS = 400;				   // experiment 101
 
-	protomon.sendIntervalS = 360;			  // experiment 120
-	protomon.initialSendWaitS = 60 + offsetS; // experiment 120
-	protomon.sendDelayS = 120;				  // experiment 120
+	protomon.sendIntervalS = 1200;			   // experiment 400
+	protomon.initialSendWaitS = 100 + offsetS; // experiment 400
+	protomon.sendDelayS = 400;				   // experiment 400
+	protomon.vizIntervalS = 1200;			   // experiment 400
+
+	// protomon.sendIntervalS = 360;			  // experiment 120
+	// protomon.vizIntervalS = 360;			  // experiment 120
+	// protomon.initialSendWaitS = 60 + offsetS; // experiment 120
+	// protomon.sendDelayS = 120;				  // experiment 120
+
+	// protomon.sendIntervalS = 720;			  // experiment 240
+	// protomon.vizIntervalS = 720;			  // experiment 240
+	// protomon.initialSendWaitS = 75 + offsetS; // experiment 240
+	//  protomon.sendDelayS = 240;				  // experiment 240
+
 	protomon.self = config.self;
 	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC | PROTOMON_LEVEL_TOPO;
 
@@ -234,7 +253,7 @@ static void getConfigStr(char *configStr, ProtoMon_Config protomon, STRP_Config 
 			config.minPktCount, config.maxPktCount, config.sendOffsetMs);
 	if (config.monitoringEnabled)
 	{
-		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%d,sendIntervalS=%d,monitoredLevels=%d,initialSendWaitS=%d,sendDelayS=%d\n",
+		sprintf(configStr + strlen(configStr), "ProtoMon: vizIntervalS=%ld,sendIntervalS=%ld,monitoredLevels=%d,initialSendWaitS=%ld,sendDelayS=%ld\n",
 				protomon.vizIntervalS, protomon.sendIntervalS, protomon.monitoredLevels, protomon.initialSendWaitS, protomon.sendDelayS);
 	}
 	else
@@ -460,7 +479,7 @@ static void initOutputDir()
 		fflush(stdout);
 		exit(EXIT_FAILURE);
 	}
-	sprintf(cmd, "cp '../../benchmark/send.csv' '%s/send.csv'", outputDir);
+	sprintf(cmd, "cp '../../benchmark/%s' '%s/%s'", config.sendCsv, outputDir, config.sendCsv);
 	system(cmd);
 
 	char filePath[100];
@@ -497,7 +516,7 @@ static void *sendMsg_func(void *args)
 	int total;
 	unsigned long long prevSleep, waitIdle;
 	char filePath[100];
-	sprintf(filePath, "../benchmark/%s", inputFile);
+	sprintf(filePath, "../benchmark/%s", config.sendCsv);
 	// Read from config.txt
 	FILE *file = fopen(filePath, "r");
 	if (file == NULL)
@@ -534,7 +553,7 @@ static void *sendMsg_func(void *args)
 
 		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
 		{
-			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
+			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, config.sendCsv, line);
 			fflush(stdout);
 			exit(EXIT_FAILURE);
 			// continue;
@@ -713,7 +732,7 @@ static void initPktCountTable()
 	config.maxPktCount = 0;
 
 	char filePath[100];
-	sprintf(filePath, "../benchmark/%s", inputFile);
+	sprintf(filePath, "../benchmark/%s", config.sendCsv);
 	// Read from config.txt
 	FILE *file = fopen(filePath, "r");
 	if (file == NULL)
@@ -745,7 +764,7 @@ static void initPktCountTable()
 
 		if (sscanf(line, "%[^,],%[^,],%[^,],%s", &nodes, &sleep, &dest, &size) != CSV_COLS)
 		{
-			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, inputFile, line);
+			logMessage(ERROR, "Line %d in %s: %s malformed\n", numLine, config.sendCsv, line);
 			fflush(stdout);
 			// exit(EXIT_FAILURE);
 			continue;

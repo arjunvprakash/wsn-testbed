@@ -29,6 +29,8 @@ int (*MAC_send)(MAC *h, unsigned char dest, unsigned char *data, unsigned int le
 int (*MAC_recv)(MAC *h, unsigned char *data) = MACAW_recv;
 int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout) = MACAW_timedrecv;
 
+static void initMetrics();
+
 // Kontrollflags
 #define CTRL_RET '\xC1' // Antwort des Moduls
 #define CTRL_RTS '\xC6' // Request To Send (RTS)
@@ -379,6 +381,7 @@ static void requestToSend(MAC *mac, uint8_t addr, uint16_t msg_len)
 		sem_wait(&metrics.mutex);
 		metrics.data[addr].bytes += sizeof(buffer);
 		sem_post(&metrics.mutex);
+		printf("## MAC_TX: %d B\n", sizeof(buffer));
 	}
 
 	if (mac->debug)
@@ -416,6 +419,7 @@ static void clearToSend(MAC *mac, uint8_t addr, uint16_t msg_len)
 		sem_wait(&metrics.mutex);
 		metrics.data[addr].bytes += sizeof(buffer);
 		sem_post(&metrics.mutex);
+		printf("## MAC_TX: %d B\n", sizeof(buffer));
 	}
 
 	if (mac->debug)
@@ -452,6 +456,7 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 	sem_wait(&metrics.mutex);
 	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
 	sem_post(&metrics.mutex);
+	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
 
 static bool acknowledged(MAC *mac, uint8_t addr)
@@ -1150,13 +1155,19 @@ static void *sendT_func(void *args)
 
 			// Nachricht versenden
 			SX1262_send(buffer, sizeof(buffer));
-			if (msg.addr != ADDR_BROADCAST)
-			{
-				sem_wait(&metrics.mutex);
-				metrics.data[msg.addr].bytes += sizeof(buffer);
-				sem_post(&metrics.mutex);
-			}
 
+			// Update metrics
+			uint8_t txAddr = msg.addr;
+			if (msg.addr == ADDR_BROADCAST)
+			{
+				txAddr = 0;
+			}
+			sem_wait(&metrics.mutex);
+			metrics.data[txAddr].frames++;
+			metrics.data[txAddr].bytes += sizeof(buffer);
+			printf("## MAC_TX: %d B\n", sizeof(buffer));
+			sem_post(&metrics.mutex);
+			
 			if (mac->debug)
 			{
 				// Gesendeten Header und Nachricht zum Testen ausgeben
@@ -1231,6 +1242,8 @@ static void *sendT_func(void *args)
 
 void MACAW_init(MAC *mac, unsigned char addr)
 {
+	initMetrics();
+
 	// Adresse speichern
 	mac->addr = addr;
 
@@ -1449,8 +1462,17 @@ int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	sem_wait(&metrics.mutex);
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%ld,%ld", data.bytes, data.drops);
+	int rowlen = sprintf(buffer, "%ld,%ld", data.bytes + metrics.data[0].bytes, data.drops);
 	metrics.data[addr] = (MAC_Data){0};
+	metrics.data[0].bytes = 0;
 	sem_post(&metrics.mutex);
 	return rowlen;
+}
+
+static void initMetrics()
+{
+	sem_init(&metrics.mutex, 0, 1);
+	sem_wait(&metrics.mutex);
+	memset(metrics.data, 0, sizeof(metrics.data));
+	sem_post(&metrics.mutex);
 }

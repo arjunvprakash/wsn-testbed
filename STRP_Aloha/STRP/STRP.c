@@ -65,20 +65,6 @@ typedef struct
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
-typedef struct NodeRoutingTable
-{
-    char *timestamp;
-    uint8_t src;
-    uint8_t numNodes;
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-} NodeRoutingTable;
-
-typedef struct TableQueue
-{
-    NodeRoutingTable table[MAX_ACTIVE_NODES];
-    sem_t mutex, full, free;
-    unsigned int begin, end;
-} TableQueue;
 
 typedef struct STRP_Params
 {
@@ -107,7 +93,6 @@ static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
-static TableQueue tableQ;
 
 int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;

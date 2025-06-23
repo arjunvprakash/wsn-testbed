@@ -335,7 +335,9 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 
 	// Acknowledgement versenden
 	SX1262_send(buffer, sizeof(buffer));
+	sem_wait(&metrics.mutex);
 	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
+	sem_post(&metrics.mutex);
 	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
 

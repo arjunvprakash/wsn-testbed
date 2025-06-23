@@ -93,7 +93,6 @@ static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
-static TableQueue tableQ;
 
 int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;

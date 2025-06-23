@@ -546,7 +546,7 @@ void setConfigDefaults(ProtoMon_Config *c)
     }
     if (c->sendIntervalS == 0)
     {
-        c->sendIntervalS = 30;
+        c->sendIntervalS = 180;
     }
 
     if (numLayers > 0)
@@ -556,7 +556,7 @@ void setConfigDefaults(ProtoMon_Config *c)
             c->vizIntervalS = c->sendIntervalS;
             if (c->vizIntervalS > 0)
             {
-                logMessage(DEBUG, "Viz interval (%d s) < send interval (%d s).Default to to %d s\n", c->vizIntervalS, c->sendIntervalS, c->vizIntervalS);
+                logMessage(DEBUG, "Viz interval too less. Default to to %d s\n", c->vizIntervalS);
             }
         }
 
@@ -565,7 +565,7 @@ void setConfigDefaults(ProtoMon_Config *c)
             c->sendDelayS = (uint16_t)floor(c->sendIntervalS / numLayers);
             if (c->sendDelayS > 0)
             {
-                logMessage(DEBUG, "Send delay (%d s) too high.Default to %d s\n", c->sendDelayS, c->sendIntervalS, c->sendIntervalS);
+                logMessage(DEBUG, "Send delay too high. Default to %d s\n", c->sendIntervalS);
             }
         }
     }
