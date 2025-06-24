@@ -16,7 +16,9 @@
 /**
  * @brief Address of the sink/gateway node
  */
-#define ADDR_SINK 0XE
+#define ADDR_SINK 0XD
+
+#define MAX_PAYLOAD_SIZE 120
 
 /**
  * @brief Enum for log levels used in the logging system.

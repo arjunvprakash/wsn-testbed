@@ -303,20 +303,22 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                         valid_plots += 1
 
         else:
-            for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
-                if src_addr_df[metric].max() > 0:
-                    src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
-                    # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
-                    if metric.lower().startswith("total"):
-                        src_addr_df[metric] = src_addr_df[metric].cumsum()
-
+            if metric.lower().startswith("agg"):
+                for (src), src_addr_df in data.groupby(['Source']):
+                    src = src[0]
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy() 
+                        if metric.lower().split("agg")[1].startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+                        addr = src_addr_df['Address'].unique()[0]
                     if src_addr_df.shape[0] > 0:
                         # Create Bokeh ColumnDataSource
                         source = ColumnDataSource(src_addr_df)
 
-                        key = (src, addr)                        
+                        key = (src,addr) 
+                        #print(key)
                     
-                        labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                        labelStr = f'Node {src}'
                         p.line('RelativeTime', 
                                metric
                                ,source=source
@@ -332,6 +334,36 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                                ,size=2
                                )
                         valid_plots += 1
+            else:
+                for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
+                        # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
+                        if metric.lower().startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+
+                        if src_addr_df.shape[0] > 0:
+                            # Create Bokeh ColumnDataSource
+                            source = ColumnDataSource(src_addr_df)
+
+                            key = (src, addr)                        
+                        
+                            labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                            p.line('RelativeTime', 
+                                metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,line_width=2
+                                ,color=color_map[key]
+                                )
+                            p.scatter('RelativeTime'
+                                    ,metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,color=color_map[key]
+                                ,size=2
+                                )
+                            valid_plots += 1
         
         if valid_plots > 0:
             p.legend.background_fill_alpha = 0.2 
@@ -583,7 +615,6 @@ if os.path.exists(network_csv):
 
     ### Data extraction for Network Tree
     # Check if LinkType column contains any INBOUND entries
-    # child_exist = df[(df['State'] != NodeState.UNKNOWN) & (df['LinkType'] == LinkType.INBOUND)].shape[0] > 0
 
     df_p1 = pd.DataFrame()   
     df_p2 = pd.DataFrame()
@@ -592,11 +623,11 @@ if os.path.exists(network_csv):
 
     ###     Direct parent info
     df_p1 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.OUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
-    print(f"Direct parent links : {df_p1.shape[0]}")
+    # print(f"Direct parent links : {df_p1.shape[0]}")
 
     ###     Direct child info
     df_p2 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']].rename(columns={'Source': 'Address', 'Address': 'Source'})
-    print(f"Direct child links : {df_p2.shape[0]}")
+    # print(f"Direct child links : {df_p2.shape[0]}")
 
     # Support for tree protocols: STRP
     # Check if the columns 'Parent' and 'ParentRSSI' exist in df
@@ -604,7 +635,7 @@ if os.path.exists(network_csv):
     ###    Extract indirect parent info
     if parentcols_exist:
         df_p3 = df[df['State'] != NodeState.UNKNOWN.value][['Timestamp','Address', 'Parent', 'ParentRSSI']].rename(columns={'Address': 'Source', 'Parent': 'Address', 'ParentRSSI': 'RSSI'})
-        print(f"Indirect parent links : {df_p3.shape[0]}")
+        # print(f"Indirect parent links : {df_p3.shape[0]}")
 
     #  Bidirectional links     
     df_p4 = df[(df['State'] != NodeState.UNKNOWN.value) & (df['LinkType'] == LinkType.INOUTBOUND.value)][['Timestamp','Source', 'Address', 'RSSI']]
@@ -612,7 +643,7 @@ if os.path.exists(network_csv):
         # Duplicate the rows and swap Source and Address
         df_p4_swapped = df_p4.rename(columns={'Source': 'Address', 'Address': 'Source'})
         df_p4 = pd.concat([df_p4, df_p4_swapped], ignore_index=True)
-        print(f"Bidirectional links : {df_p4.shape[0]}")
+        # print(f"Bidirectional links : {df_p4.shape[0]}")
 
     ###     Combine
     df_parent = pd.concat([df_p1, df_p2, df_p3, df_p4], ignore_index=True)
