@@ -424,7 +424,7 @@ static void *sendMetrics_func(void *args)
             //     fflush(stdout);
             //     exit(EXIT_FAILURE);
             // }
-            uint8_t buffer[bufferSize];
+            
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_ROU);
             if (bufLen)
             {
@@ -458,7 +458,7 @@ static void *sendMetrics_func(void *args)
                 sleep(config.sendDelayS);
                 totalDelayS += config.sendDelayS;
             }
-            uint8_t buffer[bufferSize];
+            
             uint16_t bufLen = getMetricsBuffer(buffer, bufferSize, CTRL_TAB);
             if (bufLen)
             {

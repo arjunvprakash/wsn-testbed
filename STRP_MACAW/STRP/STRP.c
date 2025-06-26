@@ -11,7 +11,7 @@
 #include "STRP.h"
 #include "../util.h"
 
-#define PACKETQ_SIZE 16
+#define PACKETQ_SIZE 32
 #define MIN_RSSI -128
 #define INITIAL_PARENT 0
 
@@ -65,20 +65,6 @@ typedef struct
     uint8_t minAddr, maxAddr;
 } ActiveNodes;
 
-typedef struct NodeRoutingTable
-{
-    char *timestamp;
-    uint8_t src;
-    uint8_t numNodes;
-    NodeInfo nodes[MAX_ACTIVE_NODES];
-} NodeRoutingTable;
-
-typedef struct TableQueue
-{
-    NodeRoutingTable table[MAX_ACTIVE_NODES];
-    sem_t mutex, full, free;
-    unsigned int begin, end;
-} TableQueue;
 
 typedef struct STRP_Params
 {
@@ -101,13 +87,12 @@ static uint16_t sendSeq[MAX_ACTIVE_NODES] = {0};
 static uint16_t recvSeq[MAX_ACTIVE_NODES] = {0};
 static pthread_t recvT;
 static pthread_t sendT;
-static MAC mac;
+// static MAC *mac;
 static const unsigned short headerSize = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seqId[2] | len[2] ]
 static uint8_t parentAddr;
 static ActiveNodes neighbours;
 static uint8_t loopyParent;
 static STRP_Config config;
-static TableQueue tableQ;
 
 int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;
@@ -160,19 +145,19 @@ int STRP_init(STRP_Config c)
     pthread_t sendBeaconT;
     setConfigDefaults(&c);
     config = c;
-    ALOHA_init(&mac, config.self);
+
+    MACAW_init(config.mac, config.self);
     if (config.loglevel > INFO)
     {
-        mac.debug = 1;
+        config.mac->debug = 1;
     }
-    mac.recvTimeout = config.recvTimeoutMs;
-    // mac.maxtrials = 2;
+
     sendQ_init();
     recvQ_init();
     initNeighbours();
     initMetrics();
 
-    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+    if (pthread_create(&recvT, NULL, recvPackets_func, NULL) != 0)
     {
         logMessage(ERROR, "STRP: Failed to create Routing receive thread");
         exit(EXIT_FAILURE);
@@ -184,14 +169,14 @@ int STRP_init(STRP_Config c)
 
     if (config.self != ADDR_SINK)
     {
-        if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
+        if (pthread_create(&sendT, NULL, sendPackets_func, NULL) != 0)
         {
             logMessage(ERROR, "STRP: Failed to create Routing send thread");
             exit(EXIT_FAILURE);
         }
     }
     // Beacon thread
-    if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
+    if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, NULL) != 0)
     {
         logMessage(ERROR, "STRP: Failed to create sendBeaconPeriodic thread");
         exit(EXIT_FAILURE);
@@ -427,17 +412,15 @@ static void *recvPackets_func(void *args)
             continue;
         }
 
-        MAC mac1 = mac;
-        MAC *macTemp = &mac1;
-        int pktSize = MAC_timedRecv(macTemp, pkt, 1);
+        int pktSize = MAC_timedRecv(config.mac, pkt, 1);
         if (pktSize == 0)
         {
             free(pkt);
             continue;
         }
         Routing_Header metadata;
-        metadata.prev = macTemp->recvH.src_addr;
-        metadata.RSSI = macTemp->RSSI;
+        metadata.prev = config.mac->recvH.src_addr;
+        metadata.RSSI = config.mac->RSSI;
 
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT)
@@ -489,7 +472,7 @@ static void *recvPackets_func(void *args)
                         }
                     }
                 }
-                if (MAC_send(macTemp, parentAddr, pkt, pktSize))
+                if (MAC_send(config.mac, parentAddr, pkt, pktSize))
                 {
                     printf("%s - FWD: %02d -> %02d total: %02d\n", timestamp(), src, parentAddr, ++total[src]);
                 }
@@ -616,11 +599,8 @@ static void *sendPackets_func(void *args)
             continue;
         }
 
-        MAC mac1 = mac;
-        MAC *macTemp = &mac1;
-
         time_t start = time(NULL);
-        if (!MAC_send(macTemp, parentAddr, pkt, pktSize))
+        if (!MAC_send(config.mac, parentAddr, pkt, pktSize))
         {
             printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
@@ -688,6 +668,10 @@ static void senseNeighbours()
         neighbours.nodes[parentAddr].RSSI = MIN_RSSI;
     }
 
+    // Disable ambient noise monitoring for sensing
+    MAC tempMac = *config.mac;
+    config.mac->ambient = 0;
+
     do
     {
         uint16_t count = 0;
@@ -700,9 +684,9 @@ static void senseNeighbours()
         time_t start = time(NULL);
         do
         {
+            usleep(randInRange(500000, 1200000));
             sendBeacon();
             count++;
-            usleep(randInRange(500000, 1200000));
         } while (time(NULL) - start < config.senseDurationS);
 
         if (config.loglevel >= DEBUG)
@@ -735,6 +719,9 @@ static void senseNeighbours()
         }
 
     } while (1);
+
+    // Reset ambient noise monitoring
+    config.mac->ambient = tempMac.ambient;
 
     if (config.self != ADDR_SINK)
     {
@@ -1174,7 +1161,8 @@ static void sendBeacon()
     {
         printf("# %s - Sending beacon\n", timestamp());
     }
-    if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
+
+    if (!MAC_send(config.mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
     {
         printf("%s - ### Error: MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
     }
@@ -1189,7 +1177,9 @@ static void *sendBeaconPeriodic(void *args)
     sleep(config.beaconIntervalS);
     while (1)
     {
+        usleep(randInRange(500000, 1200000));
         sendBeacon();
+        logMessage(INFO,"Sent beacon\n");
         if ((time(NULL) - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
             cleanupInactiveNodes();
@@ -1253,7 +1243,7 @@ uint8_t Routing_isDataPkt(uint8_t ctrl)
 
 uint8_t *Routing_getMetricsHeader()
 {
-    return "TotalParentChanges,TotalBeaconsSent,TotalBeaconsRecv";
+    return "AggParentChanges,AggBeaconsSent,TotalBeaconsRecv";
 }
 
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
@@ -1283,16 +1273,20 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
     int offset = 0;
     uint8_t src = config.self;
     time_t timestamp = time(NULL);
+
+    NodeInfo node = activeNodes.nodes[parentAddr];
+    uint8_t row[100];
+    int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, node.addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
+
+    // Clear timestamp to avoid unnecessary redundancy
+    timestamp = 0L;
+
     for (uint8_t addr = min; addr <= max; addr++)
     {
-        NodeInfo node = activeNodes.nodes[addr];
-        if (node.state != UNKNOWN)
+        node = activeNodes.nodes[addr];
+        if (node.state != UNKNOWN && addr != parentAddr)
         {
-            uint8_t row[100];
-            int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
-
-            // Clear timestamp to avoid unnecessary redundancy
-            timestamp = 0L;
+            rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
 
             if (offset + rowlen < size)
             {
@@ -1301,6 +1295,7 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
             }
             else
             {
+                logMessage(DEBUG, "Topology metrics buffer overflow\n");
                 break;
             }
         }
@@ -1322,10 +1317,10 @@ void setConfigDefaults(STRP_Config *config)
     {
         config->nodeTimeoutS = 60;
     }
-    if (config->recvTimeoutMs == 0)
-    {
-        config->recvTimeoutMs = 1000;
-    }
+    // if (config->recvTimeoutMs == 0)
+    // {
+    //     config->recvTimeoutMs = 1000;
+    // }
     if (config->strategy == 0)
     {
         config->strategy = CLOSEST;

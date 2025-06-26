@@ -35,6 +35,9 @@ typedef struct MAC {
 
 	/* Sonstige */
 	int debug;                  // Gibt an, ob Debug-Ausgaben erstellt werden sollen
+
+	// Enable ambient noise monitoring
+	int ambient;
 } MAC;
 
 void MACAW_init(MAC*, unsigned char);

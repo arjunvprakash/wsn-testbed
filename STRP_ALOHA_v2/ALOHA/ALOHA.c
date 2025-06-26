@@ -36,6 +36,31 @@ typedef struct MAC_Metrics
 
 static MAC_Metrics metrics;
 
+typedef enum strpParamIndex
+{
+	FRAMES,
+	BACKOFFS,
+	FAILURES,
+	RETRIES,
+	DROPS,
+	BYTES
+} strpParamIndex;
+
+Parameter alohaParams[] = {
+	{.name = "Frames", .type = TYPE_UINT16},
+	{.name = "Backoffs", .type = TYPE_UINT16},
+	{.name = "Failures", .type = TYPE_UINT16},
+	{.name = "Retries", .type = TYPE_UINT16},
+	{.name = "AggDrops", .type = TYPE_UINT16},
+	{.name = "AggTotalBytes", .type = TYPE_UINT16}};
+uint8_t numAlohaParams = sizeof(alohaParams) / sizeof(Parameter);
+Metric alohaValues[MAX_ACTIVE_NODES];
+
+void ALOHA_initParamsV2()
+{
+	Metric_initAll(alohaValues, MAX_ACTIVE_NODES, alohaParams, numAlohaParams);
+}
+
 int (*MAC_send)(MAC *h, unsigned char dest, unsigned char *data, unsigned int len) = ALOHA_send;
 int (*MAC_recv)(MAC *h, unsigned char *data) = ALOHA_recv;
 int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout) = ALOHA_timedrecv;
@@ -335,9 +360,17 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 
 	// Acknowledgement versenden
 	SX1262_send(buffer, sizeof(buffer));
-	sem_wait(&metrics.mutex);
-	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
-	sem_post(&metrics.mutex);
+	if (1)
+	{
+		uint16_t increment = sizeof(buffer);
+		Metric_updateParamVal(&alohaValues[recvH.src_addr], BYTES, (void *)&increment);
+	}
+	else
+	{
+		sem_wait(&metrics.mutex);
+		metrics.data[recvH.src_addr].bytes += sizeof(buffer);
+		sem_post(&metrics.mutex);
+	}
 	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
 
@@ -695,9 +728,17 @@ static void *sendMsg_func(void *args)
 
 				if (msg.addr != ADDR_BROADCAST)
 				{
-					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].backoffs++;
-					sem_post(&metrics.mutex);
+					if (1)
+					{
+						uint16_t increment = 1;
+						Metric_updateParamVal(&alohaValues[msg.addr], BACKOFFS, (void *)&increment);
+					}
+					else
+					{
+						sem_wait(&metrics.mutex);
+						metrics.data[msg.addr].backoffs++;
+						sem_post(&metrics.mutex);
+					}
 				}
 
 				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
@@ -705,9 +746,17 @@ static void *sendMsg_func(void *args)
 				{
 					if (msg.addr != ADDR_BROADCAST)
 					{
-						sem_wait(&metrics.mutex);
-						metrics.data[msg.addr].drops++;
-						sem_post(&metrics.mutex);
+						if (1)
+						{
+							uint16_t increment = 1;
+							Metric_updateParamVal(&alohaValues[msg.addr], DROPS, (void *)&increment);
+						}
+						else
+						{
+							sem_wait(&metrics.mutex);
+							metrics.data[msg.addr].drops++;
+							sem_post(&metrics.mutex);
+						}
 					}
 					break;
 				}
@@ -732,11 +781,21 @@ static void *sendMsg_func(void *args)
 			{
 				txAddr = 0;
 			}
-			sem_wait(&metrics.mutex);
-			metrics.data[txAddr].frames++;
-			metrics.data[txAddr].bytes += MAC_Header_len + msg.len;
+			if (1)
+			{
+				uint16_t increment = 1;
+				Metric_updateParamVal(&alohaValues[txAddr], FRAMES, (void *)&increment);
+				uint16_t bytes = MAC_Header_len + msg.len;
+				Metric_updateParamVal(&alohaValues[txAddr], BYTES, (void *)&bytes);
+			}
+			else
+			{
+				sem_wait(&metrics.mutex);
+				metrics.data[txAddr].frames++;
+				metrics.data[txAddr].bytes += MAC_Header_len + msg.len;
+				sem_post(&metrics.mutex);
+			}
 			printf("## MAC_TX: %d B\n", MAC_Header_len + msg.len);
-			sem_post(&metrics.mutex);
 
 			if (mac->debug)
 			{
@@ -753,20 +812,37 @@ static void *sendMsg_func(void *args)
 			// Auf Acknowledgement warten
 			if (msg.addr != ADDR_BROADCAST && !acknowledged(mac, msg.addr))
 			{
-				// Update metrics
-				sem_wait(&metrics.mutex);
-				metrics.data[msg.addr].failures++;
-				sem_post(&metrics.mutex);
-
 				if (mac->debug)
 					printf("No ACK received. addr:%02d seq:%d\n", msg.addr, sendSeq[msg.addr]);
+
+				// Update metrics
+				if (1)
+				{
+					uint16_t increment = 1;
+					Metric_updateParamVal(&alohaValues[msg.addr], FAILURES, (void *)&increment);
+				}
+				else
+				{
+					sem_wait(&metrics.mutex);
+					metrics.data[msg.addr].failures++;
+					sem_post(&metrics.mutex);
+				}
 
 				// Anzahl Sendeversuche = max. Anz. Versuche -> Sendeversuch abbrechen
 				if (numtrials >= mac->maxtrials)
 				{
-					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].drops++;
-					sem_post(&metrics.mutex);
+					if (1)
+					{
+						uint16_t increment = 1;
+						Metric_updateParamVal(&alohaValues[msg.addr], DROPS, (void *)&increment);
+					}
+					else
+					{
+						sem_wait(&metrics.mutex);
+						metrics.data[msg.addr].drops++;
+						sem_post(&metrics.mutex);
+					}
+
 					printf("### Packet to %02d dropped: %d B\n", msg.addr, msg.len);
 					fflush(stdout);
 					break;
@@ -775,9 +851,17 @@ static void *sendMsg_func(void *args)
 				// Anzahl Sendeversuche inkrementieren
 				numtrials++;
 
-				sem_wait(&metrics.mutex);
-				metrics.data[msg.addr].retries++;
-				sem_post(&metrics.mutex);
+				if (1)
+				{
+					uint16_t increment = 1;
+					Metric_updateParamVal(&alohaValues[msg.addr], RETRIES, (void *)&increment);
+				}
+				else
+				{
+					sem_wait(&metrics.mutex);
+					metrics.data[msg.addr].retries++;
+					sem_post(&metrics.mutex);
+				}
 
 				continue;
 			}
@@ -816,6 +900,7 @@ static void *sendMsg_func(void *args)
 void ALOHA_init(MAC *mac, unsigned char addr)
 {
 	// ###
+	ALOHA_initParamsV2();
 	initMetrics();
 
 	// Adresse speichern
@@ -1047,4 +1132,11 @@ static void initMetrics()
 	sem_wait(&metrics.mutex);
 	memset(metrics.data, 0, sizeof(metrics.data));
 	sem_post(&metrics.mutex);
+}
+
+Metric MAC_getMetrics(uint8_t addr)
+{
+	Metric metric = alohaValues[addr];
+	Metric_reset(&alohaValues[addr]);
+	return metric;
 }

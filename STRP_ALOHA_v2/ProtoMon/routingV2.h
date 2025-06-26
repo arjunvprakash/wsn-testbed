@@ -4,6 +4,8 @@
 
 #include <stdint.h>
 
+#include "metric.h"
+
 /**
  * @brief Header information from the received message.
  * @note Must contain fields
@@ -69,12 +71,6 @@ extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
 extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
 /**
- * @returns size of the routing header
- * @note Dependency with ProtoMon
- */
-uint8_t Routing_getHeaderSize();
-
-/**
  * @brief Check if a packet is a data packet.
  * @param ctrl control flag of the packet
  * @returns 1 if the control flag is of a data packet
@@ -83,10 +79,16 @@ uint8_t Routing_getHeaderSize();
 uint8_t Routing_isDataPkt(uint8_t ctrl);
 
 /**
+ * @returns size of the routing header
+ * @note Dependency with ProtoMon
+ */
+uint8_t Routing_getHeaderSize();
+
+/**
  * @returns CSV header of metrics collected by Routing protocol.
  * @note Dependency with ProtoMon
  */
-uint8_t *Routing_getMetricsHeader();
+// uint8_t *Routing_getMetricsHeader();
 
 /**
  * @returns CSV header for fields of neighbour data.
@@ -94,18 +96,20 @@ uint8_t *Routing_getMetricsHeader();
  * @note Must contain fields : [Timestamp,Source,Address,State,LinkType,RSSI] irrespective of order
  * @note Additional fields must be explicitly handled in the ProtoMon/viz/script.py
  */
-uint8_t *Routing_getTopologyHeader();
+// uint8_t *Routing_getTopologyHeader();
 
 /**
- * @returns CSV data of metrics collected by Routing protocol.
+ * @returns Metrics data of the specified node collected by Routing protocol.
  * @note Dependency with ProtoMon
  */
-int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
+Metric Routing_getMetrics(uint8_t addr);
 
 /**
- * @returns CSV data of neighbour nodes
+ * @returns Topology data of neighbour nodes
  * @note Dependency with ProtoMon
  */
-int Routing_getTopologyData(char *buffer, uint16_t size);
+Metric Routing_getTopologyDataV2();
+
+
 
 #endif // ROUTING_H

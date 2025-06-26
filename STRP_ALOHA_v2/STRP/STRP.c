@@ -72,6 +72,23 @@ typedef struct STRP_Params
     uint16_t beaconsRecv;
 } STRP_Params;
 
+Parameter strpParams[] = {
+    {.name = "BeaconsRecv", .type = TYPE_UINT16}};
+uint8_t numStrpParams = sizeof(strpParams) / sizeof(Parameter);
+Metric strpValues[MAX_ACTIVE_NODES];
+
+void STRP_initParamsV2()
+{
+    Metric_initAll(strpValues, MAX_ACTIVE_NODES, strpParams, numStrpParams);
+}
+
+typedef enum strpParamIndex
+{
+    PARENT_CHANGES,
+    BEACONS_SENT,
+    BEACONS_RECV
+} strpParamIndex;
+
 typedef struct Metrics
 {
     // mutex and data for each node
@@ -155,6 +172,8 @@ int STRP_init(STRP_Config c)
     recvQ_init();
     initNeighbours();
     initMetrics();
+
+    STRP_initParamsV2();
 
     if (pthread_create(&recvT, NULL, recvPackets_func, NULL) != 0)
     {
@@ -489,6 +508,14 @@ static void *recvPackets_func(void *args)
                 printf("# %s - Beacon src: %02d (%d) parent: %02d(%d)\n", timestamp(), metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
             }
             updateActiveNodes(metadata.prev, metadata.RSSI, beacon->parent, beacon->parentRSSI);
+
+            if (1)
+            {
+                uint16_t increment = 1;
+                sem_wait(&strpValues[metadata.prev].mutex);
+                Metric_updateParamVal(&strpValues[metadata.prev], PARENT_CHANGES, (void *)&increment);
+                sem_post(&strpValues[metadata.prev].mutex);
+            }
             metrics.data[metadata.prev].beaconsRecv++;
         }
         else
@@ -1337,4 +1364,11 @@ void setConfigDefaults(STRP_Config *config)
 uint8_t *Routing_getTopologyHeader()
 {
     return "Timestamp,Source,Address,State,LinkType,RSSI,Parent,ParentRSSI";
+}
+
+Metric Routing_getMetrics(uint8_t addr)
+{
+    Metric metric = strpValues[addr];
+    Metric_reset(&strpValues[addr]);
+    return metric;
 }

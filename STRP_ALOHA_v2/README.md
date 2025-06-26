@@ -16,20 +16,6 @@ sudo apt install python3-pip
 # Required to fix the import error for numpy
 sudo apt-get install libopenblas-dev
 sudo apt-get install libopenjp2-7
-
-# Additional steps - as required on Pi13 (use only in case of errors in GUI logs)
-pip install -U pip setuptools
-sudo apt-get install python3-venv
-
-pip3 install numpy
-python3 -m pip install pandas
-# pip install pandas==2.2.3 # If above installation of pandas hangs/fails
-# pip install Pillow==9.3.0 # In case of error "Building wheel for pillow (pyproject.toml) did not run successfully."
-
-# For benchmark
-pip install -r ../../benchmark/viz/requirements.txt
-# For ProtoMon
-pip install -r ../../ProtoMon/viz/requirements.txt
 pip --version
 ``` 
 

@@ -12,7 +12,7 @@
 #include "../common.h"
 #include "../util.h"
 #include "../STRP/STRP.h"
-#include "../ProtoMon/ProtoMon.h"
+#include "../ProtoMon/ProtoMonV2.h"
 
 #define HTTP_PORT 8000
 #define CSV_COLS 4
@@ -97,15 +97,20 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	config.name = "Experiment 400_3"; // Experiment 400
-	config.runtTimeS = 39715;		  // Experiment 400
-	config.sendCsv = "send_400.csv";  // Experiment 400
-	config.monitoringEnabled = false; // Experiment 400
+	// config.name = "Experiment 400_3"; // Experiment 400
+	// config.runtTimeS = 39715;		  // Experiment 400
+	// config.sendCsv = "send_400.csv";  // Experiment 400
+	// config.monitoringEnabled = false; // Experiment 400
 
 	// config.name = "Experiment 120_0"; // Experiment 120
 	// config.runtTimeS = 12895;		  // Experiment 120
 	// config.sendCsv = "send_120.csv";  // Experiment 120
-	// config.monitoringEnabled = false; // Experiment 120
+	// config.monitoringEnabled = true; // Experiment 120
+
+	config.name = "Experiment serialized 120_0"; // Experiment 120_ser
+	config.runtTimeS = 12895;					 // Experiment 120_ser
+	config.sendCsv = "send_120.csv";			 // Experiment 120_ser
+	config.monitoringEnabled = true;			 // Experiment 120_ser
 
 	// config.name = "Experiment 240";	 // Experiment 240
 	// config.runtTimeS = 23875;		 // Experiment 240
@@ -116,6 +121,9 @@ int main(int argc, char *argv[])
 
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;
+
+	config.maxSyncSleepS = 5;  // Experiment 120_ser
+	config.senseDurationS = 5; // Experiment 120_ser
 
 	logMessage(INFO, "Node: %02d\n", config.self);
 	logMessage(INFO, "Role : %s\n", config.self == ADDR_SINK ? "SINK" : "NODE");
@@ -132,15 +140,19 @@ int main(int argc, char *argv[])
 	initPktCountTable();
 
 	// unsigned int offsetS = 0;
-	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 400
+	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 400
 
 	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); // experiment 120
+
+	unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 30); // experiment 120_ser
 
 	// unsigned int offsetS = config.self == ADDR_SINK ? 0 : ((config.hopCountTable[config.self] - 1) * 50); // experiment 240
 
 	config.sendOffsetMs = 0;
 
 	strp.beaconIntervalS = 1200 + offsetS;
+
+	// strp.beaconIntervalS = 10 + offsetS; // experiment 120_ser
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 3600;
 	strp.self = config.self;
@@ -156,15 +168,20 @@ int main(int argc, char *argv[])
 
 	protomon.loglevel = INFO;
 
-	protomon.sendIntervalS = 1200;			   // experiment 400
-	protomon.initialSendWaitS = 100 + offsetS; // experiment 400
-	protomon.sendDelayS = 400;				   // experiment 400
-	protomon.vizIntervalS = 1200;			   // experiment 400
+	// protomon.sendIntervalS = 1200;			   // experiment 400
+	// protomon.initialSendWaitS = 100 + offsetS; // experiment 400
+	// protomon.sendDelayS = 400;				   // experiment 400
+	// protomon.vizIntervalS = 1200;			   // experiment 400
 
 	// protomon.sendIntervalS = 360;			  // experiment 120
 	// protomon.vizIntervalS = 360;			  // experiment 120
 	// protomon.initialSendWaitS = 60 + offsetS; // experiment 120
 	// protomon.sendDelayS = 120;				  // experiment 120
+
+	protomon.sendIntervalS = 60;			  // experiment 120_ser
+	protomon.vizIntervalS = 360;			  // experiment 120_ser
+	protomon.initialSendWaitS = 30 + offsetS; // experiment 120_ser
+	protomon.sendDelayS = 20;				  // experiment 120_ser
 
 	// protomon.sendIntervalS = 720;			  // experiment 240
 	// protomon.vizIntervalS = 720;			  // experiment 240
@@ -172,7 +189,7 @@ int main(int argc, char *argv[])
 	//  protomon.sendDelayS = 240;				  // experiment 240
 
 	protomon.self = config.self;
-	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC | PROTOMON_LEVEL_TOPO;
+	protomon.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC;
 
 	if (config.monitoringEnabled)
 	{

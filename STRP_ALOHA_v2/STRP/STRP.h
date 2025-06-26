@@ -4,7 +4,8 @@
 
 #include "../ALOHA/ALOHA.h"
 #include "../common.h"
-#include "../ProtoMon/routing.h"
+#include "../ProtoMon/routingV2.h"
+#include "../ProtoMon/metric.h"
 
 
 typedef struct MAC MAC;
