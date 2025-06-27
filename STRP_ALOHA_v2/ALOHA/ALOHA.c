@@ -1137,6 +1137,5 @@ static void initMetrics()
 Metric MAC_getMetrics(uint8_t addr)
 {
 	Metric metric = alohaValues[addr];
-	Metric_reset(&alohaValues[addr]);
 	return metric;
 }

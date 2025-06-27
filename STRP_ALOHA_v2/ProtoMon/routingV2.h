@@ -101,6 +101,7 @@ uint8_t Routing_getHeaderSize();
 /**
  * @returns Metrics data of the specified node collected by Routing protocol.
  * @note Dependency with ProtoMon
+ * @note If addr is ADDR_BROADCASE, it is a metadata read. So do not reset the metric.
  */
 Metric Routing_getMetrics(uint8_t addr);
 
@@ -109,7 +110,5 @@ Metric Routing_getMetrics(uint8_t addr);
  * @note Dependency with ProtoMon
  */
 Metric Routing_getTopologyDataV2();
-
-
 
 #endif // ROUTING_H

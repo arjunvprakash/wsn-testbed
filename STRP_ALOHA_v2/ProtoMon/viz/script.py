@@ -1,3 +1,4 @@
+import random
 import pandas as pd
 import numpy as np
 import networkx as nx
@@ -269,6 +270,17 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
         palette = combined_palette[:num_pairs] if num_pairs <= len(combined_palette) else combined_palette * (num_pairs // len(combined_palette) + 1)
 
         color_map = {pair: palette[i % len(palette)] for i, pair in enumerate(unique_pairs)}
+
+        def generate_random_rgb():
+            r = random.randint(0, 255)
+            g = random.randint(0, 255)
+            b = random.randint(0, 255)
+            return (r, g, b)
+
+        # Fix for key error in agg case: ToDO refactor
+        def get_color(source, address):
+            key = (source, address)
+            return color_map.get(key, generate_random_rgb())
         
         if metric == "TotalLost":
             for (src, addr), src_addr_df in lost_packets_df.groupby(['Source', 'Address']):
@@ -291,47 +303,79 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                                ,source=source
                                ,legend_label=f'Node {src} → {addr}'
                                ,line_width=2
-                               ,color=color_map[key]
+                               ,color=get_color(src,addr)
                                )
                         p.scatter('RelativeTime'
                                 ,metric
                                ,source=source
                                ,legend_label=f'Node {src} → {addr}'
-                               ,color=color_map[key]
+                               ,color=get_color(src,addr)
                                ,size=2
                                )                               
                         valid_plots += 1
 
         else:
-            for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
-                if src_addr_df[metric].max() > 0:
-                    src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
-                    # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
-                    if metric.lower().startswith("total"):
-                        src_addr_df[metric] = src_addr_df[metric].cumsum()
-
+            if metric.lower().startswith("agg"):
+                for (src), src_addr_df in data.groupby(['Source']):
+                    src = src[0]
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source',metric]].copy() 
+                        if metric.lower().split("agg")[1].startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+                        # addr = src_addr_df['Address'].unique()[0]
                     if src_addr_df.shape[0] > 0:
                         # Create Bokeh ColumnDataSource
                         source = ColumnDataSource(src_addr_df)
 
-                        key = (src, addr)                        
+                        #key = (src,addr) 
+                        #print(key)
                     
-                        labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                        labelStr = f'Node {src}'
                         p.line('RelativeTime', 
                                metric
                                ,source=source
                                ,legend_label=labelStr
                                ,line_width=2
-                               ,color=color_map[key]
+                               ,color=get_color(src,0)
                                )
                         p.scatter('RelativeTime'
                                 ,metric
                                ,source=source
                                ,legend_label=labelStr
-                               ,color=color_map[key]
+                               ,color=get_color(src,0)
                                ,size=2
                                )
                         valid_plots += 1
+            else:
+                for (src, addr), src_addr_df in data.groupby(['Source', 'Address']):
+                    if src_addr_df[metric].max() > 0:
+                        src_addr_df = src_addr_df[['RelativeTime','Source','Address',metric]].copy()
+                        # src_addr_df = src_addr_df.sort_values(by='RelativeTime')
+                        if metric.lower().startswith("total"):
+                            src_addr_df[metric] = src_addr_df[metric].cumsum()
+
+                        if src_addr_df.shape[0] > 0:
+                            # Create Bokeh ColumnDataSource
+                            source = ColumnDataSource(src_addr_df)
+
+                            key = (src, addr)                        
+                        
+                            labelStr = f'Node {addr} → {src}' if metric.lower().endswith('recv') or metric.lower().endswith('latency') else f'Node {src} → {addr}'
+                            p.line('RelativeTime', 
+                                metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,line_width=2
+                                ,color=get_color(src,addr)
+                                )
+                            p.scatter('RelativeTime'
+                                    ,metric
+                                ,source=source
+                                ,legend_label=labelStr
+                                ,color=get_color(src,addr)
+                                ,size=2
+                                )
+                            valid_plots += 1
         
         if valid_plots > 0:
             p.legend.background_fill_alpha = 0.2 
@@ -340,7 +384,13 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
             # p.legend.location = "top_left" if src % 2 == 0 else "top_right"
             p.legend.click_policy = "hide" 
 
-            if metric.lower().endswith('recv') or metric.lower().endswith('latency'):
+            if metric.lower().startswith("agg"):
+                hover = HoverTool(tooltips=[
+                    ("Time", "@RelativeTime s"),
+                    (metric, f"@{metric}"),
+                    ("Source", f"@Source")
+                ])       
+            elif metric.lower().endswith('recv') or metric.lower().endswith('latency'):
                 hover = HoverTool(tooltips=[
                     ("Time", "@RelativeTime s"),
                     (metric, f"@{metric}"),
@@ -353,7 +403,7 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
                     (metric, f"@{metric}"),
                     ("Source", f"@Source"),
                     ("Address", "@Address")
-                ])                            
+                ])                                
             p.add_tools(hover) 
             # p.add_tools(WheelZoomTool())
             # p.toolbar.active_inspect = hover
@@ -679,7 +729,11 @@ if os.path.exists(network_csv):
         ax[i].set_title('Adjacency Graph')
         i += 1
 
-for j in range(i, len(fig.axes)):
+# for j in range(i, len(fig.axes)):
+#     if not fig.axes[j].has_data():  # Check if the axis is empty
+#         fig.delaxes(fig.axes[j])
+
+for j in range(len(fig.axes) - 1, i - 1, -1):
     if not fig.axes[j].has_data():  # Check if the axis is empty
         fig.delaxes(fig.axes[j])
 

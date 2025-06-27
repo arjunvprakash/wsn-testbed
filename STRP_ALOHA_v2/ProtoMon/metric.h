@@ -7,7 +7,6 @@
 
 #include "../common.h"
 
-
 typedef enum Param_Type
 {
     TYPE_INT,
@@ -32,7 +31,6 @@ typedef struct Metric
     uint8_t addr;
     sem_t mutex; // Mutex for thread safety
 } Metric;
-
 
 int Metric_setParamVal(Metric *metric, uint8_t index, void *value);
 int Metric_getSize(Metric metric);

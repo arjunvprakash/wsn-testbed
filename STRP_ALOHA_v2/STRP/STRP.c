@@ -73,7 +73,7 @@ typedef struct STRP_Params
 } STRP_Params;
 
 Parameter strpParams[] = {
-    {.name = "BeaconsRecv", .type = TYPE_UINT16}};
+    {.name = "ParentChanges", .type = TYPE_UINT8}};
 uint8_t numStrpParams = sizeof(strpParams) / sizeof(Parameter);
 Metric strpValues[MAX_ACTIVE_NODES];
 
@@ -512,9 +512,7 @@ static void *recvPackets_func(void *args)
             if (1)
             {
                 uint16_t increment = 1;
-                sem_wait(&strpValues[metadata.prev].mutex);
                 Metric_updateParamVal(&strpValues[metadata.prev], PARENT_CHANGES, (void *)&increment);
-                sem_post(&strpValues[metadata.prev].mutex);
             }
             metrics.data[metadata.prev].beaconsRecv++;
         }
@@ -1205,7 +1203,7 @@ static void *sendBeaconPeriodic(void *args)
     {
         usleep(randInRange(500000, 1200000));
         sendBeacon();
-        logMessage(INFO,"Sent beacon\n");
+        logMessage(INFO, "Sent beacon\n");
         if ((time(NULL) - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
             cleanupInactiveNodes();
@@ -1369,6 +1367,5 @@ uint8_t *Routing_getTopologyHeader()
 Metric Routing_getMetrics(uint8_t addr)
 {
     Metric metric = strpValues[addr];
-    Metric_reset(&strpValues[addr]);
     return metric;
 }

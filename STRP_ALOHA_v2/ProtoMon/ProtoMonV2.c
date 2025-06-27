@@ -184,7 +184,7 @@ static void initOutputFilesV2()
             fprintf(file, ",%s", metric.params[i].name);
         }
         Metric macMetric = MAC_getMetrics(0);
-        logMessage(DEBUG, "MAC metrics: %d\n", macMetric.numParams);
+        // logMessage(DEBUG, "MAC metrics: %d\n", macMetric.numParams);
         for (int i = 0; i < macMetric.numParams; i++)
         {
             fprintf(file, ",%s", macMetric.params[i].name);
@@ -246,19 +246,20 @@ static void initOutputFilesV2()
         Metric metric = routingValues[0];
         for (int i = 0; i < metric.numParams; i++)
         {
-            if (i == ROU_PATH)
-            {
-                continue;
-            }
+            // if (i == ROU_PATH)
+            // {
+            //     continue;
+            // }
             fprintf(file, ",%s", metric.params[i].name);
         }
         Metric rouMetric = Routing_getMetrics(0);
-        logMessage(DEBUG, "Routing metrics: %d\n", rouMetric.numParams);
+        // logMessage(DEBUG, "Routing metrics: %d\n", rouMetric.numParams);
         for (int i = 0; i < rouMetric.numParams; i++)
         {
             fprintf(file, ",%s", rouMetric.params[i].name);
-        }        
-        fprintf(file, ",Path\n");
+        }
+        // fprintf(file, ",Path\n");
+        fprintf(file, "\n");
         fflush(file);
         fclose(file);
 
@@ -356,6 +357,90 @@ static int sendMetricsToSink(uint8_t *buffer, unsigned int len, CTRL ctrl)
     return Original_Routing_sendMsg(ADDR_SINK, extBuffer, extLen);
 }
 
+/**
+ * Writes a parameter value to a CSV row buffer based on its type.
+ *
+ * @param csvRow Pointer to the buffer where the CSV row is being constructed.
+ * @param rowLen Pointer to the current length of the row in the buffer.
+ * @param p Pointer to the parameter value to be written.
+ * @param type The type of the parameter (e.g., TYPE_UINT8, TYPE_FLOAT).
+ * @param updateValPointer : If enabled, pointer p is updated
+ */
+static void writeParamValueToBuffer(uint8_t *csvRow, uint16_t *rowLen, uint8_t **p, Param_Type type, uint8_t updateValPointer)
+{
+    switch (type)
+    {
+    case TYPE_UINT8:
+    {
+        uint8_t value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%u", value);
+        break;
+    }
+    case TYPE_UINT16:
+    {
+        uint16_t value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%lu", value);
+        break;
+    }
+    case TYPE_INT16:
+    {
+        int16_t value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%ld", value);
+        break;
+    }
+    case TYPE_INT8:
+    {
+        int8_t value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%d", value);
+        break;
+    }
+    case TYPE_FLOAT:
+    {
+        float value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%.2f", value);
+        break;
+    }
+    case TYPE_INT:
+    {
+        int value;
+        memcpy(&value, *p, sizeof(value));
+        if (updateValPointer)
+        {
+            *p += sizeof(value);
+        }
+        *rowLen += snprintf(csvRow + *rowLen, SINK_MAX_BUFFER - *rowLen, ",%d", value);
+        break;
+    }
+    default:
+        logMessage(ERROR, "Unknown parameter type: %d\n", type);
+    }
+}
+
 void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CTRL ctrl)
 {
     if (bufferSize < sizeof(uint8_t) + sizeof(uint16_t))
@@ -375,7 +460,7 @@ void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CT
         return;
     }
 
-    if (config.loglevel >= TRACE)
+    // if (config.loglevel >= TRACE)
     {
         printf("# ");
         for (int i = 0; i < bufferSize - sizeof(ctrlFlag); i++)
@@ -383,6 +468,7 @@ void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CT
             printf("%02X ", p[i]);
         }
         printf("\n");
+        fflush(stdout);
     }
 
     uint8_t numRows;
@@ -409,7 +495,7 @@ void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CT
             uint8_t addr;
             memcpy(&addr, p, sizeof(addr));
             p += sizeof(addr);
-            int rowLen = snprintf(csvRow, SINK_MAX_BUFFER, "%ld,%d,%d", (long)timestamp, src, addr);
+            uint16_t rowLen = snprintf(csvRow, SINK_MAX_BUFFER, "%ld,%d,%d", (long)timestamp, src, addr);
 
             for (int j = 0; j < routingValues[0].numParams; j++)
             {
@@ -423,67 +509,76 @@ void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CT
                     {
                         rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%s", path);
                     }
-                    p += pathLen + 1; // move past null terminator
+                    p += pathLen;
+                    //  + 1; // move past null terminator
                     continue;
                 }
+                writeParamValueToBuffer(csvRow, &rowLen, &p, type, 1);
 
-                switch (type)
-                {
-                case TYPE_UINT8:
-                {
-                    uint8_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_UINT16:
-                {
-                    uint16_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_INT16:
-                {
-                    int16_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_INT8:
-                {
-                    int8_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_FLOAT:
-                {
-                    float value;
-                    memcpy(&value, p, sizeof(value));
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%.2f", value);
-                    p += sizeof(value);
-                    break;
-                }
-                case TYPE_INT:
-                {
-                    int value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                default:
-                    logMessage(ERROR, "Unknown parameter type: %d\n", type);
-                }
+                // switch (type)
+                // {
+                // case TYPE_UINT8:
+                // {
+                //     uint8_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_UINT16:
+                // {
+                //     uint16_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_INT16:
+                // {
+                //     int16_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_INT8:
+                // {
+                //     int8_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_FLOAT:
+                // {
+                //     float value;
+                //     memcpy(&value, p, sizeof(value));
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%.2f", value);
+                //     p += sizeof(value);
+                //     break;
+                // }
+                // case TYPE_INT:
+                // {
+                //     int value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // default:
+                //     logMessage(ERROR, "Unknown parameter type: %d\n", type);
+                // }
+            }
+            Metric protocolMetric = Routing_getMetrics(0);
+            for (int j = 0; j < protocolMetric.numParams; j++)
+            {
+                Param_Type type = protocolMetric.params[j].type;
+                writeParamValueToBuffer(csvRow, &rowLen, &p, type, 1);
             }
             csvRow[rowLen++] = '\n'; // newline
             csvRow[rowLen] = '\0';   // null terminatior
             logMessage(DEBUG, "%s", csvRow);
+            fflush(stdout);
             writeBufferToFile(fileName, csvRow);
         }
     }
@@ -495,72 +590,145 @@ void deserializeMetricsPkt(uint8_t *buffer, uint16_t bufferSize, uint8_t src, CT
             uint8_t addr;
             memcpy(&addr, p, sizeof(addr));
             p += sizeof(addr);
-            int rowLen = snprintf(csvRow, SINK_MAX_BUFFER, "%ld,%d,%d", (long)timestamp, src, addr);
+            uint16_t rowLen = snprintf(csvRow, SINK_MAX_BUFFER, "%ld,%d,%d", (long)timestamp, src, addr);
 
             for (int j = 0; j < macValues[0].numParams; j++)
             {
                 Param_Type type = macValues[0].params[j].type;
 
-                switch (type)
-                {
-                case TYPE_UINT8:
-                {
-                    uint8_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_UINT16:
-                {
-                    uint16_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_INT16:
-                {
-                    int16_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_INT8:
-                {
-                    int8_t value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                case TYPE_FLOAT:
-                {
-                    float value;
-                    memcpy(&value, p, sizeof(value));
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%.2f", value);
-                    p += sizeof(value);
-                    break;
-                }
-                case TYPE_INT:
-                {
-                    int value;
-                    memcpy(&value, p, sizeof(value));
-                    p += sizeof(value);
-                    rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
-                    break;
-                }
-                default:
-                    logMessage(ERROR, "Unknown  parameter type: %d\n", type);
-                }
+                writeParamValueToBuffer(csvRow, &rowLen, &p, type, 1);
+
+                // switch (type)
+                // {
+                // case TYPE_UINT8:
+                // {
+                //     uint8_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_UINT16:
+                // {
+                //     uint16_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_INT16:
+                // {
+                //     int16_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_INT8:
+                // {
+                //     int8_t value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // case TYPE_FLOAT:
+                // {
+                //     float value;
+                //     memcpy(&value, p, sizeof(value));
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%.2f", value);
+                //     p += sizeof(value);
+                //     break;
+                // }
+                // case TYPE_INT:
+                // {
+                //     int value;
+                //     memcpy(&value, p, sizeof(value));
+                //     p += sizeof(value);
+                //     rowLen += snprintf(csvRow + rowLen, SINK_MAX_BUFFER - rowLen, ",%d", value);
+                //     break;
+                // }
+                // default:
+                //     logMessage(ERROR, "Unknown  parameter type: %d\n", type);
+                // }
+            }
+            Metric protocolMetric = MAC_getMetrics(0);
+            for (int j = 0; j < protocolMetric.numParams; j++)
+            {
+                Param_Type type = protocolMetric.params[j].type;
+                writeParamValueToBuffer(csvRow, &rowLen, &p, type, 1);
             }
             csvRow[rowLen++] = '\n'; // newline
             csvRow[rowLen] = '\0';   // null terminatior
             logMessage(DEBUG, "%s", csvRow);
+            fflush(stdout);
             writeBufferToFile(fileName, csvRow);
         }
     }
+}
+
+static int getProtocolMetricsSerialized(uint8_t *buffer, Metric protocolMetric)
+{
+    uint16_t usedSize = 0;
+    if (protocolMetric.params != NULL && protocolMetric.numParams > 0)
+    {
+        sem_wait(&protocolMetric.mutex);
+        for (uint8_t j = 0; j < protocolMetric.numParams; j++)
+        {
+            switch (protocolMetric.params[j].type)
+            {
+            case TYPE_INT:
+            {
+                int value = protocolMetric.params[j].value ? *(int *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+            case TYPE_INT8:
+            {
+                int8_t value = protocolMetric.params[j].value ? *(int8_t *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+
+            case TYPE_UINT8:
+            {
+                uint8_t value = protocolMetric.params[j].value ? *(uint8_t *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+
+            case TYPE_INT16:
+            {
+                int16_t value = protocolMetric.params[j].value ? *(int16_t *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+
+            case TYPE_UINT16:
+            {
+                uint16_t value = protocolMetric.params[j].value ? *(uint16_t *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+
+            case TYPE_FLOAT:
+            {
+                float value = protocolMetric.params[j].value ? *(float *)protocolMetric.params[j].value : 0;
+                memcpy(buffer + usedSize, &value, sizeof(value));
+                usedSize += sizeof(value);
+                break;
+            }
+            }
+        }
+        sem_post(&protocolMetric.mutex);
+    }
+    printf("getProtocolMetricsSerialized: addr=%d usedSize=%d\n", protocolMetric.addr, usedSize);
+    return usedSize;
 }
 
 static uint16_t getMetricsSerialized(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
@@ -636,6 +804,20 @@ static uint16_t getMetricsSerialized(uint8_t *buffer, uint16_t bufferSize, CTRL 
 
                 // reset routing metrics
                 Metric_reset(&metric);
+
+                // Get protocol metrics
+                Metric protocolMetric = Routing_getMetrics(metric.addr);
+                uint16_t protocolMetricSize = Metric_getSize(protocolMetric);
+                if (usedSize + protocolMetricSize >= bufferSize)
+                {
+                    if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(DEBUG, "Routing metrics buffer overflow\n");
+                    }
+                    break;
+                }
+                usedSize += getProtocolMetricsSerialized(buffer + usedSize, protocolMetric);
+                Metric_reset(&protocolMetric);
             }
         }
         if (numMetrics > 0)
@@ -699,6 +881,20 @@ static uint16_t getMetricsSerialized(uint8_t *buffer, uint16_t bufferSize, CTRL 
 
                 // reset mac metrics
                 Metric_reset(&metric);
+
+                // Get protocol metrics
+                Metric protocolMetric = MAC_getMetrics(metric.addr);
+                uint16_t protocolMetricSize = Metric_getSize(protocolMetric);
+                if (usedSize + protocolMetricSize >= bufferSize)
+                {
+                    if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(DEBUG, "MAC metrics buffer overflow\n");
+                    }
+                    break;
+                }
+                usedSize += getProtocolMetricsSerialized(buffer + usedSize, protocolMetric);
+                Metric_reset(&protocolMetric);
             }
         }
         if (numMetrics > 0)
@@ -730,6 +926,7 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
 {
     uint16_t usedSize = 0;
     time_t timestamp = time(NULL);
+    memset(buffer, 0, bufferSize);
     if (ctrl == CTRL_ROU)
     {
         for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
@@ -749,6 +946,7 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
             }
             if (metric.params[ROU_SENT].value != NULL || metric.params[ROU_RECV].value != NULL)
             {
+                sem_wait(&metric.mutex);
                 usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, "%ld,%d,%d", (long)timestamp, config.self, metric.addr);
 
                 // Ensure order of parameters is same as in definition
@@ -768,13 +966,30 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
                 latency = (uint16_t)latency / (recv > 0 ? recv : 1);
                 usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", latency);
 
-                uint8_t *path = metric.params[ROU_PATH].value ? (uint8_t *)metric.params[ROU_PATH].value : (uint8_t *)"";
+                uint8_t *path = metric.params[ROU_PATH].value ? (uint8_t *)metric.params[ROU_PATH].value : (uint8_t *)",";
                 size_t pathLen = strlen((char *)path);
                 if (pathLen > 0)
                 {
-                    snprintf(buffer + usedSize, bufferSize - usedSize, ",%s", path);
-                    usedSize += pathLen;
+                    usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, ",%s", path);
                 }
+                sem_post(&metric.mutex);
+
+                // Get protocol metrics
+                Metric protocolMetric = Routing_getMetrics(metric.addr);
+                uint16_t protocolMetricSize = Metric_getSize(protocolMetric);
+                if (usedSize + protocolMetricSize >= bufferSize)
+                {
+                    if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(DEBUG, "Routing metrics buffer overflow\n");
+                    }
+                    break;
+                }
+                for (int j = 0; j < protocolMetric.numParams; j++)
+                {
+                    writeParamValueToBuffer(buffer, &usedSize, (uint8_t **)&protocolMetric.params[j].value, protocolMetric.params[j].type, 0);
+                }
+                Metric_reset(&protocolMetric);
 
                 buffer[usedSize++] = '\n'; // newline
 
@@ -783,7 +998,7 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
             }
         }
     }
-    if (ctrl = CTRL_MAC)
+    if (ctrl == CTRL_MAC)
     {
         for (uint8_t i = 1; i < MAX_ACTIVE_NODES; i++)
         {
@@ -802,6 +1017,7 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
             }
             if (metric.params[MAC_SENT].value != NULL || metric.params[MAC_RECV].value != NULL)
             {
+                sem_wait(&metric.mutex);
                 usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, "%ld,%d,%d", (long)timestamp, config.self, metric.addr);
 
                 // Ensure order of parameters is same as in definition
@@ -817,6 +1033,24 @@ uint16_t getMetricsCSV2(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl)
                 uint16_t latency = metric.params[MAC_LATENCY].value ? *(uint16_t *)metric.params[MAC_LATENCY].value : 0;
                 latency = (uint16_t)latency / (recv > 0 ? recv : 1);
                 usedSize += snprintf(buffer + usedSize, bufferSize - usedSize, ",%d", latency);
+                sem_post(&metric.mutex);
+
+                // Get protocol metrics
+                Metric protocolMetric = MAC_getMetrics(metric.addr);
+                uint16_t protocolMetricSize = Metric_getSize(protocolMetric);
+                if (usedSize + protocolMetricSize >= bufferSize)
+                {
+                    if (config.loglevel >= DEBUG)
+                    {
+                        logMessage(DEBUG, "Routing metrics buffer overflow\n");
+                    }
+                    break;
+                }
+                for (int j = 0; j < protocolMetric.numParams; j++)
+                {
+                    writeParamValueToBuffer(buffer, &usedSize, (uint8_t **)&protocolMetric.params[j].value, protocolMetric.params[j].type, 0);
+                }
+                Metric_reset(&protocolMetric);
 
                 buffer[usedSize++] = '\n'; // newline
 
@@ -1328,7 +1562,7 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     {
         uint16_t increment = 1;
         Metric_updateParamVal(&routingValues[dest], ROU_SENT, (void *)&increment);
-        logMessage(DEBUG, "routingValues[%02d].params[ROU_SENT].value: %ld\n", dest, *(uint16_t *)routingValues[dest].params[ROU_SENT].value);
+        // logMessage(DEBUG, "routingValues[%02d].params[ROU_SENT].value: %ld\n", dest, *(uint16_t *)routingValues[dest].params[ROU_SENT].value);
     }
     else
     {
@@ -1346,6 +1580,25 @@ int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
     }
 
     return ret;
+}
+
+int setPath(Metric *metric, uint8_t *path)
+{
+    sem_wait(&metric->mutex);
+    if (metric->params[ROU_PATH].value == NULL)
+    {
+        metric->params[ROU_PATH].value = malloc(240);
+        if (metric->params[ROU_PATH].value == NULL)
+        {
+            logMessage(ERROR, "Error allocating memory for ROU_PATH of [%02d]\n", metric->addr);
+            fflush(stdout);
+            exit(EXIT_FAILURE);
+        }
+    }
+    memset(metric->params[ROU_PATH].value, 0, 240);
+    strcpy((char *)metric->params[ROU_PATH].value, path);
+    sem_post(&metric->mutex);
+    return 0;
 }
 
 int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
@@ -1411,9 +1664,11 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
             Metric_updateParamVal(&routingValues[src], ROU_RECV, (void *)&increment);
             Metric_setParamVal(&routingValues[src], ROU_NUMHOPS, (void *)&numHops);
             Metric_setParamVal(&routingValues[src], ROU_LATENCY, (void *)&latency);
-            logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[ROU_NUMHOPS].value);
-            logMessage(DEBUG, "routingValues[%02d].params[ROU_RECV].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_RECV].value);
-            logMessage(DEBUG, "routingValues[%02d].params[ROU_LATENCY].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_LATENCY].value);
+            setPath(&routingValues[src], lastPath);
+            // logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[ROU_NUMHOPS].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_RECV].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_RECV].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_LATENCY].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_LATENCY].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_PATH].value: %s\n", src, (uint8_t *)routingValues[src].params[ROU_PATH].value);
         }
         else
         {
@@ -1449,6 +1704,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
             {
                 logMessage(INFO, "Received %s data of Node %02d: %d B\n", (ctrl == CTRL_MAC) ? "MAC" : (ctrl == CTRL_TAB ? "Topology" : "Routing"), src, len);
                 deserializeMetricsPkt(extendedData, len, src, ctrl);
+                fflush(stdout);
             }
             else
             {
@@ -1575,9 +1831,11 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
             Metric_updateParamVal(&routingValues[src], ROU_RECV, (void *)&increment);
             Metric_setParamVal(&routingValues[src], ROU_NUMHOPS, (void *)&numHops);
             Metric_setParamVal(&routingValues[src], ROU_LATENCY, (void *)&latency);
-            logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[ROU_NUMHOPS].value);
-            logMessage(DEBUG, "routingValues[%02d].params[ROU_RECV].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_RECV].value);
-            logMessage(DEBUG, "routingValues[%02d].params[ROU_LATENCY].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_LATENCY].value);
+            setPath(&routingValues[src], lastPath);
+            // logMessage(INFO, "### ProtoMon : hops: %d\n", *(uint8_t *)routingValues[src].params[ROU_NUMHOPS].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_RECV].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_RECV].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_LATENCY].value: %d\n", src, *(uint16_t *)routingValues[src].params[ROU_LATENCY].value);
+            // logMessage(DEBUG, "routingValues[%02d].params[ROU_PATH].value: %s\n", src, (uint8_t *)routingValues[src].params[ROU_PATH].value);
         }
         else
         {
@@ -1683,7 +1941,7 @@ int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned 
 
     uint8_t extData[MAX_PAYLOAD_SIZE];
     uint8_t *temp = extData;
-    if (dest != ADDR_BROADCAST) // exclude broadcast messages - beacons
+    if (dest != 0) // exclude broadcast messages - beacons
     {
         // Check if msg packet
         uint8_t ctrl;
@@ -1710,7 +1968,7 @@ int ProtoMon_MAC_send(MAC *h, unsigned char dest, unsigned char *data, unsigned 
             {
                 uint16_t increment = 1;
                 Metric_updateParamVal(&macValues[dest], MAC_SENT, (void *)&increment);
-                logMessage(DEBUG, "macValues[%02d].params[MAC_SENT].value: %u\n", dest, *(uint16_t *)macValues[dest].params[MAC_SENT].value);
+                // logMessage(DEBUG, "macValues[%02d].params[MAC_SENT].value: %u\n", dest, *(uint16_t *)macValues[dest].params[MAC_SENT].value);
             }
         }
     }
@@ -1758,7 +2016,7 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
         printf("\n");
     }
 
-    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
+    if (dest != 0) // exclude broadcasts - beacons
     {
         // Check if msg packet
         uint8_t ctrl;
@@ -1794,8 +2052,8 @@ int ProtoMon_MAC_recv(MAC *h, unsigned char *data)
                 uint16_t increment = 1;
                 Metric_updateParamVal(&macValues[src], MAC_RECV, (void *)&increment);
                 Metric_updateParamVal(&macValues[src], MAC_LATENCY, (void *)&latency);
-                logMessage(DEBUG, "macValues[%02d].params[MAC_RECV].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_RECV].value);
-                logMessage(DEBUG, "macValues[%02d].params[MAC_LATENCY].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_LATENCY].value);
+                // logMessage(DEBUG, "macValues[%02d].params[MAC_RECV].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_RECV].value);
+                // logMessage(DEBUG, "macValues[%02d].params[MAC_LATENCY].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_LATENCY].value);
             }
             else
             {
@@ -1885,7 +2143,7 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
         printf("\n");
     }
 
-    if (dest != ADDR_BROADCAST) // exclude broadcasts - beacons
+    if (dest != 0) // exclude broadcasts - beacons
     {
         // Check if msg packet
         uint8_t ctrl;
@@ -1921,8 +2179,8 @@ int ProtoMon_MAC_timedRecv(MAC *h, unsigned char *data, unsigned int timeout)
                 uint16_t increment = 1;
                 Metric_updateParamVal(&macValues[src], MAC_RECV, (void *)&increment);
                 Metric_updateParamVal(&macValues[src], MAC_LATENCY, (void *)&latency);
-                logMessage(DEBUG, "macValues[%02d].params[MAC_RECV].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_RECV].value);
-                logMessage(DEBUG, "macValues[%02d].params[MAC_LATENCY].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_LATENCY].value);
+                // logMessage(DEBUG, "macValues[%02d].params[MAC_RECV].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_RECV].value);
+                // logMessage(DEBUG, "macValues[%02d].params[MAC_LATENCY].value: %ld\n", src, *(uint16_t *)macValues[src].params[MAC_LATENCY].value);
             }
         }
 

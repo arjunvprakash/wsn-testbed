@@ -40,7 +40,6 @@ extern int (*MAC_recv)(MAC *h, unsigned char *data);
  */
 extern int (*MAC_timedRecv)(MAC *h, unsigned char *data, unsigned int timeout);
 
-
 /**
  * @returns size of the MAC header
  * @note Dependency with ProtoMon
@@ -55,6 +54,7 @@ uint8_t MAC_getHeaderSize();
 
 /**
  * @returns Metric corresponding to the specified node collected by MAC protocol.
+ * @note If addr is ADDR_BROADCASE, it is a metadata read. So do not reset the metric.
  * @note Dependency with ProtoMon
  */
 Metric MAC_getMetrics(uint8_t addr);

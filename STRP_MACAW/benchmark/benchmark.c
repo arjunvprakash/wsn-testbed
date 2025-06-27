@@ -73,7 +73,7 @@ static void initParentTable()
 	config.parentTable[20] = 18;
 	config.parentTable[21] = 9;
 	config.parentTable[22] = 20;
-	config.parentTable[23] = 15;
+	// config.parentTable[23] = 15;
 	config.parentTable[24] = 22;
 	// config.parentTable[25] = 6;
 	config.parentTable[27] = 20;
@@ -97,10 +97,10 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	config.name = "Experiment MACAW 400_3"; // Experiment 400
+	config.name = "Experiment MACAW 400_0"; // Experiment 400
 	config.runtTimeS = 39715;				// Experiment 400
 	config.sendCsv = "send_400.csv";		// Experiment 400
-	config.monitoringEnabled = true;		// Experiment 400
+	config.monitoringEnabled = false;		// Experiment 400
 
 	// config.name = "Experiment 120_0"; // Experiment 120
 	// config.runtTimeS = 12895;		  // Experiment 120

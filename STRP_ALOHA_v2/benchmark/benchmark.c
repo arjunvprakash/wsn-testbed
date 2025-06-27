@@ -73,7 +73,7 @@ static void initParentTable()
 	config.parentTable[20] = 18;
 	config.parentTable[21] = 9;
 	config.parentTable[22] = 20;
-	config.parentTable[23] = 15;
+	// config.parentTable[23] = 15;
 	config.parentTable[24] = 22;
 	// config.parentTable[25] = 6;
 	config.parentTable[27] = 20;
@@ -152,7 +152,6 @@ int main(int argc, char *argv[])
 
 	strp.beaconIntervalS = 1200 + offsetS;
 
-	// strp.beaconIntervalS = 10 + offsetS; // experiment 120_ser
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 3600;
 	strp.self = config.self;
@@ -179,7 +178,7 @@ int main(int argc, char *argv[])
 	// protomon.sendDelayS = 120;				  // experiment 120
 
 	protomon.sendIntervalS = 60;			  // experiment 120_ser
-	protomon.vizIntervalS = 360;			  // experiment 120_ser
+	protomon.vizIntervalS = 120;			  // experiment 120_ser
 	protomon.initialSendWaitS = 30 + offsetS; // experiment 120_ser
 	protomon.sendDelayS = 20;				  // experiment 120_ser
 
