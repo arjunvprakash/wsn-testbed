@@ -15,6 +15,7 @@ typedef struct MAC_Data
 	uint16_t frames;
 	uint16_t drops;
 	uint16_t bytes;
+	uint16_t control;
 } MAC_Data;
 
 typedef struct MAC_Metrics
@@ -380,6 +381,7 @@ static void requestToSend(MAC *mac, uint8_t addr, uint16_t msg_len)
 	{
 		sem_wait(&metrics.mutex);
 		metrics.data[addr].bytes += sizeof(buffer);
+		metrics.data[addr].control++;
 		sem_post(&metrics.mutex);
 		printf("## MAC_TX: %d B\n", sizeof(buffer));
 	}
@@ -418,6 +420,7 @@ static void clearToSend(MAC *mac, uint8_t addr, uint16_t msg_len)
 		SX1262_send(buffer, sizeof(buffer));
 		sem_wait(&metrics.mutex);
 		metrics.data[addr].bytes += sizeof(buffer);
+		metrics.data[addr].control++;
 		sem_post(&metrics.mutex);
 		printf("## MAC_TX: %d B\n", sizeof(buffer));
 	}
@@ -455,6 +458,7 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 	
 	sem_wait(&metrics.mutex);
 	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
+	metrics.data[recvH.src_addr].control++;
 	sem_post(&metrics.mutex);
 	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
@@ -1029,8 +1033,8 @@ static void *sendT_func(void *args)
 		// In den Zustand "delay" wechseln
 		state = delay_s;
 
-		// Random Delay
-		msleep(rand() % (mac->timeout * 1000));
+		// Sleep for a short random duration
+		msleep(100 + rand() % 501);
 
 		while (1)
 		{
@@ -1455,14 +1459,14 @@ uint8_t MAC_getHeaderSize()
 
 uint8_t *MAC_getMetricsHeader()
 {
-	return "AggTotalBytes,AggDrops";
+	return "AggTotalBytes,AggDrops,ControlFramesSent";
 }
 
 int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	sem_wait(&metrics.mutex);
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%ld,%ld", data.bytes + metrics.data[0].bytes, data.drops);
+	int rowlen = sprintf(buffer, "%ld,%ld,%ld", data.bytes + metrics.data[0].bytes, data.drops,data.control);
 	metrics.data[addr] = (MAC_Data){0};
 	metrics.data[0].bytes = 0;
 	sem_post(&metrics.mutex);

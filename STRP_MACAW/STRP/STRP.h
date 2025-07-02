@@ -57,14 +57,10 @@ typedef struct STRP_Config
     // Neighbor keepalive timeout (seconds)
     // Default 60s
     unsigned int nodeTimeoutS;
-
-    // Receive timeout for MAC layer (milliseconds)
-    // Default 1000ms
-    // unsigned int recvTimeoutMs;
     
     MAC *mac;
 
-    // Pointer to parent array of size MAX_ACTIVE_NODES indexed by node address
+    // Parent address for the FIXED strategy
     uint8_t parentAddr;
 
 } STRP_Config;

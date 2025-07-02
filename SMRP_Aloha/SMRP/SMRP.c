@@ -786,7 +786,7 @@ uint8_t Routing_isDataPkt(uint8_t ctrl)
 
 uint8_t *Routing_getMetricsHeader()
 {
-    return "TotalBeaconsSent,TotalBeaconsRecv";
+    return "AggBeaconsSent,TotalBeaconsRecv";
 }
 
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
@@ -856,10 +856,10 @@ void setConfigDefaults(SMRP_Config *config)
     {
         config->nodeTimeoutS = 60;
     }
-    if (config->recvTimeoutMs == 0)
-    {
-        config->recvTimeoutMs = 1000;
-    }
+    // if (config->recvTimeoutMs == 0)
+    // {
+    //     config->recvTimeoutMs = 1000;
+    // }
     if (config->loglevel == 0)
     {
         config->loglevel = INFO;

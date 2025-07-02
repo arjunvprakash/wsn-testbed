@@ -151,6 +151,7 @@ int main(int argc, char *argv[])
 	strp.mac = &mac;
 	STRP_init(strp);
 	mac.ambient = 0;
+	mac.timeout = 1;
 
 	syncTime(config.maxSyncSleepS);
 

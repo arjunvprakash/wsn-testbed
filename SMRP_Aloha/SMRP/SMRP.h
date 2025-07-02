@@ -42,9 +42,7 @@ typedef struct SMRP_Config
     // Default 60s
     unsigned int nodeTimeoutS;
 
-    // Receive timeout for MAC layer (milliseconds)
-    // Default 1000ms
-    unsigned int recvTimeoutMs;
+    MAC mac;
 
     // Number of maximum tries to find nexthop
     // Default 2

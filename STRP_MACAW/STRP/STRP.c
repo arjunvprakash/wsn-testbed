@@ -47,7 +47,6 @@ typedef struct
 {
     uint8_t addr;
     int8_t RSSI;
-    unsigned short hopsToSink;
     time_t lastSeen;
     Routing_LinkType link;
     uint8_t parent;
@@ -1179,7 +1178,7 @@ static void *sendBeaconPeriodic(void *args)
     {
         usleep(randInRange(500000, 1200000));
         sendBeacon();
-        logMessage(INFO,"Sent beacon\n");
+        logMessage(INFO, "Sent beacon\n");
         if ((time(NULL) - neighbours.lastCleanupTime) > config.nodeTimeoutS)
         {
             cleanupInactiveNodes();
@@ -1253,6 +1252,7 @@ int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
     sem_wait(&metrics.mutex);
     metrics.data[addr] = (STRP_Params){0};
     metrics.data[0].beaconsSent = 0;
+    metrics.data[0].parentChanges = 0;
     sem_post(&metrics.mutex);
     return rowlen;
 }
@@ -1274,19 +1274,33 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
     uint8_t src = config.self;
     time_t timestamp = time(NULL);
 
+    // Write parent info first
     NodeInfo node = activeNodes.nodes[parentAddr];
-    uint8_t row[100];
-    int rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, node.addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
+    uint8_t parentRow[100] = {0};
+    uint16_t parentRowlen = 0;
+    parentRowlen += snprintf(parentRow, sizeof(parentRow), "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, node.addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
+    if (offset + parentRowlen < size)
+    {
+        memcpy(buffer + offset, parentRow, parentRowlen);
+        offset += parentRowlen;
+    }
+    else
+    {
+        logMessage(DEBUG, "Topology metrics buffer overflow\n");
+    }
 
     // Clear timestamp to avoid unnecessary redundancy
     timestamp = 0L;
 
+    // Write other node info
     for (uint8_t addr = min; addr <= max; addr++)
     {
         node = activeNodes.nodes[addr];
         if (node.state != UNKNOWN && addr != parentAddr)
         {
-            rowlen = sprintf(row, "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
+            uint8_t row[100];
+            uint16_t rowlen = 0;
+            rowlen += snprintf(row, sizeof(row), "%ld,%d,%d,%d,%d,%d,%d,%d\n", (long)timestamp, src, addr, node.state, node.link, node.RSSI, node.parent, node.parentRSSI);
 
             if (offset + rowlen < size)
             {
@@ -1316,11 +1330,7 @@ void setConfigDefaults(STRP_Config *config)
     if (config->nodeTimeoutS == 0)
     {
         config->nodeTimeoutS = 60;
-    }
-    // if (config->recvTimeoutMs == 0)
-    // {
-    //     config->recvTimeoutMs = 1000;
-    // }
+    }    
     if (config->strategy == 0)
     {
         config->strategy = CLOSEST;
