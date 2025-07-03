@@ -66,7 +66,7 @@ static void initParentTable()
 	// config.parentTable[12] = 6;
 	// config.parentTable[13] = ADDR_SINK; // Sink
 	// // config.parentTable[14] = ADDR_SINK;
-	config.parentTable[15] = 9;
+	config.parentTable[15] = 16;
 	config.parentTable[16] = 9;
 	config.parentTable[18] = ADDR_SINK;
 	// config.parentTable[19] = ADDR_SINK;

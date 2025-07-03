@@ -13,13 +13,6 @@
  * @note     int RSSI;     // RSSI of the previous hop address
  */
 typedef struct Routing_Header Routing_Header;
-// {
-//     uint8_t src;  // Source of the packet
-//     uint8_t dst;  // Destination of the packet
-//     uint8_t prev; // Address of the previous hop
-//     int RSSI;     // RSSI of the previous hop address
-//     uint16_t len; // Length of the payload
-// } Routing_Header;
 
 /**
  * @brief Supported link types for neighbor nodes

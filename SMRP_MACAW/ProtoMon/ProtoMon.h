@@ -3,7 +3,7 @@
 #pragma once
 
 #include "../common.h"
-#include "../MACAW/MACAW.h" // include the MAC layer implemetation
+#include "../ALOHA/ALOHA.h" // include the MAC layer implemetation
 #include "../SMRP/SMRP.h"   // include the routing layer implemetation
 
 /**
@@ -34,6 +34,11 @@ typedef struct ProtoMon_Config
     // Could be used to wait for lower layers to initialize.
     // Default 30s
     uint16_t initialSendWaitS;
+
+    // Delay before sending the subsequent metric packet
+    // Default: sendIntervalS / numLayers
+    // This is used to avoid sending all metrics at once.
+    uint16_t sendDelayS; 
 } ProtoMon_Config;
 
 /**
@@ -55,5 +60,6 @@ typedef enum ProtoMon_Level
  * @return None.
  */
 void ProtoMon_init(ProtoMon_Config config);
+
 
 #endif // STRP_H

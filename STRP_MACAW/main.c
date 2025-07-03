@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 15000;
+	sleepDuration = 35000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
@@ -47,16 +47,16 @@ int main(int argc, char *argv[])
 	config.sendDelayS = 30;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = 15;
-	ProtoMon_init(config);
+	config.initialSendWaitS = 55;
+	// ProtoMon_init(config);
 
 	STRP_Config strp;
 	strp.beaconIntervalS = 20;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 90;
 	strp.self = self;
-	strp.senseDurationS = 10;
-	strp.strategy = NEXT_LOWER;
+	strp.senseDurationS = 30;
+	strp.strategy = CLOSEST;
 	MAC mac;
 	strp.mac = &mac;
 	STRP_init(strp);

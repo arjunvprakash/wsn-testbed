@@ -2,6 +2,11 @@
 #define SMRP_H
 #pragma once
 
+#include <stdint.h>
+#include <stdbool.h>
+#include <semaphore.h> // sem_init, sem_wait, sem_trywait, sem_timedwait
+
+
 #include "../ALOHA/ALOHA.h"
 #include "../common.h"
 #include "../ProtoMon/routing.h"
@@ -42,7 +47,7 @@ typedef struct SMRP_Config
     // Default 60s
     unsigned int nodeTimeoutS;
 
-    MAC mac;
+    MAC *mac;
 
     // Number of maximum tries to find nexthop
     // Default 2

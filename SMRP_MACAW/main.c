@@ -53,10 +53,13 @@ int main(int argc, char *argv[])
 	smrp.beaconIntervalS = 30;
 	smrp.loglevel = INFO;
 	smrp.nodeTimeoutS = 60;
-	smrp.recvTimeoutMs = 1000;
 	smrp.self = self;
 	smrp.senseDurationS = 15;
 	smrp.maxTries = 1;
+	MAC mac;
+	smrp.mac = &mac;
+	SMRP_init(smrp);
+	mac.ambient = 0;
 	SMRP_init(smrp);
 
 	// if (self != ADDR_SINK)
