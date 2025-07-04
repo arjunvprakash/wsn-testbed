@@ -43,9 +43,10 @@ int main(int argc, char *argv[])
 	ProtoMon_Config config;
 	config.vizIntervalS = 60;
 	config.loglevel = INFO;
-	config.sendIntervalS = 20;
+	config.sendIntervalS = 60;
+	config.sendDelayS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LEVEL_ALL;
+	config.monitoredLevels = PROTOMON_LEVEL_ROUTING;
 	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 

@@ -195,7 +195,7 @@ static Bytes sendQ_dequeue() {
     return c;
 }
 
-static void* recvT_func(void* args) {
+static void* recvBytes_func(void* args) {
     while (1) {
         uint8_t c;
 
@@ -207,7 +207,7 @@ static void* recvT_func(void* args) {
     }
 }
 
-static void* sendT_func(void* args) {
+static void* sendBytes_func(void* args) {
     while (1) {
         // Blockieren bis Bytes in der Warteschlange verfügbar ist
         Bytes c = sendQ_dequeue();
@@ -344,13 +344,13 @@ void SX1262_init(unsigned int channel, int mode) {
 
     /*** Threads ***/
     // Empfangsthread starten
-    if (pthread_create(&recvT, NULL, &recvT_func, NULL) != 0) {
+    if (pthread_create(&recvT, NULL, &recvBytes_func, NULL) != 0) {
         fprintf(stderr, "Error %d creating recvThread: %s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }
 
     // Sendethread starten
-    if (pthread_create(&sendT, NULL, &sendT_func, NULL) != 0) {
+    if (pthread_create(&sendT, NULL, &sendBytes_func, NULL) != 0) {
         fprintf(stderr, "Error %d creating sendThread: %s\n", errno, strerror(errno));
         exit(EXIT_FAILURE);
     }

@@ -3,6 +3,7 @@
 #pragma once
 
 #include <stdint.h> // uint8_t, int8_t, uint32_t
+#include "../ProtoMon/mac.h"
 
 #define ADDR_BROADCAST 0XFF
 
@@ -33,6 +34,12 @@ typedef struct MAC
 
 	/* Sonstige */
 	int debug; // Gibt an, ob Debug-Ausgaben erstellt werden sollen
+
+	// Enable ambient noise monitoring
+	int ambient;
+
+	// Backoff time in ms if noise too high
+	int noiseBackoffMs;
 } MAC;
 
 void ALOHA_init(MAC *, unsigned char);
@@ -44,13 +51,5 @@ int ALOHA_timedrecv(MAC *, unsigned char *, unsigned int);
 int ALOHA_send(MAC *, unsigned char, unsigned char *, unsigned int);
 int ALOHA_Isend(MAC *, unsigned char, unsigned char *, unsigned int);
 
-// ####
-extern int (*MAC_send)(MAC *, unsigned char, unsigned char *, unsigned int);
-extern int (*MAC_recv)(MAC *, unsigned char *);
-extern int (*MAC_timedRecv)(MAC *, unsigned char *, unsigned int);
-
-uint8_t MAC_getHeaderSize();
-uint8_t *MAC_getMetricsHeader();
-int MAC_getMetricsData(uint8_t *buffer, uint8_t addr);
 
 #endif /* ALOHA_H */

@@ -3,7 +3,7 @@
 #pragma once
 
 #include "../common.h"
-#include "../ALOHA/ALOHA.h" // include the MAC layer implemetation
+#include "../MACAW/MACAW.h" // include the MAC layer implemetation
 #include "../SMRP/SMRP.h"   // include the routing layer implemetation
 
 /**

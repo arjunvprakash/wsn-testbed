@@ -9,10 +9,10 @@
 #include <unistd.h>    // sleep, exec, chdir
 
 #include "SMRP.h"
-#include "../common.h"
 #include "../util.h"
 
 #define PACKETQ_SIZE 16
+#define MIN_RSSI -128
 
 // Packet control flags
 #define CTRL_PKT '\x45' // SMRP data packet
@@ -30,6 +30,7 @@ typedef struct DataPacket
     uint8_t src;
     uint16_t len;
     uint8_t *data;
+    Routing_Header metadata;
 } DataPacket;
 
 typedef struct PacketQueue
@@ -42,7 +43,7 @@ typedef struct PacketQueue
 typedef struct
 {
     uint8_t addr;
-    int RSSI;
+    int8_t RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
     Routing_LinkType link;
@@ -77,7 +78,7 @@ static Metrics metrics;
 static PacketQueue sendQ, recvQ;
 static pthread_t recvT;
 static pthread_t sendT;
-static MAC mac;
+
 static const unsigned short headerSize = 5; // [ ctrl | dest | src | len[2] ]
 static ActiveNodes neighbours;
 static SMRP_Config config;
@@ -98,7 +99,7 @@ static void *sendPackets_func(void *args);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void *receiveBeaconHandler(void *args);
 static void senseNeighbours();
-static void updateActiveNodes(uint8_t addr, int RSSI);
+static void updateActiveNodes(uint8_t addr, int8_t RSSI);
 static void changeParent();
 static void initNeighbours();
 static void cleanupInactiveNodes();
@@ -139,16 +140,17 @@ int SMRP_init(SMRP_Config c)
     setConfigDefaults(&c);
     config = c;
     srand(config.self * time(NULL));
-    mac.recvTimeout = config.recvTimeoutMs;
-    mac.maxtrials = 2;
-    MACAW_init(&mac, config.self);
-    mac.debug = config.loglevel > INFO;
+    MACAW_init(config.mac, config.self);
+    if (config.loglevel > INFO)
+    {
+        config.mac->debug = 1;
+    }
     sendQ_init();
     recvQ_init();
     initNeighbours();
     initMetrics();
 
-    if (pthread_create(&recvT, NULL, recvPackets_func, &mac) != 0)
+    if (pthread_create(&recvT, NULL, recvPackets_func, NULL) != 0)
     {
         logMessage(ERROR, "Failed to create Routing receive thread\n");
         fflush(stdout);
@@ -159,7 +161,7 @@ int SMRP_init(SMRP_Config c)
 
     if (config.self != ADDR_SINK)
     {
-        if (pthread_create(&sendT, NULL, sendPackets_func, &mac) != 0)
+        if (pthread_create(&sendT, NULL, sendPackets_func, NULL) != 0)
         {
             logMessage(ERROR, "Failed to create Routing send thread\n");
             fflush(stdout);
@@ -167,7 +169,7 @@ int SMRP_init(SMRP_Config c)
         }
     }
     // Beacon thread
-    if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, &mac) != 0)
+    if (pthread_create(&sendBeaconT, NULL, sendBeaconPeriodic, NULL) != 0)
     {
         logMessage(ERROR, "Failed to create sendBeaconPeriodic thread");
         fflush(stdout);
@@ -203,10 +205,13 @@ int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
 int SMRP_recvMsg(Routing_Header *header, uint8_t *data)
 {
     DataPacket msg = recvMsgQ_dequeue();
-    header->dst = msg.dest;
-    header->RSSI = mac.RSSI;
+
+    // Populate header with message metadata
+    header->dst = msg.metadata.dst;
+    header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
-    header->prev = mac.recvH.src_addr;
+    header->prev = msg.metadata.prev;
+
     if (msg.data)
     {
         memcpy(data, msg.data, msg.len);
@@ -238,11 +243,12 @@ int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
         return result;
     }
 
-    // Populate header with message details
-    header->dst = msg.dest;
-    header->RSSI = mac.RSSI;
+    // Populate header with message metadata
+    header->dst = msg.metadata.dst;
+    header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
-    header->prev = mac.recvH.src_addr;
+    header->prev = msg.metadata.prev;
+    
 
     if (msg.data != NULL)
     {
@@ -398,7 +404,6 @@ static DataPacket recvMsgQ_dequeue()
 static void *recvPackets_func(void *args)
 {
     unsigned int total[MAX_ACTIVE_NODES] = {0};
-    MAC *macTemp = (MAC *)args;
     time_t start = time(NULL);
     time_t current;
     while (1)
@@ -408,36 +413,54 @@ static void *recvPackets_func(void *args)
         {
             continue;
         }
-        // int pktSize = ALOHA_recv(macTemp, pkt);
-        int pktSize = MAC_timedRecv(macTemp, pkt, 1);
+        int pktSize = MAC_timedRecv(config.mac, pkt, 1);
         if (pktSize == 0)
         {
             free(pkt);
             continue;
         }
+        Routing_Header metadata;
+        metadata.prev = config.mac->recvH.src_addr;
+        metadata.RSSI = config.mac->RSSI;
+
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT)
         {
             uint8_t dest = *(pkt + sizeof(ctrl));
             uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI);
+            updateActiveNodes(metadata.prev, metadata.RSSI);
+
+            if (config.loglevel >= TRACE)
+            {
+                logMessage(TRACE, "STRP:%s: ", __func__);
+                for (int i = 0; i < headerSize; i++)
+                    printf("%02X ", pkt[i]);
+                printf("|");
+                for (int i = headerSize; i < pktSize; i++)
+                    printf(" %02X", pkt[i]);
+                printf("\n");
+            }
+
             if (dest == config.self)
             {
                 DataPacket msg = deserializePacket(pkt);
                 // Keep
-                if (msg.len > 0)
+                if (msg.len > 0 && msg.data != NULL)
                 {
+                    metadata.dst = msg.dest;
+                    metadata.src = msg.src;
+                    msg.metadata = metadata;
                     recvQ_enqueue(msg);
                 }
             }
             else // Forward
             {
-                uint8_t nextHop = Routing_getnextHop(src, mac.recvH.src_addr, dest, config.maxTries);
+                uint8_t nextHop = Routing_getnextHop(src, metadata.prev, dest, config.maxTries);
                 if (rand() % 100 < 0)
                 {
                     nextHop = dest;
                 }
-                if (MAC_send(macTemp, nextHop, pkt, pktSize))
+                if (MAC_send(config.mac, nextHop, pkt, pktSize))
                 {
                     logMessage(INFO, "FWD: %02d -> %02d total: %02d\n", src, nextHop, ++total[src]);
                 }
@@ -452,10 +475,10 @@ static void *recvPackets_func(void *args)
             Beacon *beacon = (Beacon *)pkt;
             if (config.loglevel >= DEBUG)
             {
-                logMessage(DEBUG, "%s -Beacon src: %02d (%d)\n", timestamp(), mac.recvH.src_addr, mac.RSSI);
+                logMessage(DEBUG, "%s -Beacon src: %02d (%d)\n", timestamp(), metadata.prev, metadata.RSSI);
             }
-            updateActiveNodes(mac.recvH.src_addr, mac.RSSI);
-            metrics.data[mac.recvH.src_addr].beaconsRx++;
+            updateActiveNodes(metadata.prev, metadata.RSSI);
+            metrics.data[metadata.prev].beaconsRx++;
         }
         else
         {
@@ -531,7 +554,6 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
 
 static void *sendPackets_func(void *args)
 {
-    MAC *macTemp = (MAC *)args;
     while (1)
     {
         DataPacket msg = sendQ_dequeue();
@@ -548,7 +570,7 @@ static void *sendPackets_func(void *args)
         time_t start = time(NULL);
         uint8_t nextHop = Routing_getnextHop(msg.src, -1, msg.dest, config.maxTries);
         // nextHop = msg.dest;
-        if (!MAC_send(macTemp, nextHop, pkt, pktSize))
+        if (!MAC_send(config.mac, nextHop, pkt, pktSize))
         {
             logMessage(ERROR, "%s - MAC_send failed %s:%d\n", timestamp(), __FILE__, __LINE__);
         }
@@ -563,6 +585,10 @@ static void *sendPackets_func(void *args)
 
 static void senseNeighbours()
 {
+    // Disable ambient noise monitoring for sensing
+    MAC tempMac = *config.mac;
+    config.mac->ambient = 0;
+
     do
     {
         uint16_t count = 0;
@@ -595,11 +621,27 @@ static void senseNeighbours()
 
     } while (1);
 
-    logMessage(INFO, "Active neighbours: %d \n", neighbours.numActive);
-    fflush(stdout);
+    // Reset ambient noise monitoring
+    config.mac->ambient = tempMac.ambient;
+
+    // if (config.loglevel >= DEBUG)
+    {
+        logMessage(DEBUG, "-------------\n");
+        logMessage(DEBUG, "Active neighbors: %d\n", neighbours.numActive);
+        for (uint8_t i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
+        {
+            NodeInfo node = neighbours.nodes[i];
+            if (node.state != UNKNOWN)
+            {
+                logMessage(DEBUG, " %02d (%d)\n", i, node.RSSI);
+            }
+        }
+        logMessage(DEBUG, "-------------\n");
+        fflush(stdout);
+    }
 }
 
-static void updateActiveNodes(uint8_t addr, int RSSI)
+static void updateActiveNodes(uint8_t addr, int8_t RSSI)
 {
     sem_wait(&neighbours.mutex);
     NodeInfo *nodePtr = &neighbours.nodes[addr];
@@ -630,22 +672,17 @@ static void updateActiveNodes(uint8_t addr, int RSSI)
             neighbours.numActive++;
         }
     }
-    // Random assignment of link
-    if (addr == ADDR_SINK)
+
+    if (new)
     {
         nodePtr->link = OUTBOUND;
-    }
-    else
-    {
-        nodePtr->link = OUTBOUND;
-        // nodePtr->link = rand() % 100 < 80 ? IDLE : ROLE_NEXTHOP;
     }
     nodePtr->RSSI = RSSI;
     nodePtr->lastSeen = time(NULL);
     sem_post(&neighbours.mutex);
     if (new)
     {
-        // if (config.loglevel >= DEBUG)
+        if (config.loglevel >= DEBUG)
         {
             logMessage(DEBUG, "New %s: %02d (%02d)\n", "neighbour", addr, RSSI);
             logMessage(DEBUG, "Active neighbours: %d \n", neighbours.numActive);
@@ -704,7 +741,7 @@ static void sendBeacon()
     {
         logMessage(DEBUG, "Sending beacon\n");
     }
-    if (!MAC_send(&mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
+    if (!MAC_send(config.mac, ADDR_BROADCAST, (uint8_t *)&beacon, sizeof(Beacon)))
     {
         logMessage(INFO, "MAC_send failed %s:%d\n", __FILE__, __LINE__);
     }
@@ -735,10 +772,10 @@ char *getNodeRoleStr(const Routing_LinkType link)
     switch (link)
     {
     case OUTBOUND:
-        roleStr = "PARENT";
+        roleStr = "OUTBOUND";
         break;
     case IDLE:
-        roleStr = "NODE";
+        roleStr = "IDLE";
         break;
     default:
         roleStr = "ERROR";
@@ -780,7 +817,7 @@ uint8_t Routing_isDataPkt(uint8_t ctrl)
 
 uint8_t *Routing_getMetricsHeader()
 {
-    return "TotalBeaconsSent,TotalBeaconsRecv";
+    return "AggBeaconsSent,TotalBeaconsRecv";
 }
 
 int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
@@ -821,14 +858,14 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
             // Clear timestamp to avoid duplicate
             timestamp = 0L;
 
-            // if (offset + rowlen < size)
-            if (1)
+            if (offset + rowlen < size)
             {
                 memcpy(buffer + offset, row, rowlen);
                 offset += rowlen;
             }
             else
             {
+                logMessage(DEBUG, "Topology metrics buffer overflow\n");
                 break;
             }
         }
@@ -849,10 +886,6 @@ void setConfigDefaults(SMRP_Config *config)
     if (config->nodeTimeoutS == 0)
     {
         config->nodeTimeoutS = 60;
-    }
-    if (config->recvTimeoutMs == 0)
-    {
-        config->recvTimeoutMs = 1000;
     }
     if (config->loglevel == 0)
     {

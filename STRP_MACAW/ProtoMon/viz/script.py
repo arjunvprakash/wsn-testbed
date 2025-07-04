@@ -379,9 +379,6 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
         
         if valid_plots > 0:
             p.legend.background_fill_alpha = 0.2 
-            # p.add_layout(p.legend[0], place="right")  # Move to right if space available
-            # p.legend.label_text_font_size = "8pt"
-            # p.legend.location = "top_left" if src % 2 == 0 else "top_right"
             p.legend.click_policy = "hide" 
 
             if metric.lower().startswith("agg"):
@@ -565,6 +562,7 @@ map_config = default_map_config.copy()
 ## Standard columns for MAC and Routing data
 mac_metaColumns = ['RelativeTime','Timestamp','Source','Address']
 routing_metaColumns = ['RelativeTime','Timestamp','Source','Address', 'Path']
+df_path = pd.DataFrame()  
 
 if os.path.exists(routing_csv):
     routing_df = pd.read_csv(routing_csv)
