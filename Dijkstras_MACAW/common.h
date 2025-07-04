@@ -1,27 +1,34 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-/*
-Constants for subnet group
-*/
-
 // Constants
+
+/**
+ * @brief Maximum # of nodes in the network
+ */
 #define MAX_ACTIVE_NODES 32
 
+/**
+ * @brief Broadcast address
+ */
 #define ADDR_BROADCAST 0XFF
-#define ADDR_SINK 0X07
 
-#define MIN_SLEEP_TIME 1000 // ms
-#define MAX_SLEEP_TIME 3000 // ms
+/**
+ * @brief Address of the sink/gateway node
+ */
+#define ADDR_SINK 0XD
 
-// Logs levels
-// Dependency: util.c - logMessage(), STRP, ProtoMon
+#define MAX_PAYLOAD_SIZE 120
+
+/**
+ * @brief Enum for log levels used in the logging system.
+ */
 typedef enum LogLevel
 {
-    INFO, // Default log level
-    DEBUG,
-    TRACE,
-    ERROR
+    INFO,  // Default log level for general information messages.
+    DEBUG, // Log level for debugging messages, providing detailed information.
+    TRACE, // Log level for tracing execution flow, useful for in-depth analysis.
+    ERROR  // Log level for error messages indicating failures.
 } LogLevel;
 
 #endif

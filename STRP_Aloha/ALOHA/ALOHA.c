@@ -21,10 +21,11 @@
 typedef struct MAC_Data
 {
 	uint16_t frames;
-	uint16_t collisions;
+	uint16_t backoffs;
 	uint16_t failures;
 	uint16_t retries;
-	uint16_t retryExceed;
+	uint16_t drops;
+	uint16_t bytes;
 } MAC_Data;
 
 typedef struct MAC_Metrics
@@ -52,7 +53,7 @@ typedef struct recvMessage
 } recvMessage;
 
 // Struktur für die Empfangs-Warteschlange
-#define recvMsgQ_size 16
+#define recvMsgQ_size 32
 typedef struct recvMsgQueue
 {
 	recvMessage msg[recvMsgQ_size]; // Nachrichten der Warteschlange
@@ -73,7 +74,7 @@ typedef struct sendMessage
 } sendMessage;
 
 // Struktur für die Sende-Warteschlange
-#define sendMsgQ_size 16
+#define sendMsgQ_size 32
 typedef struct sendMsgQueue
 {
 	sendMessage msg[sendMsgQ_size]; // Nachrichten der Warteschlange
@@ -334,6 +335,10 @@ static void acknowledgement(MAC *mac, MAC_Header recvH)
 
 	// Acknowledgement versenden
 	SX1262_send(buffer, sizeof(buffer));
+	sem_wait(&metrics.mutex);
+	metrics.data[recvH.src_addr].bytes += sizeof(buffer);
+	sem_post(&metrics.mutex);
+	printf("## MAC_TX: %d B\n", sizeof(buffer));
 }
 
 static bool acknowledged(MAC *mac, uint8_t addr)
@@ -681,16 +686,17 @@ static void *sendMsg_func(void *args)
 		{
 			// Wenn Noise zu hoch
 			// ### Disable to prevent nodes getting stuck after a while
-			/*
-			if (ambientNoise(mac) <= mac->noiseThreshold)
+
+			if (mac->ambient && ambientNoise(mac) <= mac->noiseThreshold)
 			{
-				if (mac->debug)
-					printf("Noise is too high.\n");
+				// if (mac->debug)
+				printf("### Noise is too high.\n");
+				fflush(stdout);
 
 				if (msg.addr != ADDR_BROADCAST)
 				{
 					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].collisions++;
+					metrics.data[msg.addr].backoffs++;
 					sem_post(&metrics.mutex);
 				}
 
@@ -700,13 +706,13 @@ static void *sendMsg_func(void *args)
 					if (msg.addr != ADDR_BROADCAST)
 					{
 						sem_wait(&metrics.mutex);
-						metrics.data[msg.addr].retryExceed++;
+						metrics.data[msg.addr].drops++;
 						sem_post(&metrics.mutex);
 					}
 					break;
 				}
 
-				msleep(100 + rand() % 101);
+				msleep(mac->noiseBackoffMs + rand() % 101);
 
 				// 5 bis 10 Sekunden warten
 				// msleep(5000 + rand() % 5001);
@@ -716,18 +722,21 @@ static void *sendMsg_func(void *args)
 
 				continue;
 			}
-			*/
 
-			// Nachricht versenden
+			// Sleep for a short random duration
+			msleep(100 + rand() % 501);
 			SX1262_send(buffer, MAC_Header_len + msg.len);
-
 			// Update metrics
-			if (msg.addr != ADDR_BROADCAST)
+			uint8_t txAddr = msg.addr;
+			if (msg.addr == ADDR_BROADCAST)
 			{
-				sem_wait(&metrics.mutex);
-				metrics.data[msg.addr].frames++;
-				sem_post(&metrics.mutex);
+				txAddr = 0;
 			}
+			sem_wait(&metrics.mutex);
+			metrics.data[txAddr].frames++;
+			metrics.data[txAddr].bytes += MAC_Header_len + msg.len;
+			printf("## MAC_TX: %d B\n", MAC_Header_len + msg.len);
+			sem_post(&metrics.mutex);
 
 			if (mac->debug)
 			{
@@ -756,9 +765,10 @@ static void *sendMsg_func(void *args)
 				if (numtrials >= mac->maxtrials)
 				{
 					sem_wait(&metrics.mutex);
-					metrics.data[msg.addr].retryExceed++;
+					metrics.data[msg.addr].drops++;
 					sem_post(&metrics.mutex);
-
+					printf("### Packet to %02d dropped: %d B\n", msg.addr, msg.len);
+					fflush(stdout);
 					break;
 				}
 
@@ -823,6 +833,10 @@ void ALOHA_init(MAC *mac, unsigned char addr)
 	// Standardmäßig keine Debug Ausgaben erstellen
 	mac->debug = 0;
 
+	// Ambient noise monitoring
+	mac->ambient = 1;
+	mac->noiseBackoffMs = 500;
+
 	// untere Schicht initialisieren
 	SX1262_init(868, SX1262_Transmission);
 
@@ -835,7 +849,7 @@ void ALOHA_init(MAC *mac, unsigned char addr)
 	sem_init(&sem_ack, 0, 0);
 
 	// Zufallsgenerator initialisieren
-	srand(addr * time(NULL));
+	srand(addr);
 
 	// Threads starten, bei Fehler Programm beenden
 	if (pthread_create(&recvT, NULL, &recvMsg_func, mac) != 0)
@@ -1013,15 +1027,16 @@ uint8_t MAC_getHeaderSize()
 
 uint8_t *MAC_getMetricsHeader()
 {
-	return "Collission,TotalFrames,TotalRetries,TotalFailures,PDR,RetryExceed";
+	return "Backffs,TotalFrames,TotalRetries,TotalFailures,PDR,AggDrops,AggTotalBytesSent";
 }
 
 int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
-	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%d,%d,%d,%d,%d", data.collisions, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.retryExceed) * 100) / data.frames)  : 0, data.retryExceed);
 	sem_wait(&metrics.mutex);
+	const MAC_Data data = metrics.data[addr];
+	int rowlen = sprintf(buffer, "%ld,%ld,%ld,%ld,%ld,%ld,%ld", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures) * 100) / data.frames) : 0, data.drops, data.bytes + metrics.data[0].bytes);
 	metrics.data[addr] = (MAC_Data){0};
+	metrics.data[0].bytes = 0;
 	sem_post(&metrics.mutex);
 	return rowlen;
 }

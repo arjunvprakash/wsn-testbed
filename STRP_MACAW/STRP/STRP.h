@@ -6,17 +6,21 @@
 #include "../common.h"
 #include "../ProtoMon/routing.h"
 
+
+typedef struct MAC MAC;
+
 /**
  * @brief Supported parent selection strategies
  *
  */
 typedef enum ParentSelectionStrategy
 {
-    RANDOM_LOWER,
-    RANDOM,
-    NEXT_LOWER,
-    CLOSEST,
-    CLOSEST_LOWER
+    RANDOM_LOWER,  // Choose a random neighbor with address lower than self
+    RANDOM,        // Choose a random neighbor
+    NEXT_LOWER,    // Choose the neighbor with next lower address than self
+    CLOSEST,       // Choose the neighbor with least RSSI
+    CLOSEST_LOWER, // Choose the closest neighbor with address lower than self
+    FIXED          // Use the parent assignment in the config
 } ParentSelectionStrategy;
 
 typedef struct Routing_Header
@@ -24,7 +28,7 @@ typedef struct Routing_Header
     uint8_t src;  // Source of the packet
     uint8_t dst;  // Destination of the packet
     uint8_t prev; // Address of the previous hop
-    int RSSI;     // RSSI of the previous hop address
+    int8_t RSSI;     // RSSI of the previous hop address
 } Routing_Header;
 
 /**
@@ -53,13 +57,13 @@ typedef struct STRP_Config
     // Neighbor keepalive timeout (seconds)
     // Default 60s
     unsigned int nodeTimeoutS;
+    
+    MAC *mac;
 
-    // Receive timeout for MAC layer (milliseconds)
-    // Default 1000ms
-    unsigned int recvTimeoutMs;
+    // Parent address for the FIXED strategy
+    uint8_t parentAddr;
 
 } STRP_Config;
-
 
 /**
  * @brief Initialize the STRP protocol.

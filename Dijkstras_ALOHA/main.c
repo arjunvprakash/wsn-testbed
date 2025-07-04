@@ -25,7 +25,7 @@ static pthread_t sendT;
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
 
-static uint8_t nodes[] = {7, 8, 15};
+static uint8_t nodes[] = {7, 8, 13};
 int pool_size = (sizeof(nodes) / sizeof(nodes[0]));
 static uint8_t dest[5];
 

@@ -3,6 +3,9 @@
 
 #include <stdint.h>			// uint8_t, int8_t, uint32_t
 
+#include "../common.h"
+#include "../ProtoMon/mac.h"
+
 // Struktur für den Nachrichtenheader
 typedef struct MAC_Header {
 	uint8_t ctrl;			// Kontrollflag
@@ -32,15 +35,19 @@ typedef struct MAC {
 
 	/* Sonstige */
 	int debug;                  // Gibt an, ob Debug-Ausgaben erstellt werden sollen
+
+	// Enable ambient noise monitoring
+	int ambient;
 } MAC;
 
-void MAC_init(MAC*, unsigned char);
+void MACAW_init(MAC*, unsigned char);
 
-int MAC_recv(MAC*, unsigned char*);
-int MAC_tryrecv(MAC*, unsigned char*);
-int MAC_timedrecv(MAC*, unsigned char*, unsigned int);
+int MACAW_recv(MAC*, unsigned char*);
+int MACAW_tryrecv(MAC*, unsigned char*);
+int MACAW_timedrecv(MAC*, unsigned char*, unsigned int);
 
-int MAC_send(MAC*, unsigned char, unsigned char*, unsigned int);
-int MAC_Isend(MAC*, unsigned char, unsigned char*, unsigned int);
+int MACAW_send(MAC*, unsigned char, unsigned char*, unsigned int);
+int MACAW_Isend(MAC*, unsigned char, unsigned char*, unsigned int);
+
 
 #endif /* MACAW_H */

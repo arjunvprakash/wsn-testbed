@@ -36,28 +36,32 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 15000;
+	sleepDuration = 35000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
 	ProtoMon_Config config;
-	config.vizIntervalS = 60;
+	config.vizIntervalS = 180;
 	config.loglevel = INFO;
-	config.sendIntervalS = 20;
+	config.sendIntervalS = 90;
+	config.sendDelayS = 30;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = 30;
-	ProtoMon_init(config);
+	config.initialSendWaitS = 55;
+	// ProtoMon_init(config);
 
 	STRP_Config strp;
-	strp.beaconIntervalS = 30;
+	strp.beaconIntervalS = 20;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 60;
-	strp.recvTimeoutMs = 1000;
+	strp.nodeTimeoutS = 90;
 	strp.self = self;
-	strp.senseDurationS = 15;
+	strp.senseDurationS = 30;
 	strp.strategy = CLOSEST;
+	MAC mac;
+	strp.mac = &mac;
 	STRP_init(strp);
+	mac.ambient = 0;
+	mac.timeout = 1;
 
 	if (self != ADDR_SINK)
 	{

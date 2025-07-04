@@ -41,23 +41,26 @@ int main(int argc, char *argv[])
 	fflush(stdout);
 
 	ProtoMon_Config config;
-	config.vizIntervalS = 60;
+	config.vizIntervalS = 180;
 	config.loglevel = INFO;
-	config.sendIntervalS = 20;
+	config.sendIntervalS = 90;
+	config.sendDelayS = 30;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = 30;
+	config.initialSendWaitS = 15;
 	ProtoMon_init(config);
 
 	STRP_Config strp;
-	strp.beaconIntervalS = 30;
+	strp.beaconIntervalS = 20;
 	strp.loglevel = INFO;
-	strp.nodeTimeoutS = 60;
-	strp.recvTimeoutMs = 1000;
+	strp.nodeTimeoutS = 65;
 	strp.self = self;
-	strp.senseDurationS = 15;
-	strp.strategy = NEXT_LOWER;
+	strp.senseDurationS = 10;
+	strp.strategy = CLOSEST;
+	MAC mac;
+	strp.mac = &mac;
 	STRP_init(strp);
+	mac.ambient = 0;
 
 	if (self != ADDR_SINK)
 	{

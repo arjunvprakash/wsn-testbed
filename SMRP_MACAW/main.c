@@ -43,9 +43,10 @@ int main(int argc, char *argv[])
 	ProtoMon_Config config;
 	config.vizIntervalS = 60;
 	config.loglevel = INFO;
-	config.sendIntervalS = 20;
+	config.sendIntervalS = 60;
+	config.sendDelayS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LEVEL_ALL;
+	config.monitoredLevels = PROTOMON_LEVEL_ROUTING;
 	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 
@@ -53,10 +54,13 @@ int main(int argc, char *argv[])
 	smrp.beaconIntervalS = 30;
 	smrp.loglevel = INFO;
 	smrp.nodeTimeoutS = 60;
-	smrp.recvTimeoutMs = 1000;
 	smrp.self = self;
 	smrp.senseDurationS = 15;
 	smrp.maxTries = 1;
+	MAC mac;
+	smrp.mac = &mac;
+	SMRP_init(smrp);
+	mac.ambient = 0;
 	SMRP_init(smrp);
 
 	// if (self != ADDR_SINK)

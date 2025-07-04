@@ -8,7 +8,7 @@
 #define max_msg_len (240 - Routing_Header_len - MAC_Header_len)
 
 // Anzahl Netzwerkteilnehmer
-#define anz_knoten 9
+#define anz_knoten 7
 #define min_addr 7
 
 // Struktur für den Nachrichtenheader

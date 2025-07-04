@@ -25,7 +25,11 @@ static pthread_t sendT;
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
 
-static uint8_t nodes[] = {7, 8, 15};
+static void initOutputDir();
+
+static void setDirectory(char cmd[150]);
+
+static uint8_t nodes[] = {7, 8, 13};
 int pool_size = (sizeof(nodes) / sizeof(nodes[0]));
 static uint8_t dest[5];
 
@@ -64,7 +68,7 @@ int main(int argc, char *argv[])
 	config.loglevel = INFO;
 	config.sendIntervalS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC;
+	config.monitoredLevels = PROTOMON_LEVEL_ROUTING;
 	config.initialSendWaitS = 30;
 	ProtoMon_init(config);
 
