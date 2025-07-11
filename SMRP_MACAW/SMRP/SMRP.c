@@ -26,8 +26,8 @@ typedef struct Beacon
 typedef struct DataPacket
 {
     uint8_t ctrl;
-    uint8_t dest;
-    uint8_t src;
+    t_addr dest;
+    t_addr src;
     uint16_t len;
     uint8_t *data;
     Routing_Header metadata;
@@ -42,7 +42,7 @@ typedef struct PacketQueue
 
 typedef struct
 {
-    uint8_t addr;
+    t_addr addr;
     int8_t RSSI;
     unsigned short hopsToSink;
     time_t lastSeen;
@@ -57,7 +57,7 @@ typedef struct
     uint8_t numActive;
     uint8_t numNodes;
     time_t lastCleanupTime;
-    uint8_t minAddr, maxAddr;
+    t_addr minAddr, maxAddr;
 } ActiveNodes;
 
 typedef struct SMRP_Params
@@ -76,14 +76,16 @@ typedef struct Metrics
 static Metrics metrics;
 
 static PacketQueue sendQ, recvQ;
+static uint16_t sendSeq[MAX_ACTIVE_NODES] = {0};
+static uint16_t recvSeq[MAX_ACTIVE_NODES] = {0};
 static pthread_t recvT;
 static pthread_t sendT;
 
-static const unsigned short headerSize = 5; // [ ctrl | dest | src | len[2] ]
+static const unsigned short headerSize = sizeof(uint8_t) + sizeof(t_addr) + sizeof(t_addr)+ sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seq[2] | len[2] ]
 static ActiveNodes neighbours;
 static SMRP_Config config;
 
-int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = SMRP_sendMsg;
+int (*Routing_sendMsg)(t_addr dest, uint8_t *data, unsigned int len) = SMRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = SMRP_recvMsg;
 int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = SMRP_timedRecvMsg;
 
@@ -111,13 +113,13 @@ char *getNodeRoleStr(const Routing_LinkType link);
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
 
-uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries)
+uint8_t Routing_getnextHop(t_addr src, t_addr prev, t_addr dest, uint8_t maxTries)
 {
     ActiveNodes activenodes = neighbours;
     int i = 0;
     do
     {
-        NodeInfo node = activenodes.nodes[(uint8_t)randInRange(activenodes.minAddr, activenodes.maxAddr)];
+        NodeInfo node = activenodes.nodes[(t_addr)randInRange(activenodes.minAddr, activenodes.maxAddr)];
         if (node.state == ACTIVE && node.addr != src && node.addr != prev)
         {
             return node.addr;
@@ -179,7 +181,7 @@ int SMRP_init(SMRP_Config c)
 }
 
 // Send a message via SMRP
-int SMRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
+int SMRP_sendMsg(t_addr dest, uint8_t *data, unsigned int len)
 {
     DataPacket msg;
     msg.ctrl = CTRL_PKT;
@@ -426,8 +428,10 @@ static void *recvPackets_func(void *args)
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT)
         {
-            uint8_t dest = *(pkt + sizeof(ctrl));
-            uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
+            // uint8_t dest = *(pkt + sizeof(ctrl));
+            t_addr dest = *(t_addr *)(pkt + sizeof(ctrl));
+            // uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
+            t_addr src = *(t_addr *)(pkt + sizeof(ctrl) + sizeof(dest));
             updateActiveNodes(metadata.prev, metadata.RSSI);
 
             if (config.loglevel >= TRACE)
@@ -500,11 +504,26 @@ static DataPacket deserializePacket(uint8_t *pkt)
     msg.ctrl = *pkt;
     pkt += sizeof(msg.ctrl);
 
-    msg.dest = *pkt;
+    // msg.dest = *pkt;
+    memcpy(&msg.dest, pkt, sizeof(msg.dest));
     pkt += sizeof(msg.dest);
 
-    msg.src = *pkt;
+    // msg.src = *pkt;
+    memcpy(&msg.src, pkt, sizeof(msg.src));
     pkt += sizeof(msg.src);
+
+    // Extract Sequence id
+    uint16_t seqId;
+    memcpy(&seqId, pkt, sizeof(seqId));
+    pkt += sizeof(seqId);
+
+    if (seqId <= recvSeq[msg.src] && recvSeq[msg.src] != 0)
+    {
+        msg.len = 0;
+        msg.data = NULL;
+        return msg;
+    }
+    recvSeq[msg.src] = seqId;
 
     memcpy(&msg.len, pkt, sizeof(msg.len));
     pkt += sizeof(msg.len);
@@ -534,12 +553,20 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
     p += sizeof(msg.ctrl);
 
     // Set dest
-    *p = msg.dest;
+    // *p = msg.dest;
+    memcpy(p, &msg.dest, sizeof(msg.dest));
     p += sizeof(msg.dest);
 
     // Set source as self
-    *p = config.self;
+    // *p = config.self;
+    memcpy(p, &config.self, sizeof(config.self));
     p += sizeof(config.self);
+
+    // Set Sequence id
+    sendSeq[msg.dest]++;
+    memcpy(p, &sendSeq[msg.dest], sizeof(sendSeq[msg.dest]));
+    p += sizeof(sendSeq[msg.dest]);
+
 
     // Set actual msg length
     memcpy(p, &msg.len, sizeof(msg.len));
@@ -628,7 +655,7 @@ static void senseNeighbours()
     {
         logMessage(DEBUG, "-------------\n");
         logMessage(DEBUG, "Active neighbors: %d\n", neighbours.numActive);
-        for (uint8_t i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
+        for (t_addr i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
         {
             NodeInfo node = neighbours.nodes[i];
             if (node.state != UNKNOWN)
@@ -641,7 +668,7 @@ static void senseNeighbours()
     }
 }
 
-static void updateActiveNodes(uint8_t addr, int8_t RSSI)
+static void updateActiveNodes(t_addr addr, int8_t RSSI)
 {
     sem_wait(&neighbours.mutex);
     NodeInfo *nodePtr = &neighbours.nodes[addr];
@@ -696,7 +723,7 @@ void initNeighbours()
     neighbours.numActive = 0;
     neighbours.numNodes = 0;
     memset(neighbours.nodes, 0, sizeof(neighbours.nodes));
-    for (uint8_t i = 0; i < MAX_ACTIVE_NODES; i++)
+    for (t_addr i = 0; i < MAX_ACTIVE_NODES; i++)
     {
         neighbours.nodes[i].state = UNKNOWN;
     }
@@ -711,7 +738,7 @@ static void cleanupInactiveNodes()
     bool parentInactive = false;
     sem_wait(&neighbours.mutex);
     uint8_t numActive = neighbours.numActive;
-    for (uint8_t i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
+    for (t_addr i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
     {
         NodeInfo *nodePtr = &neighbours.nodes[i];
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
@@ -820,7 +847,7 @@ uint8_t *Routing_getMetricsHeader()
     return "AggBeaconsSent,TotalBeaconsRecv";
 }
 
-int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
+int Routing_getMetricsData(uint8_t *buffer, t_addr addr)
 {
     const SMRP_Params data = metrics.data[addr];
     int rowlen = sprintf(buffer, "%d,%d", metrics.data[0].beaconsTx, data.beaconsRx);
@@ -842,12 +869,12 @@ static void initMetrics()
 int Routing_getTopologyData(char *buffer, uint16_t size)
 {
     const ActiveNodes activeNodes = neighbours;
-    uint8_t max = neighbours.maxAddr;
-    uint8_t min = neighbours.minAddr;
+    t_addr max = neighbours.maxAddr;
+    t_addr min = neighbours.minAddr;
     int offset = 0;
-    uint8_t src = config.self;
+    t_addr src = config.self;
     time_t timestamp = time(NULL);
-    for (uint8_t addr = min; addr <= max; addr++)
+    for (t_addr addr = min; addr <= max; addr++)
     {
         NodeInfo node = activeNodes.nodes[addr];
         if (node.state != UNKNOWN)

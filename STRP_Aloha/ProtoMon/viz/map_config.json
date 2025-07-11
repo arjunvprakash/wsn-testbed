@@ -2,6 +2,6 @@
     "active_edge_color": "red",
     "node_color": "red",
     "sink_color": "#12D8FF",
-    "node_size": 200,
-    "font_size": 5
+    "node_size": 100,
+    "font_size": 3
 }

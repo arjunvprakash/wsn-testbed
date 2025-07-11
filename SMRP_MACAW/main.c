@@ -16,7 +16,7 @@
 
 static LogLevel loglevel = INFO;
 
-static uint8_t self;
+static t_addr self;
 static unsigned int sleepDuration;
 
 static pthread_t recvT;
@@ -27,7 +27,7 @@ static void *recvMsg_func(void *args);
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
+	self = (t_addr)atoi(argv[1]);
 	logMessage(INFO, "Node: %02d\n", self);
 	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
 	if (self != ADDR_SINK)
@@ -36,18 +36,18 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 15000;
+	sleepDuration = 60000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
 	ProtoMon_Config config;
-	config.vizIntervalS = 60;
+	config.vizIntervalS = 180;
 	config.loglevel = INFO;
-	config.sendIntervalS = 60;
-	config.sendDelayS = 20;
+	config.sendIntervalS = 180;
+	config.sendDelayS = 60;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ROUTING;
-	config.initialSendWaitS = 30;
+	config.initialSendWaitS = self + 10;
 	ProtoMon_init(config);
 
 	SMRP_Config smrp;

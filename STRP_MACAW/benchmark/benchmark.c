@@ -27,7 +27,7 @@ static const char *resultsDir = "results";
 
 typedef struct Benchmark_Config
 {
-	uint8_t self;
+	t_addr self;
 	bool monitoringEnabled;
 	unsigned long long runtTimeS;
 	unsigned short maxSyncSleepS;
@@ -66,7 +66,7 @@ static void initParentTable()
 	// config.parentTable[12] = 6;
 	// config.parentTable[13] = ADDR_SINK; // Sink
 	// // config.parentTable[14] = ADDR_SINK;
-	config.parentTable[15] = 16;
+	config.parentTable[15] = 9;
 	config.parentTable[16] = 9;
 	config.parentTable[18] = ADDR_SINK;
 	// config.parentTable[19] = ADDR_SINK;
@@ -112,7 +112,7 @@ int main(int argc, char *argv[])
 	// config.sendCsv = "send_240.csv"; // Experiment 240
 	// config.monitoringEnabled = true; // Experiment 240
 
-	config.self = (uint8_t)atoi(argv[1]);
+	config.self = (t_addr)atoi(argv[1]);
 
 	config.maxSyncSleepS = 30;
 	config.senseDurationS = 10;

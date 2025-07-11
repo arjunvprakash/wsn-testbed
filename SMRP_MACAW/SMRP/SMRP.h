@@ -16,9 +16,9 @@
 // Structs
 typedef struct Routing_Header
 {
-    uint8_t src;  // Source of the packet
-    uint8_t dst;  // Destination of the packet
-    uint8_t prev; // Address of the previous hop
+    t_addr src;  // Source of the packet
+    t_addr dst;  // Destination of the packet
+    t_addr prev; // Address of the previous hop
     int8_t RSSI;  // RSSI of the previous hop address
 } Routing_Header;
 
@@ -28,7 +28,7 @@ typedef struct Routing_Header
 typedef struct SMRP_Config
 {
     // Node's own address
-    uint8_t self;
+    t_addr self;
 
     // Log level
     // Default INFO

@@ -16,7 +16,7 @@
 
 static LogLevel loglevel = INFO;
 
-static uint8_t self;
+static t_addr self;
 static unsigned int sleepDuration;
 
 static pthread_t recvT;
@@ -27,13 +27,11 @@ static void *recvMsg_func(void *args);
 
 static void initOutputDir();
 
-static void setDirectory(char cmd[150]);
-
-static uint8_t nodes[] = {7, 8, 13};
+static t_addr nodes[] = {7, 8, 13};
 int pool_size = (sizeof(nodes) / sizeof(nodes[0]));
-static uint8_t dest[5];
+static t_addr dest[5];
 
-void destinations(uint8_t self)
+void destinations(t_addr self)
 {
 	uint8_t dst[pool_size - 1];
 	int p = 0;
@@ -48,7 +46,7 @@ void destinations(uint8_t self)
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
+	self = (t_addr)atoi(argv[1]);
 	logMessage(INFO, "Node: %02d\n", self);
 	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
 	if (self != ADDR_SINK)

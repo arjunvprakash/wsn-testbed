@@ -18,7 +18,7 @@
 
 static LogLevel loglevel = INFO;
 
-static uint8_t self;
+static t_addr self;
 static unsigned int sleepDuration;
 
 static pthread_t recvT;
@@ -29,7 +29,7 @@ static void *recvMsg_func(void *args);
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
+	self = (t_addr)atoi(argv[1]);
 	logMessage(INFO, "Node: %02d\n", self);
 	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
 	if (self != ADDR_SINK)

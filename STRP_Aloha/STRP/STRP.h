@@ -25,9 +25,9 @@ typedef enum ParentSelectionStrategy
 
 typedef struct Routing_Header
 {
-    uint8_t src;  // Source of the packet
-    uint8_t dst;  // Destination of the packet
-    uint8_t prev; // Address of the previous hop
+    t_addr src;  // Source of the packet
+    t_addr dst;  // Destination of the packet
+    t_addr prev; // Address of the previous hop
     int8_t RSSI;     // RSSI of the previous hop address
 } Routing_Header;
 
@@ -37,7 +37,7 @@ typedef struct Routing_Header
 typedef struct STRP_Config
 {
     // Node's own address
-    uint8_t self;
+    t_addr self;
 
     // Log level
     // Default INFO
@@ -57,7 +57,7 @@ typedef struct STRP_Config
     // Neighbor keepalive timeout (seconds)
     // Default 60s
     unsigned int nodeTimeoutS;
-   
+    
     MAC *mac;
 
     // Parent address for the FIXED strategy
@@ -69,7 +69,7 @@ typedef struct STRP_Config
  * @brief Initialize the STRP protocol.
  */
 int STRP_init(STRP_Config config);
-int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
+int STRP_sendMsg(t_addr dest, uint8_t *data, unsigned int len);
 int STRP_recvMsg(Routing_Header *header, uint8_t *data);
 int STRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
 

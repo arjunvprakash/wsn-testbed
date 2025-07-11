@@ -22,15 +22,15 @@
 typedef struct Beacon
 {
     uint8_t ctrl;
-    uint8_t parent;
+    t_addr parent;
     int8_t parentRSSI;
 } Beacon;
 
 typedef struct DataPacket
 {
     uint8_t ctrl;
-    uint8_t dest;
-    uint8_t src;
+    t_addr dest;
+    t_addr src;
     uint16_t len;
     uint8_t *data;
     Routing_Header metadata;
@@ -45,11 +45,11 @@ typedef struct PacketQueue
 
 typedef struct
 {
-    uint8_t addr;
+    t_addr addr;
     int8_t RSSI;
     time_t lastSeen;
     Routing_LinkType link;
-    uint8_t parent;
+    t_addr parent;
     Routing_NodeState state;
     int8_t parentRSSI;
 } NodeInfo;
@@ -61,7 +61,7 @@ typedef struct
     uint8_t numActive;
     uint8_t numNodes;
     time_t lastCleanupTime;
-    uint8_t minAddr, maxAddr;
+    t_addr minAddr, maxAddr;
 } ActiveNodes;
 
 
@@ -86,14 +86,14 @@ static uint16_t sendSeq[MAX_ACTIVE_NODES] = {0};
 static uint16_t recvSeq[MAX_ACTIVE_NODES] = {0};
 static pthread_t recvT;
 static pthread_t sendT;
-
-static const unsigned short headerSize = sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint8_t) + sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seqId[2] | len[2] ]
-static uint8_t parentAddr;
+// static MAC *mac;
+static const unsigned short headerSize = sizeof(uint8_t) + sizeof(t_addr) + sizeof(t_addr) + sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seqId[2] | len[2] ]
+static t_addr parentAddr;
 static ActiveNodes neighbours;
-static uint8_t loopyParent;
+static t_addr loopyParent;
 static STRP_Config config;
 
-int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
+int (*Routing_sendMsg)(t_addr dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
 int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;
 int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = STRP_timedRecvMsg;
 
@@ -109,7 +109,7 @@ static void *sendPackets_func(void *args);
 static int serializePacket(DataPacket msg, uint8_t **routePkt);
 static uint8_t recvQ_timed_dequeue(DataPacket *msg, struct timespec *ts);
 static void senseNeighbours();
-static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t parentRSSI);
+static void updateActiveNodes(t_addr addr, int8_t RSSI, t_addr parent, int8_t parentRSSI);
 static void changeParent();
 static void initNeighbours();
 static void cleanupInactiveNodes();
@@ -183,7 +183,7 @@ int STRP_init(STRP_Config c)
     return 1;
 }
 
-int STRP_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
+int STRP_sendMsg(t_addr dest, uint8_t *data, unsigned int len)
 {
     DataPacket msg;
     msg.ctrl = CTRL_PKT;
@@ -424,8 +424,13 @@ static void *recvPackets_func(void *args)
         uint8_t ctrl = *pkt;
         if (ctrl == CTRL_PKT)
         {
-            uint8_t dest = *(pkt + sizeof(ctrl));
-            uint8_t src = *(pkt + sizeof(ctrl) + sizeof(dest));
+            // t_addr dest = *(pkt + sizeof(ctrl));
+            t_addr dest;
+            memcpy(&dest, pkt + sizeof(ctrl), sizeof(dest));
+
+            // t_addr src = *(pkt + sizeof(ctrl) + sizeof(dest));
+            t_addr src;
+            memcpy(&src, pkt + sizeof(ctrl) + sizeof(dest), sizeof(src));
             updateActiveNodes(metadata.prev, metadata.RSSI, ADDR_BROADCAST, MIN_RSSI);
 
             if (config.loglevel >= TRACE)
@@ -512,10 +517,12 @@ static DataPacket deserializePacket(uint8_t *pkt)
     msg.ctrl = *pkt;
     pkt += sizeof(msg.ctrl);
 
-    msg.dest = *pkt;
+    // msg.dest = *pkt;
+    memcpy(&msg.dest, pkt, sizeof(msg.dest));
     pkt += sizeof(msg.dest);
 
-    msg.src = *pkt;
+    // msg.src = *pkt;
+    memcpy(&msg.src, pkt, sizeof(msg.src));
     pkt += sizeof(msg.src);
 
     // Extract Sequence id
@@ -555,15 +562,18 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
     }
 
     uint8_t *p = routePkt;
-    *p = msg.ctrl;
+    // *p = msg.ctrl;
+    memcpy(p, &msg.ctrl, sizeof(msg.ctrl));
     p += sizeof(msg.ctrl);
 
     // Set dest
-    *p = msg.dest;
+    // *p = msg.dest;
+    memcpy(p, &msg.dest, sizeof(msg.dest));
     p += sizeof(msg.dest);
 
     // Set source as config.self
-    *p = config.self;
+    // *p = config.self;
+    memcpy(p, &config.self, sizeof(config.self));
     p += sizeof(config.self);
 
     // Set Sequence id
@@ -730,7 +740,7 @@ static void senseNeighbours()
     {
         logMessage(DEBUG, "-------------\n");
         logMessage(DEBUG, "Active neighbors: %d\n", neighbours.numActive);
-        for (uint8_t i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
+        for (t_addr i = neighbours.minAddr; i <= neighbours.maxAddr; i++)
         {
             NodeInfo node = neighbours.nodes[i];
             if (node.state != UNKNOWN)
@@ -743,7 +753,7 @@ static void senseNeighbours()
     }
 }
 
-static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t parentRSSI)
+static void updateActiveNodes(t_addr addr, int8_t RSSI, t_addr parent, int8_t parentRSSI)
 {
     sem_wait(&neighbours.mutex);
     NodeInfo *nodePtr = &neighbours.nodes[addr];
@@ -814,7 +824,7 @@ static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t 
         if (config.strategy != FIXED && config.self != ADDR_SINK && !child && addr != parentAddr)
         {
             bool changed = false;
-            uint8_t prevParentAddr = parentAddr;
+            t_addr prevParentAddr = parentAddr;
             if (config.strategy == NEXT_LOWER && addr > parentAddr && addr < config.self)
             {
                 parentAddr = addr;
@@ -860,13 +870,13 @@ static void updateActiveNodes(uint8_t addr, int8_t RSSI, uint8_t parent, int8_t 
 
 static void selectClosestNeighbour()
 {
-    uint8_t newParent = ADDR_SINK;
+    t_addr newParent = ADDR_SINK;
     int newParentRSSI = MIN_RSSI;
 
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
 
-    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
+    for (t_addr i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
@@ -892,13 +902,13 @@ static void selectClosestNeighbour()
 
 void selectClosestLowerNeighbour()
 {
-    uint8_t newParent = ADDR_SINK;
+    t_addr newParent = ADDR_SINK;
     int newParentRSSI = MIN_RSSI;
 
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
 
-    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
+    for (t_addr i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
@@ -954,13 +964,13 @@ char *getRoutingStrategyStr()
 
 static void selectNextLowerNeighbour()
 {
-    uint8_t newParent = ADDR_SINK;
+    t_addr newParent = ADDR_SINK;
     int newParentRSSI = MIN_RSSI;
 
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
 
-    for (uint8_t i = activeNodes.minAddr; i < config.self; i++)
+    for (t_addr i = activeNodes.minAddr; i < config.self; i++)
     {
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
@@ -986,13 +996,13 @@ static void selectNextLowerNeighbour()
 
 static void selectRandomNeighbour()
 {
-    uint8_t newParent = ADDR_SINK;
+    t_addr newParent = ADDR_SINK;
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
     NodeInfo pool[numActive];
     uint8_t p = 0;
 
-    for (uint8_t i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
+    for (t_addr i = activeNodes.minAddr, active = 0; i <= activeNodes.maxAddr && active < numActive; i++)
     {
         NodeInfo node = activeNodes.nodes[i];
         if (node.state == ACTIVE)
@@ -1026,7 +1036,7 @@ static void selectRandomNeighbour()
 
 static void selectRandomLowerNeighbour()
 {
-    uint8_t newParent = ADDR_SINK;
+    t_addr newParent = ADDR_SINK;
     const ActiveNodes activeNodes = neighbours;
     uint8_t numActive = activeNodes.numActive;
     NodeInfo pool[numActive];
@@ -1067,7 +1077,7 @@ static void selectRandomLowerNeighbour()
 static void changeParent()
 {
     time_t start = time(NULL);
-    uint8_t prevParentAddr = parentAddr;
+    t_addr prevParentAddr = parentAddr;
     switch (config.strategy)
     {
     case NEXT_LOWER:
@@ -1102,7 +1112,7 @@ void initNeighbours()
     neighbours.numActive = 0;
     neighbours.numNodes = 0;
     memset(neighbours.nodes, 0, sizeof(neighbours.nodes));
-    for (uint8_t i = 0; i < MAX_ACTIVE_NODES; i++)
+    for (t_addr i = 0; i < MAX_ACTIVE_NODES; i++)
     {
         neighbours.nodes[i].state = UNKNOWN;
     }
@@ -1117,7 +1127,7 @@ static void cleanupInactiveNodes()
     bool parentInactive = false;
     sem_wait(&neighbours.mutex);
     uint8_t numActive = neighbours.numActive;
-    for (uint8_t i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
+    for (t_addr i = neighbours.minAddr, inactive = 0; i <= neighbours.maxAddr && inactive < numActive; i++)
     {
         NodeInfo *nodePtr = &neighbours.nodes[i];
         if (nodePtr->state == ACTIVE && ((currentTime - nodePtr->lastSeen) >= config.nodeTimeoutS))
@@ -1245,7 +1255,7 @@ uint8_t *Routing_getMetricsHeader()
     return "AggParentChanges,AggBeaconsSent,TotalBeaconsRecv";
 }
 
-int Routing_getMetricsData(uint8_t *buffer, uint8_t addr)
+int Routing_getMetricsData(uint8_t *buffer, t_addr addr)
 {
     const STRP_Params data = metrics.data[addr];
     int rowlen = sprintf(buffer, "%d,%d,%d", metrics.data[0].parentChanges, metrics.data[0].beaconsSent, data.beaconsRecv);
@@ -1268,10 +1278,10 @@ static void initMetrics()
 int Routing_getTopologyData(char *buffer, uint16_t size)
 {
     const ActiveNodes activeNodes = neighbours;
-    uint8_t max = neighbours.maxAddr;
-    uint8_t min = neighbours.minAddr;
+    t_addr max = neighbours.maxAddr;
+    t_addr min = neighbours.minAddr;
     int offset = 0;
-    uint8_t src = config.self;
+    t_addr src = config.self;
     time_t timestamp = time(NULL);
 
     // Write parent info first
@@ -1293,7 +1303,7 @@ int Routing_getTopologyData(char *buffer, uint16_t size)
     timestamp = 0L;
 
     // Write other node info
-    for (uint8_t addr = min; addr <= max; addr++)
+    for (t_addr addr = min; addr <= max; addr++)
     {
         node = activeNodes.nodes[addr];
         if (node.state != UNKNOWN && addr != parentAddr)
