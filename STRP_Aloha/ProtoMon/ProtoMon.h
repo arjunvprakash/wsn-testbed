@@ -13,7 +13,7 @@
 typedef struct ProtoMon_Config
 {
     // Node's own address
-    uint8_t self;
+    t_addr self;
 
     // Log level
     // Default INFO

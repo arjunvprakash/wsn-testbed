@@ -1,5 +1,7 @@
+#include <stdint.h>
 #ifndef COMMON_H
 #define COMMON_H
+#pragma once
 
 // Constants
 
@@ -7,6 +9,11 @@
  * @brief Maximum # of nodes in the network
  */
 #define MAX_ACTIVE_NODES 32
+
+/*
+* @brief Datatype for node addressing
+*/
+typedef uint8_t t_addr;
 
 /**
  * @brief Broadcast address

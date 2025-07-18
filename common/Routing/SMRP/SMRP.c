@@ -111,7 +111,16 @@ char *getNodeRoleStr(const Routing_LinkType link);
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
 
-uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries)
+/**
+ * Determines the next hop address for routing a message.
+ *
+ * @param src      The source address of the message.
+ * @param prev     The previous hop address.
+ * @param dest     The destination address of the message. When 0, and no next hop is found within the, the sink address is returned.
+ * @param maxTries The maximum number of attempts to find a valid next hop.
+ * @return         The address of the next hop or the destination address if no valid hop is found.
+ */
+t_addr Routing_getnextHop(t_addr src, t_addr prev, t_addr dest, uint8_t maxTries)
 {
     ActiveNodes activenodes = neighbours;
     int i = 0;
@@ -122,6 +131,7 @@ uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxT
         {
             return node.addr;
         }
+        i++;
     } while (i < maxTries);
 
     return dest == 0 ? ADDR_SINK : dest;
@@ -159,7 +169,7 @@ int SMRP_init(SMRP_Config c)
 
     senseNeighbours();
 
-    if (config.self != ADDR_SINK)
+    // if (config.self != ADDR_SINK)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, NULL) != 0)
         {
@@ -248,7 +258,6 @@ int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
     header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
     header->prev = msg.metadata.prev;
-    
 
     if (msg.data != NULL)
     {

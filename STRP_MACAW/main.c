@@ -16,7 +16,7 @@
 
 static LogLevel loglevel = INFO;
 
-static uint8_t self;
+static t_addr self;
 static unsigned int sleepDuration;
 
 static pthread_t recvT;
@@ -27,7 +27,7 @@ static void *recvMsg_func(void *args);
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
+	self = (t_addr)atoi(argv[1]);
 	logMessage(INFO, "Node: %02d\n", self);
 	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
 	if (self != ADDR_SINK)
@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 35000;
+	sleepDuration = 15000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
@@ -47,16 +47,16 @@ int main(int argc, char *argv[])
 	config.sendDelayS = 30;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_ALL;
-	config.initialSendWaitS = 55;
-	// ProtoMon_init(config);
+	config.initialSendWaitS = 15 + (self - ADDR_SINK);
+	ProtoMon_init(config);
 
 	STRP_Config strp;
 	strp.beaconIntervalS = 20;
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 90;
 	strp.self = self;
-	strp.senseDurationS = 30;
-	strp.strategy = CLOSEST;
+	strp.senseDurationS = 15;
+	strp.strategy = NEXT_LOWER;
 	MAC mac;
 	strp.mac = &mac;
 	STRP_init(strp);

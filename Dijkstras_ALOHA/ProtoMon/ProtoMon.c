@@ -23,7 +23,6 @@ typedef enum
     CTRL_TAB = '\x72',
     CTRL_MAC = '\x73',
     CTRL_ROU = '\x78',
-    CTRL_MET = '\x79'
 } CTRL;
 
 #define ROUTING_OVERHEAD_SIZE (sizeof(uint8_t) + sizeof(uint8_t) + sizeof(time_t)) // ctrl, numHops, timestamp
@@ -48,18 +47,18 @@ typedef struct Routing_Data
 typedef struct MACMetrics
 {
     MAC_Data data[MAX_ACTIVE_NODES];
-    uint8_t minAddr, maxAddr;
+    t_addr minAddr, maxAddr;
     sem_t mutex;
 } MACMetrics;
 
 typedef struct RoutingMetrics
 {
     Routing_Data data[MAX_ACTIVE_NODES];
-    uint8_t minAddr, maxAddr;
+    t_addr minAddr, maxAddr;
     sem_t mutex;
 } RoutingMetrics;
 
-static int (*Original_Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len) = NULL;
+static int (*Original_Routing_sendMsg)(t_addr dest, uint8_t *data, unsigned int len) = NULL;
 static int (*Original_Routing_recvMsg)(Routing_Header *h, uint8_t *data) = NULL;
 static int (*Original_Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = NULL;
 
@@ -80,7 +79,7 @@ static time_t startTime, lastVizTime, lastMacWrite, lastNeighborWrite, lastRouti
 static uint8_t lastPath[240];
 static uint8_t numLayers = 0; // Number of layers monitored
 
-static int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len);
+static int ProtoMon_Routing_sendMsg(t_addr dest, uint8_t *data, unsigned int len);
 static int ProtoMon_Routing_recvMsg(Routing_Header *h, uint8_t *data);
 static int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeout);
 
@@ -296,7 +295,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         // Reset metrics
         resetMacMetrics();
 
-        for (uint8_t i = metrics.minAddr; i <= metrics.maxAddr; i++)
+        for (t_addr i = metrics.minAddr; i <= metrics.maxAddr; i++)
         {
             // Generate CSV row for each non zero node
             const MAC_Data data = metrics.data[i];
@@ -340,7 +339,7 @@ static uint16_t getMetricsBuffer(uint8_t *buffer, uint16_t bufferSize, CTRL ctrl
         // Reset metrics
         resetRoutingMetrics();
 
-        for (uint8_t i = metrics.minAddr; i <= metrics.maxAddr; i++)
+        for (t_addr i = metrics.minAddr; i <= metrics.maxAddr; i++)
         {
             const Routing_Data data = metrics.data[i];
             // Generate CSV row for each non zero node
@@ -703,7 +702,7 @@ static void initMetrics()
     resetRoutingMetrics();
 }
 
-int ProtoMon_Routing_sendMsg(uint8_t dest, uint8_t *data, unsigned int len)
+int ProtoMon_Routing_sendMsg(t_addr dest, uint8_t *data, unsigned int len)
 {
     time_t start = time(NULL);
     uint16_t overhead = getRoutingOverhead();
@@ -805,7 +804,7 @@ int ProtoMon_Routing_recvMsg(Routing_Header *header, uint8_t *data)
 
     if (ctrl == CTRL_MSG)
     {
-        uint8_t src = header->src;
+        t_addr src = header->src;
 
         // Extract routing monitoring fields
         uint8_t numHops;
@@ -933,7 +932,7 @@ int ProtoMon_Routing_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigne
 
     if (ctrl == CTRL_MSG)
     {
-        uint8_t src = header->src;
+        t_addr src = header->src;
         extendedData[len] = '\0';
 
         // Extract routing monitoring fields

@@ -7,8 +7,6 @@
 #include <pthread.h>
 #include <math.h>
 
-#include "ALOHA/ALOHA.h"
-#include "GPIO/GPIO.h"
 #include "common.h"
 #include "util.h"
 #include "SMRP/SMRP.h"
@@ -18,7 +16,7 @@
 
 static LogLevel loglevel = INFO;
 
-static uint8_t self;
+static t_addr self;
 static unsigned int sleepDuration;
 
 static pthread_t recvT;
@@ -26,10 +24,11 @@ static pthread_t sendT;
 
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
+SMRP_Config smrp;
 
 int main(int argc, char *argv[])
 {
-	self = (uint8_t)atoi(argv[1]);
+	self = (t_addr)atoi(argv[1]);
 	logMessage(INFO, "Node: %02d\n", self);
 	logMessage(INFO, "Role : %s\n", self == ADDR_SINK ? "SINK" : "NODE");
 	if (self != ADDR_SINK)
@@ -38,31 +37,31 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 15000;
+	sleepDuration = self * 1000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
 	ProtoMon_Config config;
-	config.vizIntervalS = 60;
+	config.vizIntervalS = 120;
 	config.loglevel = INFO;
 	config.sendIntervalS = 60;
 	config.sendDelayS = 20;
 	config.self = self;
 	config.monitoredLevels = PROTOMON_LEVEL_TOPO;
-	config.initialSendWaitS = 30;
+	config.initialSendWaitS = self + 10;
 	ProtoMon_init(config);
 
-	SMRP_Config smrp;
-	smrp.beaconIntervalS = 30;
+	smrp.beaconIntervalS = 33;
 	smrp.loglevel = INFO;
-	smrp.nodeTimeoutS = 60;
+	smrp.nodeTimeoutS = 500;
 	smrp.self = self;
 	smrp.senseDurationS = 15;
-	smrp.maxTries = 2;
+	smrp.maxTries = 3;
 	MAC mac;
 	smrp.mac = &mac;
 	SMRP_init(smrp);
 	mac.ambient = 0;
+	SMRP_init(smrp);
 
 	// if (self != ADDR_SINK)
 	{
@@ -117,12 +116,19 @@ static void *sendMsg_func(void *args)
 	unsigned int total;
 	while (1)
 	{
+		
+
+		t_addr dest_addr = Routing_getnextHop(self, -1, 0, smrp.maxTries);
+
+		if (dest_addr == 0)
+		{
+			continue;
+		}
+
 		char buffer[5];
 		// int msg = randCode(4);
 		int msg = (self * 1000) + (++total % 1000);
 		sprintf(buffer, "%04d", msg);
-
-		uint8_t dest_addr = Routing_getnextHop(self, -1, 0, 3);
 
 		if (Routing_sendMsg(dest_addr, buffer, sizeof(buffer)))
 		{
@@ -130,11 +136,11 @@ static void *sendMsg_func(void *args)
 			fflush(stdout);
 		}
 
-		if (self == ADDR_SINK)
-		{
-			usleep((rand() % 100000) + (sleepDuration * 1000 * 2)); // Sleep 2 * sleepDuration + 100ms
-		}
-		else
+		// if (self == ADDR_SINK)
+		// {
+		// 	usleep((rand() % 100000) + (sleepDuration * 1000 * 2)); // Sleep 2 * sleepDuration + 100ms
+		// }
+		// else
 		{
 			usleep((rand() % 100000) + (sleepDuration * 1000)); // Sleep sleepDuration + 100ms to avoid busy waiting
 		}

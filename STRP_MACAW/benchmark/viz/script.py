@@ -82,6 +82,7 @@ plotList = [
             ['Node', 'LostCount'],
             ['HopCount', 'LossRate'],
             ['Node', 'LossRate'], 
+            ['Node', 'AggLoss']
             # ['SeqId','Delay'],
             # ['SeqId','RelativeRecv'],
             # ['SeqId','RelativeSent']
@@ -116,14 +117,14 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("Delay (s)")       
         ax.grid(True, zorder=0) 
     elif ('Node', 'BoxDelay') == (x,y):
-        sns.boxplot(x = 'Node', y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8) 
+        sns.boxplot(x = 'Node', y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8,medianprops=dict(color="red")) 
         ax.set_xlabel("Node")
         ax.tick_params(axis='x', labelrotation=90)
         ax.set_ylabel("Delay(s)")
         ax.set_title("Delay Variation per Node")
         ax.grid(True, zorder=0)
     elif ('HopCount', 'BoxDelay') == (x,y):
-        sns.boxplot(x = 'HopCount', y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8) 
+        sns.boxplot(x = 'HopCount', y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8,medianprops=dict(color="red")) 
         ax.set_xlabel("HopCount")
         ax.tick_params(axis='x', labelrotation=90)
         ax.set_ylabel("Delay(s)")
@@ -147,7 +148,7 @@ for i, (x,y) in enumerate(plotList):
         ax.legend(title='SeqId', bbox_to_anchor=(1.05, 1), loc='upper left', framealpha=0.5)
         ax.grid(True, zorder=0)
     elif ('HopCount', 'LostCount') == (x,y):            
-        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8)
+        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8,medianprops=dict(color="red"))
         ax.set_title("Lost Packets v/s HopCount")
         ax.set_xlabel(x)
         ax.tick_params(axis='x', labelrotation=90)
@@ -172,7 +173,7 @@ for i, (x,y) in enumerate(plotList):
         ax.set_ylabel("% of packets lost")
         ax.grid(True)
     elif ('HopCount', 'LossRate') == (x,y):            
-        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8)
+        sns.boxplot(x=x, y=y, data = df_lost, ax=ax, linewidth=.75, fliersize=0.8,medianprops=dict(color="red"))
         ax.set_title("Loss Rate v/s HopCount")
         ax.set_xlabel(x)
         ax.tick_params(axis='x', labelrotation=90)
@@ -183,7 +184,7 @@ for i, (x,y) in enumerate(plotList):
         ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
     elif ('Node', 'AggDelay') == (x,y):
         # df['Delay'].plot(kind='box',ax=ax)
-        sns.boxplot(y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8)
+        sns.boxplot(y = 'Delay', data = df, ax=ax, linewidth=.75, fliersize=0.8,medianprops=dict(color="red"))
         ax.set_title("Variation in Aggregate Delay")
         ax.set_ylabel("Delay(s)")
         ax.set_xlabel("Aggregate")
@@ -205,6 +206,28 @@ for i, (x,y) in enumerate(plotList):
         
         # Position the text on the plot
         ax.text(1.05, 0.5, stats_text, transform=ax.transAxes, fontsize=10)
+    elif ('Node', 'AggLoss') == (x,y):
+        # df['Delay'].plot(kind='box',ax=ax)
+        sns.boxplot(y = 'LossRate', data = df_lost, ax=ax, linewidth=.75, fliersize=0.8, medianprops=dict(color="red"))
+        ax.set_title("Variation in Loss")
+        ax.set_ylabel("Loss(# pkt)")
+        ax.set_xlabel("Aggregate")
+        ax.grid(True, zorder=0)
+
+        mean = df_lost['LossRate'].mean()
+        median = df_lost['LossRate'].median()
+        std_dev = df_lost['LossRate'].std()
+        min_val = df_lost['LossRate'].min()
+        max_val = df_lost['LossRate'].max()
+
+        stats_text = (
+            f'Mean: {mean:.2f} s\n'
+            f'Median: {median:.2f} s\n'
+            f'SD: {std_dev:.2f} s\n'
+            f'Min: {min_val:.2f} s\n'
+            f'Max: {max_val:.2f} s'
+        )
+        ax.text(1.05, 0.5, stats_text, transform=ax.transAxes)
     # else:
     #     for (src, addr), grp in df.groupby(['Source', 'Address']):
     #         plt.title(f'{x} vs {y}')

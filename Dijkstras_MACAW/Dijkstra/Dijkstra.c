@@ -230,7 +230,7 @@ static sendMessage sendMsgQ_dequeue()
 
 int paths[anz_knoten][anz_knoten] = {
 	// 7  8  9 10 11 12 13 
-	  {0, 10, 0, 0, 0, 0, 10}, // Node 7
+	  {10, 10, 0, 0, 0, 0, 0}, // Node 7
 	  {10, 0, 0, 0, 0, 0, 10},   // Node 8
 	  {0, 0, 0, 0, 0, 0, 0},   // Node 9
 	  {0, 0, 0, 0, 0, 0, 0},   // Node 10

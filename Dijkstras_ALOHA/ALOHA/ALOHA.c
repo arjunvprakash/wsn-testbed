@@ -1034,7 +1034,7 @@ int MAC_getMetricsData(uint8_t *buffer, uint8_t addr)
 {
 	sem_wait(&metrics.mutex);
 	const MAC_Data data = metrics.data[addr];
-	int rowlen = sprintf(buffer, "%ld,%ld,%ld,%ld,%ld,%ld,%ld", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures) * 100) / data.frames) : 0, data.drops, data.bytes + metrics.data[0].bytes);
+	int rowlen = sprintf(buffer, "%ld,%ld,%ld,%ld,%ld,%ld,%ld", data.backoffs, data.frames, data.retries, data.failures, data.frames > 0 ? (((data.frames - data.failures - data.drops) * 100) / data.frames) : 0, data.drops, data.bytes + metrics.data[0].bytes);
 	metrics.data[addr] = (MAC_Data){0};
 	metrics.data[0].bytes = 0;
 	sem_post(&metrics.mutex);

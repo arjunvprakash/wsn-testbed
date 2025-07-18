@@ -3,13 +3,14 @@
 #pragma once
 
 #include <stdint.h>
+#include "../common.h"
 
 /**
  * @brief Header information from the received message.
  * @note Must contain fields
- * @note     uint8_t src;  // Source of the packet
- * @note     uint8_t dst;  // Destination of the packet
- * @note     uint8_t prev; // Address of the previous hop
+ * @note     t_addr src;  // Source of the packet
+ * @note     t_addr dst;  // Destination of the packet
+ * @note     t_addr prev; // Address of the previous hop
  * @note     int RSSI;     // RSSI of the previous hop address
  */
 typedef struct Routing_Header Routing_Header;
@@ -47,7 +48,7 @@ typedef enum Routing_NodeState
  * @param len Length of the data.
  * @return 1 on success, 0 on error.
  */
-extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
+extern int (*Routing_sendMsg)(t_addr dest, uint8_t *data, unsigned int len);
 
 /**
  * @brief Receive data from the Routing layer. Blocking operation.
@@ -100,7 +101,7 @@ uint8_t *Routing_getTopologyHeader();
  * @returns CSV data of metrics collected by Routing protocol.
  * @note Dependency with ProtoMon
  */
-int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
+int Routing_getMetricsData(uint8_t *buffer, t_addr addr);
 
 /**
  * @returns CSV data of neighbour nodes

@@ -250,7 +250,7 @@ def plot_metricsV7(df, cols, layer, saveDir='plots'):
     sent_df = data[['RelativeTime', 'Source', 'Address', 'TotalSent']].copy()
     recv_df = data[['RelativeTime', 'Source', 'Address', 'TotalRecv']].copy()
     recv_df = recv_df.rename(columns={'Source': 'Address', 'Address': 'Source'})  # Swap Source & Address
-    lost_packets_df = pd.concat([sent_df.assign(TotalRecv=-1), recv_df.assign(TotalSent=0)], ignore_index=True).sort_values(by="RelativeTime")
+    lost_packets_df = pd.concat([sent_df.assign(TotalRecv=0), recv_df.assign(TotalSent=0)], ignore_index=True).sort_values(by="RelativeTime")
 
     valid_metrics.append("TotalLost")  # Add LostPackets
     num_metrics = len(valid_metrics)

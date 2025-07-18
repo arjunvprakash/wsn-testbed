@@ -876,6 +876,7 @@ static void *recvT_func(void *args)
 				for (int i = 0; i < recvH.msg_len; i++)
 					printf(" %02X", msg_buffer[i]);
 				printf("\n");
+				fflush(stdout);
 			}
 
 			// Wenn eine Nachricht mit einer kleineren oder gleichen Sequenznummer schon empfangen wurde
@@ -1182,6 +1183,7 @@ static void *sendT_func(void *args)
 				for (int i = MAC_Header_len; i < MAC_Header_len + msg.len; i++)
 					printf(" %02X", buffer[i]);
 				printf("\n");
+				fflush(stdout);
 			}
 
 			// Auf Acknowledgement warten

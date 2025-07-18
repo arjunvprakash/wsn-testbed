@@ -8,7 +8,7 @@
 #define max_msg_len (240 - Routing_Header_len - MAC_Header_len)
 
 // Anzahl Netzwerkteilnehmer
-#define anz_knoten 7
+#define anz_knoten 9
 #define min_addr 7
 
 // Struktur für den Nachrichtenheader
@@ -40,15 +40,5 @@ int Dijkstras_send(uint8_t dest, uint8_t *data, unsigned int len);
 int Dijkstras_recv(Routing_Header *h, uint8_t *data);
 int Dijkstras_timedrecv(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
-// Access points for ProtoMon
-extern int (*Routing_sendMsg)(uint8_t dest, uint8_t *data, unsigned int len);
-extern int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data);
-extern int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout);
-uint8_t Routing_getHeaderSize();
-uint8_t Routing_isDataPkt(uint8_t ctrl);
-uint8_t *Routing_getMetricsHeader();
-uint8_t *Routing_getTopologyHeader();
-int Routing_getMetricsData(uint8_t *buffer, uint8_t addr);
-int Routing_getTopologyData(char *buffer, uint16_t size);
 
 #endif //DIJKSTRA_H

@@ -1,21 +1,26 @@
-#ifndef DIJKSTRAS_H
-#define DIJKSTRAS_H
+#ifndef DIJKSTRA_H
+#define DIJKSTRA_H
 
-#include "../MACAW/MACAW.h"
+#include "../ALOHA/ALOHA.h"
+#include "../ProtoMon/routing.h"
 
 // maximale Nachrichtenlänge
 #define max_msg_len (240 - Routing_Header_len - MAC_Header_len)
 
 // Anzahl Netzwerkteilnehmer
-#define anz_knoten 7
+#define anz_knoten 9
+#define min_addr 7
 
 // Struktur für den Nachrichtenheader
 typedef struct Routing_Header {
 	uint8_t ctrl;			// Kontrollflag
-	uint8_t src_addr;		// Absenderadresse
+	uint8_t src;		// Absenderadresse
 	uint8_t dst;		// Zieladresse
+	int RSSI;
+	uint8_t prev;
+	uint16_t len;
 } Routing_Header;
-#define Routing_Header_len 3
+#define Routing_Header_len sizeof(uint8_t) + sizeof(uint8_t) +  sizeof(uint8_t) + sizeof(uint16_t)// ctrl, src, dest, len
 
 typedef struct Routing {
 	/* konfigurierbare Parameter */
@@ -31,11 +36,9 @@ typedef struct Routing {
 
 void Dijkstras_init(Routing*, unsigned char);
 
-int Dijkstras_recv(Routing*, unsigned char*);
-int Dijkstras_tryrecv(Routing*, unsigned char*);
-int Dijkstras_timedrecv(Routing*, unsigned char*, unsigned int);
+int Dijkstras_send(uint8_t dest, uint8_t *data, unsigned int len);
+int Dijkstras_recv(Routing_Header *h, uint8_t *data);
+int Dijkstras_timedrecv(Routing_Header *h, uint8_t *data, unsigned int timeout);
 
-int Dijkstras_send(Routing*, unsigned char, unsigned char*, unsigned int);
-int Dijkstras_Isend(Routing*, unsigned char, unsigned char*, unsigned int);
 
-#endif
+#endif //DIJKSTRA_H
