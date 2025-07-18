@@ -11,7 +11,7 @@
 #include "SMRP.h"
 #include "../util.h"
 
-#define PACKETQ_SIZE 16
+#define PACKETQ_SIZE 64
 #define MIN_RSSI -128
 
 // Packet control flags
@@ -81,7 +81,7 @@ static uint16_t recvSeq[MAX_ACTIVE_NODES] = {0};
 static pthread_t recvT;
 static pthread_t sendT;
 
-static const unsigned short headerSize = sizeof(uint8_t) + sizeof(t_addr) + sizeof(t_addr)+ sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seq[2] | len[2] ]
+static const unsigned short headerSize = sizeof(uint8_t) + sizeof(t_addr) + sizeof(t_addr) + sizeof(uint16_t) + sizeof(uint16_t); // [ ctrl | dest | src | seq[2] | len[2] ]
 static ActiveNodes neighbours;
 static SMRP_Config config;
 
@@ -113,20 +113,20 @@ char *getNodeRoleStr(const Routing_LinkType link);
 static void initMetrics();
 static void setConfigDefaults(SMRP_Config *config);
 
-uint8_t Routing_getnextHop(t_addr src, t_addr prev, t_addr dest, uint8_t maxTries)
+t_addr Routing_getnextHop(t_addr src, t_addr prev, t_addr dest, uint8_t maxTries)
 {
     ActiveNodes activenodes = neighbours;
     int i = 0;
     do
     {
-        NodeInfo node = activenodes.nodes[(t_addr)randInRange(activenodes.minAddr, activenodes.maxAddr)];
+        NodeInfo node = activenodes.nodes[(uint8_t)randInRange(activenodes.minAddr, activenodes.maxAddr)];
         if (node.state == ACTIVE && node.addr != src && node.addr != prev)
         {
             return node.addr;
         }
-    } while (i < maxTries);
+    } while (++i < maxTries);
 
-    return dest == 0 ? ADDR_SINK : dest;
+    return dest == 0 && src != ADDR_SINK ? ADDR_SINK : dest;
 }
 
 // Initialize the SMRP
@@ -161,7 +161,7 @@ int SMRP_init(SMRP_Config c)
 
     senseNeighbours();
 
-    if (config.self != ADDR_SINK)
+    // if (config.self != ADDR_SINK)
     {
         if (pthread_create(&sendT, NULL, sendPackets_func, NULL) != 0)
         {
@@ -250,7 +250,6 @@ int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
     header->RSSI = msg.metadata.RSSI;
     header->src = msg.src;
     header->prev = msg.metadata.prev;
-    
 
     if (msg.data != NULL)
     {
@@ -436,7 +435,7 @@ static void *recvPackets_func(void *args)
 
             if (config.loglevel >= TRACE)
             {
-                logMessage(TRACE, "STRP:%s: ", __func__);
+                logMessage(TRACE, "SMRP:%s: ", __func__);
                 for (int i = 0; i < headerSize; i++)
                     printf("%02X ", pkt[i]);
                 printf("|");
@@ -519,6 +518,7 @@ static DataPacket deserializePacket(uint8_t *pkt)
 
     if (seqId <= recvSeq[msg.src] && recvSeq[msg.src] != 0)
     {
+        logMessage(ERROR, "SeqId validation failed\n");
         msg.len = 0;
         msg.data = NULL;
         return msg;
@@ -566,7 +566,6 @@ static int serializePacketV2(DataPacket msg, uint8_t *routePkt)
     sendSeq[msg.dest]++;
     memcpy(p, &sendSeq[msg.dest], sizeof(sendSeq[msg.dest]));
     p += sizeof(sendSeq[msg.dest]);
-
 
     // Set actual msg length
     memcpy(p, &msg.len, sizeof(msg.len));
@@ -640,6 +639,7 @@ static void senseNeighbours()
         if (neighbours.numActive == 0)
         {
             logMessage(INFO, "No neighbors detected. Trying again...\n");
+            fflush(stdout);
         }
         else
         {
@@ -920,7 +920,7 @@ void setConfigDefaults(SMRP_Config *config)
     }
     if (config->maxTries == 0)
     {
-        config->maxTries = 2;
+        config->maxTries = 3;
     }
 }
 

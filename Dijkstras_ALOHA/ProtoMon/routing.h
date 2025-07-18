@@ -3,6 +3,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "../common.h"
 
 /**
  * @brief Header information from the received message.

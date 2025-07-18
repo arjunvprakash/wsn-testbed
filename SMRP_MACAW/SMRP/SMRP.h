@@ -65,6 +65,6 @@ int SMRP_timedRecvMsg(Routing_Header *header, uint8_t *data, unsigned int timeou
 /**
  * @brief Get the address of a random active node from neighbour list.
  */
-uint8_t Routing_getnextHop(uint8_t src, uint8_t prev, uint8_t dest, uint8_t maxTries);
+t_addr Routing_getnextHop(t_addr src, t_addr prev, t_addr dest, uint8_t maxTries);
 
 #endif // SMRP_H

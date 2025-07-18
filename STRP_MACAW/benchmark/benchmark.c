@@ -59,14 +59,14 @@ static void initParentTable()
 	// config.parentTable[1] = ADDR_SINK;
 	// config.parentTable[4] = 6;
 	// config.parentTable[5] = 6;
-	// config.parentTable[6] = 16;
+	// config.parentTable[6] = 12;
 	config.parentTable[7] = ADDR_SINK;
 	config.parentTable[8] = 7;
 	config.parentTable[9] = ADDR_SINK;
-	// config.parentTable[12] = 6;
-	// config.parentTable[13] = ADDR_SINK; // Sink
-	// // config.parentTable[14] = ADDR_SINK;
-	config.parentTable[15] = 9;
+	// config.parentTable[12] = 21;
+	// // config.parentTable[13] = ADDR_SINK; // Sink
+	// config.parentTable[14] = 9;
+	config.parentTable[15] = 16;
 	config.parentTable[16] = 9;
 	config.parentTable[18] = ADDR_SINK;
 	// config.parentTable[19] = ADDR_SINK;
@@ -97,10 +97,10 @@ static void initHopCountTable();
 
 int main(int argc, char *argv[])
 {
-	config.name = "Experiment MACAW 400_3"; // Experiment 400
+	config.name = "Experiment MACAW 400_0"; // Experiment 400
 	config.runtTimeS = 39715;				// Experiment 400
 	config.sendCsv = "send_400.csv";		// Experiment 400
-	config.monitoringEnabled = true;		// Experiment 400
+	config.monitoringEnabled = false;		// Experiment 400
 
 	// config.name = "Experiment 120_0"; // Experiment 120
 	// config.runtTimeS = 12895;		  // Experiment 120

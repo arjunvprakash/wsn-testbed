@@ -25,13 +25,15 @@ static pthread_t sendT;
 static void *sendMsg_func(void *args);
 static void *recvMsg_func(void *args);
 
+static void initOutputDir();
+
 static t_addr nodes[] = {7, 8, 13};
 int pool_size = (sizeof(nodes) / sizeof(nodes[0]));
 static t_addr dest[5];
 
 void destinations(t_addr self)
 {
-	t_addr dst[pool_size - 1];
+	uint8_t dst[pool_size - 1];
 	int p = 0;
 	for (int i = 0; i < pool_size; i++)
 	{
@@ -53,7 +55,7 @@ int main(int argc, char *argv[])
 	}
 	srand(self * time(NULL));
 
-	sleepDuration = 15000;
+	sleepDuration = self * 2 * 1000;
 	logMessage(INFO, "Sleep duration: %d ms\n", sleepDuration);
 	fflush(stdout);
 
@@ -64,13 +66,13 @@ int main(int argc, char *argv[])
 	config.loglevel = INFO;
 	config.sendIntervalS = 20;
 	config.self = self;
-	config.monitoredLevels = PROTOMON_LEVEL_ROUTING | PROTOMON_LEVEL_MAC;
-	// config.initialSendWaitS = 30;
+	config.monitoredLevels = PROTOMON_LEVEL_ROUTING;
+	config.initialSendWaitS = 30 + (self * 2);
 	ProtoMon_init(config);
 
 	Routing routing;
 	Dijkstras_init(&routing, self);
-	// routing.debug = 1;
+	routing.mac.ambient = 0;
 
 	// if (self != ADDR_SINK)
 	{

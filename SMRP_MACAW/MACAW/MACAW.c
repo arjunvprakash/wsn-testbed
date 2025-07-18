@@ -48,7 +48,7 @@ typedef struct recvMessage
 } recvMessage;
 
 // Struktur für die Empfangs-Warteschlange
-#define recvMsgQ_size 16
+#define recvMsgQ_size 64
 typedef struct recvMsgQueue
 {
 	recvMessage msg[recvMsgQ_size]; // Nachrichten der Warteschlange
@@ -69,7 +69,7 @@ typedef struct sendMessage
 } sendMessage;
 
 // Struktur für die Sende-Warteschlange
-#define sendMsgQ_size 16
+#define sendMsgQ_size 64
 typedef struct sendMsgQueue
 {
 	sendMessage msg[sendMsgQ_size]; // Nachrichten der Warteschlange
@@ -876,6 +876,7 @@ static void *recvT_func(void *args)
 				for (int i = 0; i < recvH.msg_len; i++)
 					printf(" %02X", msg_buffer[i]);
 				printf("\n");
+				fflush(stdout);
 			}
 
 			// Wenn eine Nachricht mit einer kleineren oder gleichen Sequenznummer schon empfangen wurde
@@ -1182,6 +1183,7 @@ static void *sendT_func(void *args)
 				for (int i = MAC_Header_len; i < MAC_Header_len + msg.len; i++)
 					printf(" %02X", buffer[i]);
 				printf("\n");
+				fflush(stdout);
 			}
 
 			// Auf Acknowledgement warten

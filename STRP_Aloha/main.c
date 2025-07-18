@@ -55,12 +55,14 @@ int main(int argc, char *argv[])
 	strp.loglevel = INFO;
 	strp.nodeTimeoutS = 60;
 	strp.self = self;
-	strp.senseDurationS = 10;
+	strp.senseDurationS = 30;
 	strp.strategy = CLOSEST;
 	MAC mac;
 	strp.mac = &mac;
 	STRP_init(strp);
 	mac.ambient = 0;
+
+	exit(0);
 
 	if (self != ADDR_SINK)
 	{
