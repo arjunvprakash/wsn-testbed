@@ -1,165 +1,82 @@
 # wsn-testbed
 
-## Overview
-```mermaid
-graph TD
-    subgraph main.c
-        main[main]
-        send_t[sendT_func]
-        recv_t[recvT_func]
-    end
+A framework to monitor and visualize parameters and topology in a WSN testbed.
 
-    subgraph ALOHA.c
-        ALOHA_sendMsgQ_enqueue[sendMsgQ_enqueue]
-        ALOHA_sendT_func[sendMsg_func]
-        ALOHA_recvT_func[recvMsg_func]
-        ALOHA_recvMsgQ_timeddequeue[recvMsgQ_timeddequeue]
-        ALOHA_MAC_send[MAC_send]
-        ALOHA_MAC_timedrecv[MAC_timedrecv]
-        ALOHA_sendMsgQ[(sendMsgQ)]
-        ALOHA_recvMsgQ[(recvMsgQ)]
-    end
+### Features SUmmary
+- Collects generic parameters such as packets sent/received, average latency
+- Select protocols to be monitored (routing, MAC or both)
+- Underlying protocols can define their own set of custom paramters
+- Protocol parameters can be integrated into ProtoMon by implementing the required APIs 
+- Visualization of collected metrics as timeseries line charts at the sink
+- Customize the type of line chart using metric name prefixes : `Total`, `Agg` or `AggTotal`
+- Plot the geographical distribution (node positions) by inputting : (i) a map image of the field area and (ii) the node position as coordinates of the image
+- Customize node positions viz using custom configuration 
 
-    subgraph SX1262.c
-        SX1262_send[SX1262_send]
-        SX1262_timedrecv[SX1262_timedrecv]
-        SX1262_recvQ_timeddequeue[recvQ_timeddequeue]
-        SX1262_sendQ_enqueue[sendQ_enqueue]
-        SX1262_send_t[sendBytes_func]
-        SX1262_recv_t[recvBytes_func]
-        SX1262_recvQ_enqueue[recvQ_enqueue]
-        SX1262_sendQ[("sendQ")]
-        SX1262_recvQ[(recvQ)]
-    end
+## Setup and Usage
 
-    main-->|pthread_create| send_t
-    main-->|pthread_create| recv_t
-    send_t-->ALOHA_MAC_send
-    -->ALOHA_sendMsgQ_enqueue
-    -->ALOHA_sendMsgQ
-    -.-|async|ALOHA_sendT_func
-    --> SX1262_send
-    -->SX1262_sendQ_enqueue
-    -->SX1262_sendQ
-    -.-|async|SX1262_send_t
-    -->|TX| Serial
+To import the existing projects from the github repository () into the
+locally installed testbed GUI, one can do a `git clone` into the
+`sw_workspace` of the GUI. Make sure that the project directories are
+directly in the `sw_workspace` and not nested within the `wsn-testbed`
+or any other subdirectory.
 
-    Serial-->|RX|SX1262_recv_t
-    -->SX1262_recvQ_enqueue
-    -->SX1262_recvQ    
+For a protocol stack to setup and use the ProtoMon framework, there are
+minimal code changes required in the project for each layer, as
+described below.
 
-    recv_t-->ALOHA_MAC_timedrecv
-    -->ALOHA_recvMsgQ_timeddequeue
+#### Application layer:
 
+The core activity to be done at the application layer is to enable the
+monitoring of the underlying protocols by initializing ProtoMon.
+Following steps are to be taken.
 
-    ALOHA_recvMsgQ-->ALOHA_recvMsgQ_timeddequeue
-    ALOHA_recvT_func-->SX1262_timedrecv
-    -->SX1262_recvQ_timeddequeue
-    -->SX1262_recvQ
+1.  Include the header files: `common.h` and `ProtoMon/ProtoMon.h`
 
-    ALOHA_recvT_func-.->|async|ALOHA_recvMsgQ
+2.  Set the monitoring levels and other configuration in a
+    `ProtoMon_config` variable
 
-```
+3.  Invoke `ProtoMon_init` passing the `ProtoMon_config` variable to
+    initialize ProtoMon. It is ideal to be done before initializating
+    the routing and MAC protocols.
 
-## Sequence Diagram 
-```mermaid
-sequenceDiagram
-    participant main.c
-    participant ALOHA.c
-    participant SX1262.c
+#### Routing and MAC layers:
 
-    main.c->>ALOHA.c: MAC_send(msg)
-    ALOHA.c->>ALOHA.c: sendMsgQ_enqueue(msg)
-    ALOHA.c->>ALOHA.c: sendT_func()
-    ALOHA.c->>SX1262.c: sendQ_enqueue(bytes)
-    SX1262.c->>SX1262.c: sendT_func()
-    SX1262.c->>Serial: Transmit bytes
+The changes to be made are related to implementing the API functions of
+ProtoMon. Following steps are to be taken.
 
-    Serial->>SX1262.c: Receive bytes
-    SX1262.c->>SX1262.c: recvT_func()
-    SX1262.c->>ALOHA.c: recvQ_enqueue(bytes)
-    ALOHA.c->>ALOHA.c: recvT_func()
-    ALOHA.c->>ALOHA.c: recvMsgQ_timeddequeue(msg)
-    main.c->>ALOHA.c: recvMsgQ_dequeue()
-    ALOHA.c-->>main.c: Received message
+1.  Include the header files: `common.h` and as well as either
+    `ProtoMon/routing.h` or `ProtoMon/mac.h` for the routing or mac
+    layer respectively.
 
-```
+2.  Implement the control, metrics and topology APIs. If there are no
+    protocol-specific parameters being monitored, provide empty
+    implementations corresponding to each of the respective API
+    functions.
 
-## Class Diagram
-```mermaid
-classDiagram
-    class MAC {
-        -addr: uint8_t
-        -maxtrials: uint8_t
-        -noiseThreshold: int8_t
-        -recvTimeout: uint32_t
-        -debug: bool
-        -recvH: MAC_Header
-        -RSSI: uint8_t
-        +MAC_init()
-        +MAC_recv()
-        +MAC_tryrecv()
-        +MAC_timedrecv()
-        +MAC_send()
-    }
+3.  Adapt and assign the send/receive functions of the protocol to the
+    respective function pointers of ProtoMon send/receive API. For
+    example in STRP :
 
-    class ALOHA {
-        -recvMsgQueue: CircularBuffer<recvMessage>
-        -sendMsgQueue: CircularBuffer<sendMessage>
-        -recvT_func()
-        -sendT_func()
-        -recvMsgQ_init()
-        -recvMsgQ_timeddequeue()
-        -recvMsgQ_dequeue()
-        -recvMsgQ_trydequeue()
-        -recvMsgQ_timeddequeue()
-        -sendMsgQ_init()
-        -sendMsgQ_enqueue()
-        -sendMsgQ_dequeue()
-        -acknowledged()
-        -acknowledgement()
-    }
+    ```
+    int (*Routing_sendMsg)(t_addr dest, uint8_t *data, unsigned int len) = STRP_sendMsg;
+    int (*Routing_recvMsg)(Routing_Header *h, uint8_t *data) = STRP_recvMsg;
+    int (*Routing_timedRecvMsg)(Routing_Header *h, uint8_t *data, unsigned int timeout) = STRP_timedRecvMsg;
+    ```
 
-    class SX1262 {
-        -recvQueue: CircularBuffer<uint8_t>
-        -sendQueue: CircularBuffer<Bytes>
-        -recvT_func()
-        -sendT_func()
-        -recvQ_init()
-        -recvQ_enqueue()
-        -recvQ_dequeue()
-        -sendQ_init()
-        -sendQ_enqueue()
-        -sendQ_dequeue()
-        +SX1262_send()
-        +SX1262_recv()
-        +SX1262_timedrecv()
-        +SX1262_tryrecv()
-    }
+After these few changes, ProtoMon would be successfully integrated into
+the project to monitor the routing and MAC protocols. Simply commenting
+out the ProtoMon initialize statement would deactivate the monitoring
+and no other change is required for it.
 
-    MAC ..> ALOHA
-    ALOHA ..> SX1262
+## Architecture
+
+<img width="836" height="633" alt="ProtoMon Architecture" src="https://github.com/user-attachments/assets/e8db923d-600d-432a-a1b0-cf59686e8a43" />
+
+## ProtoMon Interfaces
+
+<img width="841" height="615" alt="ProtoMon Interfaces" src="https://github.com/user-attachments/assets/9ed7db2c-5552-486f-98d6-41077521d7fc" />
+
+## Implementation Overview
+<img width="839" height="1681" alt="Overview" src="https://github.com/user-attachments/assets/9e84939a-0e96-42c4-ba8e-9134cf5a1cc1" />
 
 
-```
-## Activity Diagrams
-### Receive
-```mermaid
-graph TD
-    Start-->ReceiveControlFlag[Receive control flag]
-    ReceiveControlFlag--CTRL_RET-->ReceiveAmbientNoise[Receive ambient noise response]
-    ReceiveAmbientNoise-->StoreAmbientNoise[Store ambient noise value]
-    StoreAmbientNoise-->End
-    ReceiveControlFlag--CTRL_MSG-->ReceiveHeader[Receive message header]
-    ReceiveHeader-->ConstructRecvH[Construct recvH structure]
-    ConstructRecvH-->ReceivePayload[Receive message payload and RSSI]
-    ReceivePayload-->ValidateMessage[Validate checksum and destination address]
-    ValidateMessage--Invalid-->HandleInvalidMessage[Handle invalid message]
-    HandleInvalidMessage-->End
-    ValidateMessage--Valid and Addressed-->EnqueueMessage[Enqueue message in recvMsgQueue]
-    EnqueueMessage-->SendAck[Send acknowledgment]
-    SendAck-->End
-    ReceiveControlFlag--Unknown-->HandleUnknownFlag[Handle unknown control flag]
-    HandleUnknownFlag-->End
-
-```
