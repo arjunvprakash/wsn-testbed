@@ -60,7 +60,8 @@ ssh -L 8000:localhost:8000 pi@<sink.address>
 
 ## Results Samples
 
-<img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
+<img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/18bf0ddb-da44-4c27-95ac-a193b4c1e163" />
+
 
 ### The configuration used for the above results:
 | **Configuration** | **Value** | **Remarks** |
