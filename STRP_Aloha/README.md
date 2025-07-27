@@ -41,7 +41,7 @@ pip --version
 1. Copy the project directory `STRP_ALOHA` to `/home/pi/sw_workspace/` 
 2. Use the makefile to build the binary with the commands:
 ```bash
-cd /home/pi/sw_workspace/AlohaRoute/
+cd /home/pi/sw_workspace/STRP_ALOHA/
 mkdir -p Debug
 make -s && > Debug/output.txt
 ```
@@ -63,82 +63,18 @@ ssh -L 8000:localhost:8000 pi@<sink.address>
 <img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
 
 ### The configuration used for the above results:
-<table>
-<caption>STRP_MACAW: Configuration flags</caption>
-<thead>
-<tr>
-<th style="text-align: left;"><strong>Configuration</strong></th>
-<th style="text-align: left;"><strong>Value</strong></th>
-<th style="text-align: left;"><strong>Remarks</strong></th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td style="text-align: left;">sleepDuration</td>
-<td style="text-align: left;">15000</td>
-<td style="text-align: left;">Application layer packet send frequency
-(ms)</td>
-</tr>
-<tr>
-<td style="text-align: left;">vizIntervalS</td>
-<td style="text-align: left;">180</td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">loglevel</td>
-<td style="text-align: left;"><code>INFO</code></td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">sendIntervalS</td>
-<td style="text-align: left;">90</td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">sendDelay</td>
-<td style="text-align: left;">30</td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">monitoredLevels</td>
-<td style="text-align: left;"><code>PROTOMON_LEVEL_ALL</code></td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">initialSendWaitS</td>
-<td style="text-align: left;"><em>15 + (self - ADDR_SINK)</em></td>
-<td style="text-align: left;">ProtoMon_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">beaconIntervalS</td>
-<td style="text-align: left;">20</td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">loglevel</td>
-<td style="text-align: left;">INFO</td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">nodeTimeoutS</td>
-<td style="text-align: left;">90</td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">senseDurationS</td>
-<td style="text-align: left;">15</td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">strategy</td>
-<td style="text-align: left;"><code>NEXT_LOWER</code></td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-<tr>
-<td style="text-align: left;">mac</td>
-<td style="text-align: left;">MAC{ambient=0,<br />
-timeout=1}</td>
-<td style="text-align: left;">STRP_Config</td>
-</tr>
-</tbody>
-</table>
+| **Configuration** | **Value** | **Remarks** |
+|:---|:---|:---|
+| sleepDuration | 60000 | Application layer packet send frequency (ms) |
+| vizIntervalS | 240 | ProtoMon_Config |
+| loglevel | `INFO` | ProtoMon_Config |
+| sendIntervalS | 180 | ProtoMon_Config |
+| sendDelay | 60 | ProtoMon_Config |
+| monitoredLevels | `PROTOMON_LEVEL_ALL` | ProtoMon_Config |
+| initialSendWaitS | 15 + *self* | ProtoMon_Config |
+| beaconIntervalS | 15 | STRP_Config |
+| loglevel | INFO | STRP_Config |
+| nodeTimeoutS | 60 | STRP_Config |
+| senseDurationS | 10 | STRP_Config |
+| strategy | `CLOSEST` | STRP_Config |
+| mac | MAC{ambient=0} | STRP_Config |
