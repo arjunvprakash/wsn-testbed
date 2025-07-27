@@ -61,3 +61,84 @@ ssh -L 8000:localhost:8000 pi@<sink.address>
 ## Results Samples
 
 <img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
+
+### The configuration used for the above results:
+<table>
+<caption>STRP_MACAW: Configuration flags</caption>
+<thead>
+<tr>
+<th style="text-align: left;"><strong>Configuration</strong></th>
+<th style="text-align: left;"><strong>Value</strong></th>
+<th style="text-align: left;"><strong>Remarks</strong></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align: left;">sleepDuration</td>
+<td style="text-align: left;">15000</td>
+<td style="text-align: left;">Application layer packet send frequency
+(ms)</td>
+</tr>
+<tr>
+<td style="text-align: left;">vizIntervalS</td>
+<td style="text-align: left;">180</td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">loglevel</td>
+<td style="text-align: left;"><code>INFO</code></td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">sendIntervalS</td>
+<td style="text-align: left;">90</td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">sendDelay</td>
+<td style="text-align: left;">30</td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">monitoredLevels</td>
+<td style="text-align: left;"><code>PROTOMON_LEVEL_ALL</code></td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">initialSendWaitS</td>
+<td style="text-align: left;"><em>15 + (self - ADDR_SINK)</em></td>
+<td style="text-align: left;">ProtoMon_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">beaconIntervalS</td>
+<td style="text-align: left;">20</td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">loglevel</td>
+<td style="text-align: left;">INFO</td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">nodeTimeoutS</td>
+<td style="text-align: left;">90</td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">senseDurationS</td>
+<td style="text-align: left;">15</td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">strategy</td>
+<td style="text-align: left;"><code>NEXT_LOWER</code></td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+<tr>
+<td style="text-align: left;">mac</td>
+<td style="text-align: left;">MAC{ambient=0,<br />
+timeout=1}</td>
+<td style="text-align: left;">STRP_Config</td>
+</tr>
+</tbody>
+</table>
