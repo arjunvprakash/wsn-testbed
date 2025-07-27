@@ -34,11 +34,11 @@ pip --version
 ``` 
 
 ### Configuration
-1. Set the sink address to `ADDR_SINK` in [common.h](common.h#L13)
+1. Set the sink address to `ADDR_SINK` in [common.h](common.h#L26)
 
 ### Execution
-1. Login as the pi user on the nodes as well as the sink
-1. Copy the project directory `AlohaRoute` to `/home/pi/sw_workspace/` 
+1. Login as the pi user on all pis
+1. Copy the project directory `STRP_ALOHA` to `/home/pi/sw_workspace/` 
 2. Use the makefile to build the binary with the commands:
 ```bash
 cd /home/pi/sw_workspace/AlohaRoute/
@@ -47,32 +47,17 @@ make -s && > Debug/output.txt
 ```
 3. Run the generated binary using :
 ```bash
-cd /home/pi/sw_workspace/AlohaRoute/Debug
-bash -c './AlohaRoute <addr> # Address of the respective node/sink
+cd /home/pi/sw_workspace/STRP_ALOHA/Debug
+bash -c './STRP_ALOHA <addr> # Address of the respective node
 ```
 
 ### View the network topology
 2. On the client machine, open an SSH tunnel to the sink port 8000 using the command:
 ```bash
-ssh -L 8000:localhost:8000 pi@sink
+ssh -L 8000:localhost:8000 pi@<sink.address>
 ```
 3. On the client. open http://localhost:8000/ on the browser.
 
 ## Results Samples
 
-![network_graph_2024-08-21 18%3A29%3A21](https://github.com/user-attachments/assets/c3171cee-83f8-456c-8e2f-d6f553f0e296)
-![network_graph_2024-08-21 18%3A27%3A59](https://github.com/user-attachments/assets/9f58df68-840c-4bc7-974b-743b55e98aa7)
-![network_graph_2nodes](https://github.com/user-attachments/assets/cf218bf2-39a8-45b8-9f5f-6d62913d972c)
-![network_graph](https://github.com/user-attachments/assets/cbe31ae0-7998-4695-b664-abddb38d3f26)
-
-
-
-## Functional Overview
-
-![Node: State Diagram](https://github.com/user-attachments/assets/498ceb98-5ee0-46b6-a2e8-7865197b7c7a)
-
-![Sink: State Diagram](https://github.com/user-attachments/assets/61f38c28-a1f6-45cd-a0e0-7a96af3caffd)
-
-## Architecture
-
-![Architecture](https://github.com/user-attachments/assets/2a767383-09fb-4f22-9d32-f471772b138a)
+<img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
