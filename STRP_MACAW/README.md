@@ -38,7 +38,7 @@ pip --version
 
 ### Execution
 1. Login as the pi user on all pis
-1. Copy the project directory `STRP_ALOHA` to `/home/pi/sw_workspace/` 
+1. Copy the project directory `STRP_MACAW` to `/home/pi/sw_workspace/` 
 2. Use the makefile to build the binary with the commands:
 ```bash
 cd /home/pi/sw_workspace/AlohaRoute/
@@ -47,8 +47,8 @@ make -s && > Debug/output.txt
 ```
 3. Run the generated binary using :
 ```bash
-cd /home/pi/sw_workspace/STRP_ALOHA/Debug
-bash -c './STRP_ALOHA <addr> # Address of the respective node
+cd /home/pi/sw_workspace/STRP_MACAW/Debug
+bash -c './STRP_MACAW <addr> # Address of the respective node
 ```
 
 ### View the network topology
@@ -60,7 +60,7 @@ ssh -L 8000:localhost:8000 pi@<sink.address>
 
 ## Results Samples
 
-<img width="1903" height="2751" alt="STRP_ALOHA" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
+<img width="1903" height="2751" alt="STRP_MACAW" src="https://github.com/user-attachments/assets/89a43896-e07f-44fc-9d9e-150097921941" />
 
 ### The configuration used for the above results:
 <table>
