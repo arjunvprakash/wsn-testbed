@@ -1,11 +1,5 @@
-# Simple Tree Routing Protocol (STRP) & ProtoMon
-A simple, but fully autonomous tree-based routing protocol in combination with an interface to visualize the network topology.
-
-## Features
-1. Complete autonomity
-2. Neighbor discovery and routing table management
-3. Routing table propogation to sink
-4. Topology visualization on sink
+# Dijkstras routing & ProtoMon
+Routing protocol that uses a weighted-path matrix and Dijkstras algorithm (originally developed by [@tk154](https://github.com/tk154)), combined with ProtoMon. 
 
 ## Usage
 ### Pre-requisites
@@ -16,49 +10,59 @@ sudo apt install python3-pip
 # Required to fix the import error for numpy
 sudo apt-get install libopenblas-dev
 sudo apt-get install libopenjp2-7
+
+# Additional steps - as required on Pi13 (use only in case of errors in GUI logs)
+pip install -U pip setuptools
+sudo apt-get install python3-venv
+
+pip3 install numpy
+python3 -m pip install pandas
+# pip install pandas==2.2.3 # If above installation of pandas hangs/fails
+# pip install Pillow==9.3.0 # In case of error "Building wheel for pillow (pyproject.toml) did not run successfully."
+
+# For benchmark
+pip install -r ../../benchmark/viz/requirements.txt
+# For ProtoMon
+pip install -r ../../ProtoMon/viz/requirements.txt
 pip --version
 ``` 
 
 ### Configuration
-1. Set the sink address to `ADDR_SINK` in [common.h](common.h#L13)
+1. Set the sink address to `ADDR_SINK` in [common.h](common.h#L26)
 
 ### Execution
-1. Login as the pi user on the nodes as well as the sink
-1. Copy the project directory `AlohaRoute` to `/home/pi/sw_workspace/` 
+1. Login as the pi user on all pis
+1. Copy the project directory `Dijkstras_ALOHA` to `/home/pi/sw_workspace/` 
 2. Use the makefile to build the binary with the commands:
 ```bash
-cd /home/pi/sw_workspace/AlohaRoute/
+cd /home/pi/sw_workspace/Dijkstras_ALOHA/
 mkdir -p Debug
 make -s && > Debug/output.txt
 ```
 3. Run the generated binary using :
 ```bash
-cd /home/pi/sw_workspace/AlohaRoute/Debug
-bash -c './AlohaRoute <addr> # Address of the respective node/sink
+cd /home/pi/sw_workspace/Dijkstras_ALOHA/Debug
+bash -c './Dijkstras_ALOHA <addr> # Address of the respective node
 ```
 
 ### View the network topology
 2. On the client machine, open an SSH tunnel to the sink port 8000 using the command:
 ```bash
-ssh -L 8000:localhost:8000 pi@sink
+ssh -L 8000:localhost:8000 pi@<sink.address>
 ```
 3. On the client. open http://localhost:8000/ on the browser.
 
 ## Results Samples
 
-![network_graph_2024-08-21 18%3A29%3A21](https://github.com/user-attachments/assets/c3171cee-83f8-456c-8e2f-d6f553f0e296)
-![network_graph_2024-08-21 18%3A27%3A59](https://github.com/user-attachments/assets/9f58df68-840c-4bc7-974b-743b55e98aa7)
-![network_graph_2nodes](https://github.com/user-attachments/assets/cf218bf2-39a8-45b8-9f5f-6d62913d972c)
-![network_graph](https://github.com/user-attachments/assets/cbe31ae0-7998-4695-b664-abddb38d3f26)
+<img width="1903" height="1728" alt="Dijkstras_ALOHA" src="https://github.com/user-attachments/assets/57165749-a81d-49d5-bb56-1316a4b8f8fb" />
 
+### The configuration used for the above results:
 
-
-## Functional Overview
-
-![Node: State Diagram](https://github.com/user-attachments/assets/498ceb98-5ee0-46b6-a2e8-7865197b7c7a)
-
-![Sink: State Diagram](https://github.com/user-attachments/assets/61f38c28-a1f6-45cd-a0e0-7a96af3caffd)
-
-## Architecture
-
-![Architecture](https://github.com/user-attachments/assets/2a767383-09fb-4f22-9d32-f471772b138a)
+| **Configuration** | **Value** | **Remarks** |
+|:---|:---|:---|
+| sleepDuration | *self \* 2 \* 1000* | Application layer packet send frequency (ms) |
+| vizIntervalS | 60 | ProtoMon_Config |
+| loglevel | `INFO` | ProtoMon_Config |
+| sendIntervalS | 20 | ProtoMon_Config |
+| monitoredLevels | `PROTOMON_LEVEL_ROUTING` | ProtoMon_Config |
+| initialSendWaitS | *30 + (self \* 2)* | ProtoMon_Config |
